@@ -1,0 +1,219 @@
+package com.example
+
+import android.content.Context
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.ui.components.ConfettiShredOverlay
+import com.example.ui.components.GlobalPaperLightingOverlay
+import com.example.ui.components.PaperBoosterBar
+import com.example.ui.components.PaperCardboardBoard
+import com.example.ui.components.PaperDioramaBackdrop
+import com.example.ui.components.PaperStatusModal
+import com.example.ui.components.PaperTopHud
+import com.example.ui.components.rememberDeviceTilt
+import com.example.ui.theme.MyApplicationTheme
+import com.example.viewmodel.PaperCrushViewModel
+import kotlin.math.roundToInt
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        val prefs = getSharedPreferences(PaperCrushViewModel.PREFS_NAME, Context.MODE_PRIVATE)
+        val factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return PaperCrushViewModel(prefs = prefs) as T
+            }
+        }
+
+        setContent {
+            MyApplicationTheme {
+                val vm: PaperCrushViewModel = viewModel(factory = factory)
+                PaperCraftCrushApp(viewModel = vm)
+            }
+        }
+    }
+}
+
+@Composable
+fun PaperCraftCrushApp(
+    viewModel: PaperCrushViewModel = viewModel()
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val confettiScraps by viewModel.confettiScraps.collectAsStateWithLifecycle()
+
+    var containerSize by remember { mutableStateOf(IntSize.Zero) }
+    var pointerTilt by remember { mutableStateOf(Offset.Zero) }
+
+    // Combines hardware gravity/accelerometer tilt with subtle pointer-position tilt
+    val deviceTilt = rememberDeviceTilt(pointerTiltOffset = pointerTilt)
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .onSizeChanged { containerSize = it }
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val change = event.changes.firstOrNull()
+                        if (change != null && containerSize.width > 0 && containerSize.height > 0) {
+                            if (change.pressed) {
+                                val nx = ((change.position.x / containerSize.width) - 0.5f) * 0.65f
+                                val ny = ((change.position.y / containerSize.height) - 0.5f) * 0.65f
+                                pointerTilt = Offset(nx, ny)
+                            } else {
+                                pointerTilt = Offset.Zero
+                            }
+                        }
+                    }
+                }
+            }
+    ) {
+        // 1. Multi-layer Paper & Origami Diorama Backdrop with tilt parallax
+        PaperDioramaBackdrop(tilt = deviceTilt)
+
+        // 2. Responsive Layout (Portrait Phone vs Landscape Tablet/Desktop Diorama)
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            val isLandscape = maxWidth > maxHeight * 1.15f
+            val hudParallaxModifier = Modifier.offset {
+                IntOffset(
+                    x = (deviceTilt.x * 5f).roundToInt(),
+                    y = (deviceTilt.y * 4f).roundToInt()
+                )
+            }
+
+            if (isLandscape) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = hudParallaxModifier
+                            .weight(1f)
+                            .widthIn(max = 360.dp)
+                            .fillMaxHeight(),
+                        verticalArrangement = Arrangement.SpaceBetween,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        PaperTopHud(
+                            state = state,
+                            onToggleSound = viewModel::toggleSound,
+                            onResetProgress = viewModel::retryOrResetLevel
+                        )
+                        PaperBoosterBar(
+                            state = state,
+                            onSelectBooster = viewModel::selectBooster
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1.1f)
+                            .fillMaxHeight(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        PaperCardboardBoard(
+                            state = state,
+                            onTileTapped = viewModel::onTileTapped,
+                            onTileSwiped = viewModel::onTileSwiped,
+                            tilt = deviceTilt,
+                            modifier = Modifier.widthIn(max = 460.dp)
+                        )
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .widthIn(max = 520.dp)
+                        .align(Alignment.Center),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    PaperTopHud(
+                        state = state,
+                        onToggleSound = viewModel::toggleSound,
+                        onResetProgress = viewModel::retryOrResetLevel,
+                        modifier = hudParallaxModifier
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        PaperCardboardBoard(
+                            state = state,
+                            onTileTapped = viewModel::onTileTapped,
+                            onTileSwiped = viewModel::onTileSwiped,
+                            tilt = deviceTilt,
+                            modifier = Modifier.widthIn(max = 430.dp)
+                        )
+                    }
+
+                    PaperBoosterBar(
+                        state = state,
+                        onSelectBooster = viewModel::selectBooster,
+                        modifier = hudParallaxModifier
+                    )
+                }
+            }
+        }
+
+        // 3. Full-Screen Confetti Shred Particle Overlay
+        ConfettiShredOverlay(scraps = confettiScraps)
+
+        // 4. Subtle Global Tilt-Reactive Lighting & Paper Specular Sheen Overlay
+        GlobalPaperLightingOverlay(tilt = deviceTilt)
+
+        // 5. Level Complete / Out of Moves Paper Modal
+        PaperStatusModal(
+            state = state,
+            onNextLevel = viewModel::advanceToNextLevel,
+            onRetryLevel = viewModel::retryOrResetLevel
+        )
+    }
+}

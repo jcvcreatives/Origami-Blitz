@@ -1,0 +1,26 @@
+<resources>
+    <string name="app_name">Paper Crush</string>
+    <string name="header_paper_craft">Paper Craft</string>
+    <string name="header_torn_level">Torn Level %1$d</string>
+    <string name="label_score">SCORE</string>
+    <string name="label_high_score">BEST: %1$d</string>
+    <string name="label_next_goal">Next Goal</string>
+    <string name="label_moves">Moves: %1$d</string>
+    <string name="booster_scissors">Cut</string>
+    <string name="booster_glue">Swap</string>
+    <string name="booster_hammer">Smash</string>
+    <string name="booster_hint_scissors">Tap any paper piece to snip it into confetti shreds!</string>
+    <string name="booster_hint_glue_first">Tap first paper piece to glue-swap anywhere!</string>
+    <string name="booster_hint_glue_second">Now tap any second piece on the board to swap!</string>
+    <string name="booster_hint_hammer">Tap any tile to crush a 3x3 cardboard block!</string>
+    <string name="btn_cancel_booster">Cancel</string>
+    <string name="btn_next_level">Next Torn Level</string>
+    <string name="btn_retry_level">Try Level Again</string>
+    <string name="btn_reset_progress">New Craft Book</string>
+    <string name="btn_sound_on">Paper SFX: ON</string>
+    <string name="btn_sound_off">Paper SFX: OFF</string>
+    <string name="dialog_win_title">Level Complete!</string>
+    <string name="dialog_win_subtitle">You crafted all goal pieces and earned +1 booster bonus!</string>
+    <string name="dialog_lose_title">Out of Moves!</string>
+    <string name="dialog_lose_subtitle">The paper diorama still needs a few more matches.</string>
+</resources>

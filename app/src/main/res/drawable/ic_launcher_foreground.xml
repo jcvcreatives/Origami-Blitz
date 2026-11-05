@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Paper shadow -->
+    <path
+        android:fillColor="#33000000"
+        android:pathData="M34,31 L48,45 L60,45 L74,31 L78,56 L54,81 L30,56 Z" />
+    <!-- Origami Fox Ears & Head -->
+    <path
+        android:fillColor="#FFFAF8F4"
+        android:pathData="M34,28 L48,42 L60,42 L74,28 L78,53 L54,78 L30,53 Z" />
+    <!-- Left Fold Facet -->
+    <path
+        android:fillColor="#FFD8D2C7"
+        android:pathData="M34,28 L48,42 L54,78 L30,53 Z" />
+    <!-- Nose tip -->
+    <path
+        android:fillColor="#FF373C40"
+        android:pathData="M49,72 L59,72 L54,78 Z" />
+</vector>

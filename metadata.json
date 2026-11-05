@@ -1,0 +1,6 @@
+{
+  "name": "Paper Craft Crush",
+  "description": "A tactile origami and layered construction paper diorama Match-3 puzzle game with procedural paper audio and confetti shred physics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
