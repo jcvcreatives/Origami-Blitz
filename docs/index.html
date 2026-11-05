@@ -1094,7 +1094,7 @@
       renderAll();
     }
 
-    function renderAll() {
+    function renderAll(motionMap = null) {
       document.getElementById('level-tape').textContent = `Torn Level ${state.level}`;
       document.getElementById('score-val').textContent = state.score;
       document.getElementById('best-val').textContent = `BEST: ${state.highScore}`;
@@ -1134,23 +1134,27 @@
         hintEl.classList.remove('active');
       }
 
-      renderBoard();
+      renderBoard(new Set(), null, motionMap);
     }
 
-    function renderBoard(crushingSet = new Set(), shakingPair = null) {
+    function renderBoard(crushingSet = new Set(), shakingPair = null, motionMap = null) {
       const grid = document.getElementById('board-grid');
       grid.innerHTML = '';
+      const animatedPieces = [];
+
       for (let r = 0; r < BOARD_SIZE; r++) {
         for (let c = 0; c < BOARD_SIZE; c++) {
           const cell = document.createElement('div');
           const isEven = (r + c) % 2 === 0;
           const isSel = (state.selected && state.selected.r === r && state.selected.c === c) ||
                         (state.glueFirst && state.glueFirst.r === r && state.glueFirst.c === c);
-          cell.className = `board-cell ${isEven ? 'cell-even' : 'cell-odd'}${isSel ? ' selected' : ''}`;
+          const key = `${r},${c}`;
+          const motion = motionMap ? motionMap.get(key) : null;
+
+          cell.className = `board-cell ${isEven ? 'cell-even' : 'cell-odd'}${isSel ? ' selected' : ''}${motion ? ' moving' : ''}`;
           cell.dataset.r = r;
           cell.dataset.c = c;
 
-          const key = `${r},${c}`;
           const isCrushing = crushingSet.has(key);
           const isShaking = shakingPair && (
             (shakingPair[0].r === r && shakingPair[0].c === c) ||
@@ -1160,9 +1164,30 @@
           const pieceDiv = document.createElement('div');
           pieceDiv.className = `tile-piece${isCrushing ? ' crushing' : ''}${isShaking ? ' shaking' : ''}`;
           pieceDiv.innerHTML = state.board[r][c].svg;
+
+          if (motion && (Math.abs(motion.dx) > 0.01 || Math.abs(motion.dy) > 0.01)) {
+            const startScale = motion.type === 'swap' ? 1.16 : 1.0;
+            pieceDiv.style.transition = 'none';
+            pieceDiv.style.transform = `translate(calc(${motion.dx * 100}% + ${motion.dx * 4}px), calc(${motion.dy * 100}% + ${motion.dy * 4}px)) scale(${startScale})`;
+            animatedPieces.push({ el: pieceDiv, type: motion.type });
+          }
+
           cell.appendChild(pieceDiv);
           grid.appendChild(cell);
         }
+      }
+
+      if (animatedPieces.length > 0) {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            animatedPieces.forEach(({ el, type }) => {
+              el.style.transition = type === 'swap'
+                ? 'transform 0.22s cubic-bezier(0.22, 1.25, 0.36, 1)'
+                : 'transform 0.28s cubic-bezier(0.25, 1.32, 0.42, 1)';
+              el.style.transform = 'translate(0px, 0px) scale(1)';
+            });
+          });
+        });
       }
     }
 
@@ -1214,9 +1239,10 @@
         applyClearedSet(initialSet, 1, bonusPts);
         renderBoard(initialSet);
         await sleep(200);
-        dropAndRefill(initialSet);
-        renderAll();
-        await sleep(220);
+        const dropMotion = dropAndRefill(initialSet);
+        audio.playCrinkle(1);
+        renderAll(dropMotion);
+        await sleep(290);
       }
 
       let combo = 0;
@@ -1232,9 +1258,10 @@
         applyClearedSet(matches, combo, matches.size >= 4 ? 45 : 30);
         renderBoard(matches);
         await sleep(210);
-        dropAndRefill(matches);
-        renderAll();
-        await sleep(220);
+        const dropMotion = dropAndRefill(matches);
+        audio.playCrinkle(1);
+        renderAll(dropMotion);
+        await sleep(290);
       }
 
       checkGameEnd();
@@ -1257,20 +1284,39 @@
     }
 
     function dropAndRefill(removedSet) {
+      const motionMap = new Map();
       for (let c = 0; c < BOARD_SIZE; c++) {
         const survivors = [];
         for (let r = BOARD_SIZE - 1; r >= 0; r--) {
           if (!removedSet.has(`${r},${c}`)) {
-            survivors.unshift(state.board[r][c]);
+            survivors.unshift({ piece: state.board[r][c], oldRow: r });
           }
         }
-        while (survivors.length < BOARD_SIZE) {
-          survivors.unshift(randomPiece());
+        const missingCount = BOARD_SIZE - survivors.length;
+        for (let i = 0; i < missingCount; i++) {
+          const targetRow = i;
+          state.board[targetRow][c] = randomPiece();
+          motionMap.set(`${targetRow},${c}`, {
+            dx: 0,
+            dy: -(missingCount + 0.65),
+            type: 'drop'
+          });
         }
-        for (let r = 0; r < BOARD_SIZE; r++) {
-          state.board[r][c] = survivors[r];
+        for (let i = 0; i < survivors.length; i++) {
+          const targetRow = missingCount + i;
+          const { piece, oldRow } = survivors[i];
+          state.board[targetRow][c] = piece;
+          const dropRows = targetRow - oldRow;
+          if (dropRows > 0) {
+            motionMap.set(`${targetRow},${c}`, {
+              dx: 0,
+              dy: -dropRows,
+              type: 'drop'
+            });
+          }
         }
       }
+      return motionMap;
     }
 
     function checkGameEnd() {
@@ -1334,16 +1380,24 @@
           state.glueFirst = null;
           renderAll();
         } else {
+          state.busy = true;
           const a = state.glueFirst;
           state.glueFirst = null;
           state.boosters.GLUE--;
           state.activeBooster = null;
+          audio.playCrinkle(2);
           const tmp = state.board[a.r][a.c];
           state.board[a.r][a.c] = state.board[r][c];
           state.board[r][c] = tmp;
+          const glueMotion = new Map([
+            [`${a.r},${a.c}`, { dx: c - a.c, dy: r - a.r, type: 'swap' }],
+            [`${r},${c}`, { dx: a.c - c, dy: a.r - r, type: 'swap' }]
+          ]);
           spawnConfettiAtCell(a.r, a.c, state.board[a.r][a.c], 10);
           spawnConfettiAtCell(r, c, state.board[r][c], 10);
           showComboBanner('GLUE SWAP!');
+          renderAll(glueMotion);
+          await sleep(250);
           await crushAndCascade(new Set());
         }
         return;
@@ -1370,18 +1424,31 @@
     async function trySwap(a, b) {
       if (state.busy) return;
       state.busy = true;
+      audio.playCrinkle(1);
       const tmp = state.board[a.r][a.c];
       state.board[a.r][a.c] = state.board[b.r][b.c];
       state.board[b.r][b.c] = tmp;
-      renderBoard();
+
+      const swapMotion = new Map([
+        [`${a.r},${a.c}`, { dx: b.c - a.c, dy: b.r - a.r, type: 'swap' }],
+        [`${b.r},${b.c}`, { dx: a.c - b.c, dy: a.r - b.r, type: 'swap' }]
+      ]);
+      renderBoard(new Set(), null, swapMotion);
+      await sleep(230);
 
       const matches = findMatches(state.board);
       if (matches.size === 0) {
         renderBoard(new Set(), [a, b]);
-        await sleep(260);
+        await sleep(190);
         const rev = state.board[a.r][a.c];
         state.board[a.r][a.c] = state.board[b.r][b.c];
         state.board[b.r][b.c] = rev;
+        const reverseMotion = new Map([
+          [`${a.r},${a.c}`, { dx: b.c - a.c, dy: b.r - a.r, type: 'swap' }],
+          [`${b.r},${b.c}`, { dx: a.c - b.c, dy: a.r - b.r, type: 'swap' }]
+        ]);
+        renderBoard(new Set(), null, reverseMotion);
+        await sleep(230);
         state.busy = false;
         renderAll();
       } else {

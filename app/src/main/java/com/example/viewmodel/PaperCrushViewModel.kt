@@ -29,6 +29,7 @@ class PaperCrushViewModel(
 
     private var nextTileId = 1L
     private var nextScrapId = 1L
+    private var nextAnimSeq = 1L
     private var particleLoopJob: Job? = null
 
     private val _uiState = MutableStateFlow(PaperGameState())
@@ -211,29 +212,46 @@ class PaperCrushViewModel(
     private fun attemptSwap(posA: GridPos, posB: GridPos) {
         viewModelScope.launch {
             _uiState.update { it.copy(isAnimating = true, selectedPos = null) }
+            soundSynth.playPaperCrinkle(1)
             val swappedBoard = swapPositions(_uiState.value.board, posA, posB)
             val matches = findMatchedPositions(swappedBoard)
 
             if (matches.isEmpty()) {
-                // Invalid swap: animate shake and swap back
-                soundSynth.playInvalidShake()
+                // Step 1: Animate the two blocks sliding across to each other's positions
                 _uiState.update {
                     it.copy(
                         board = swappedBoard,
-                        invalidSwapPair = posA to posB
+                        invalidSwapPair = null
                     )
                 }
-                delay(240)
+                delay(220)
+
+                // Step 2: Brief invalid shake at swapped position
+                soundSynth.playInvalidShake()
+                _uiState.update {
+                    it.copy(invalidSwapPair = posA to posB)
+                }
+                delay(180)
+
+                // Step 3: Animate the two blocks sliding back to their original positions
                 val restoredBoard = swapPositions(swappedBoard, posA, posB)
                 _uiState.update {
                     it.copy(
                         board = restoredBoard,
-                        invalidSwapPair = null,
+                        invalidSwapPair = null
+                    )
+                }
+                delay(220)
+
+                val settledBoard = clearTileMotion(restoredBoard)
+                _uiState.update {
+                    it.copy(
+                        board = settledBoard,
                         isAnimating = false
                     )
                 }
             } else {
-                // Valid swap: consume 1 move and run match & cascade loop
+                // Valid swap: animate the two blocks sliding into place, then run match & cascade loop
                 soundSynth.playPaperCrinkle(2)
                 _uiState.update {
                     it.copy(
@@ -241,8 +259,10 @@ class PaperCrushViewModel(
                         movesRemaining = (it.movesRemaining - 1).coerceAtLeast(0)
                     )
                 }
-                delay(140)
-                resolveCascades(swappedBoard)
+                delay(230)
+                val settledSwapBoard = clearTileMotion(swappedBoard)
+                _uiState.update { it.copy(board = settledSwapBoard) }
+                resolveCascades(settledSwapBoard)
             }
         }
     }
@@ -294,8 +314,10 @@ class PaperCrushViewModel(
                     comboBannerText = "GLUE SWAP!"
                 )
             }
-            delay(180)
-            resolveCascades(swappedBoard)
+            delay(260)
+            val settledSwapBoard = clearTileMotion(swappedBoard)
+            _uiState.update { it.copy(board = settledSwapBoard) }
+            resolveCascades(settledSwapBoard)
         }
     }
 
@@ -349,10 +371,11 @@ class PaperCrushViewModel(
         delay(200)
 
         val cascadedBoard = dropAndRefillBoard(markedBoard, positions)
+        soundSynth.playPaperCrinkle(1)
         _uiState.update { it.copy(board = cascadedBoard) }
-        delay(240)
+        delay(290)
 
-        val settledBoard = cascadedBoard.map { row -> row.map { it.copy(spawnDistance = 0f) } }
+        val settledBoard = clearTileMotion(cascadedBoard)
         _uiState.update { it.copy(board = settledBoard) }
         resolveCascades(settledBoard, startCombo = 1)
     }
@@ -407,10 +430,11 @@ class PaperCrushViewModel(
             delay(210)
 
             val refilledBoard = dropAndRefillBoard(crushingBoard, matchedPositions)
+            soundSynth.playPaperCrinkle(1)
             _uiState.update { it.copy(board = refilledBoard) }
-            delay(240)
+            delay(290)
 
-            currentBoard = refilledBoard.map { row -> row.map { it.copy(spawnDistance = 0f) } }
+            currentBoard = clearTileMotion(refilledBoard)
             _uiState.update { it.copy(board = currentBoard) }
         }
 
@@ -529,21 +553,25 @@ class PaperCrushViewModel(
             val missingCount = BOARD_SIZE - survivors.size
             val colResult = ArrayList<BoardTile>(BOARD_SIZE)
 
-            // Top new tiles cascading down
+            // Top new tiles cascading down from above the board rim
             for (i in 0 until missingCount) {
                 val targetRow = i
+                val fallDistance = (missingCount - i + 0.65f) + i.toFloat()
                 colResult.add(
                     BoardTile(
                         id = nextTileId++,
                         type = randomPiece(),
                         row = targetRow,
                         col = c,
-                        spawnDistance = (missingCount + 1).toFloat()
+                        spawnDistance = fallDistance,
+                        slideFromRowDelta = -fallDistance,
+                        slideFromColDelta = 0f,
+                        animSeq = nextAnimSeq++
                     )
                 )
             }
 
-            // Existing tiles dropping down
+            // Existing tiles dropping down by gravity
             val topToBottomSurvivors = survivors.reversed()
             for (i in topToBottomSurvivors.indices) {
                 val oldTile = topToBottomSurvivors[i]
@@ -554,6 +582,9 @@ class PaperCrushViewModel(
                         row = targetRow,
                         col = c,
                         spawnDistance = dropRows,
+                        slideFromRowDelta = -dropRows,
+                        slideFromColDelta = 0f,
+                        animSeq = if (dropRows > 0f) nextAnimSeq++ else oldTile.animSeq,
                         isCrushing = false
                     )
                 )
@@ -575,13 +606,45 @@ class PaperCrushViewModel(
     ): List<List<BoardTile>> {
         val tileA = board[a.row][a.col]
         val tileB = board[b.row][b.col]
+        val seqA = nextAnimSeq++
+        val seqB = nextAnimSeq++
         return board.mapIndexed { r, row ->
             row.mapIndexed { c, tile ->
                 when (GridPos(r, c)) {
-                    a -> tileB.copy(row = a.row, col = a.col)
-                    b -> tileA.copy(row = b.row, col = b.col)
-                    else -> tile
+                    a -> tileB.copy(
+                        row = a.row,
+                        col = a.col,
+                        spawnDistance = 0f,
+                        slideFromRowDelta = (b.row - a.row).toFloat(),
+                        slideFromColDelta = (b.col - a.col).toFloat(),
+                        animSeq = seqA
+                    )
+                    b -> tileA.copy(
+                        row = b.row,
+                        col = b.col,
+                        spawnDistance = 0f,
+                        slideFromRowDelta = (a.row - b.row).toFloat(),
+                        slideFromColDelta = (a.col - b.col).toFloat(),
+                        animSeq = seqB
+                    )
+                    else -> tile.copy(
+                        spawnDistance = 0f,
+                        slideFromRowDelta = 0f,
+                        slideFromColDelta = 0f
+                    )
                 }
+            }
+        }
+    }
+
+    private fun clearTileMotion(board: List<List<BoardTile>>): List<List<BoardTile>> {
+        return board.map { row ->
+            row.map { tile ->
+                tile.copy(
+                    spawnDistance = 0f,
+                    slideFromRowDelta = 0f,
+                    slideFromColDelta = 0f
+                )
             }
         }
     }

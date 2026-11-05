@@ -74,6 +74,8 @@ import com.example.ui.theme.OrigamiFoxOrange
 import com.example.ui.theme.PeppermintRed
 import com.example.ui.theme.PeppermintWhite
 import com.example.ui.theme.StickyNoteYellow
+import androidx.compose.ui.zIndex
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -124,10 +126,15 @@ fun PaperCardboardBoard(
                 verticalArrangement = Arrangement.SpaceEvenly
             ) {
                 for (r in 0 until BOARD_SIZE) {
+                    val rowHasMotion = state.board.getOrNull(r)?.any {
+                        abs(it.slideFromColDelta) > 0.01f || abs(it.slideFromRowDelta) > 0.01f
+                    } == true || state.selectedPos?.row == r || state.glueFirstPos?.row == r
+
                     Row(
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxWidth(),
+                            .fillMaxWidth()
+                            .zIndex(if (rowHasMotion) 3f else 0f),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         for (c in 0 until BOARD_SIZE) {
@@ -139,12 +146,16 @@ fun PaperCardboardBoard(
                             val isInvalidShake = state.invalidSwapPair?.let {
                                 it.first == pos || it.second == pos
                             } == true
+                            val tileHasMotion = tile != null && (
+                                abs(tile.slideFromColDelta) > 0.01f || abs(tile.slideFromRowDelta) > 0.01f
+                            )
 
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
                                     .aspectRatio(1f)
                                     .padding(2.dp)
+                                    .zIndex(if (tileHasMotion || isSelected) 4f else 0f)
                             ) {
                                 if (tile != null) {
                                     key(tile.id) {
@@ -205,16 +216,51 @@ private fun PaperBoardCell(
     val density = LocalDensity.current
     val cellPx = with(density) { cellSize.toPx() }
 
-    val dropAnim = remember { Animatable(if (tile.spawnDistance > 0f) -tile.spawnDistance else 0f) }
-    LaunchedEffect(tile.row, tile.spawnDistance) {
-        if (dropAnim.value != 0f) {
-            dropAnim.animateTo(
-                targetValue = 0f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioLowBouncy,
-                    stiffness = Spring.StiffnessMediumLow
+    val offsetColAnim = remember(tile.id) { Animatable(tile.slideFromColDelta) }
+    val offsetRowAnim = remember(tile.id) { Animatable(tile.slideFromRowDelta) }
+
+    LaunchedEffect(tile.animSeq, tile.slideFromColDelta, tile.slideFromRowDelta) {
+        val hasColSlide = abs(tile.slideFromColDelta) > 0.001f
+        val hasRowSlide = abs(tile.slideFromRowDelta) > 0.001f
+        val isGravityDrop = tile.spawnDistance > 0.001f
+
+        if (hasColSlide || hasRowSlide) {
+            offsetColAnim.snapTo(tile.slideFromColDelta)
+            offsetRowAnim.snapTo(tile.slideFromRowDelta)
+
+            if (isGravityDrop) {
+                // Falling block animation: bouncy gravity drop
+                offsetRowAnim.animateTo(
+                    targetValue = 0f,
+                    animationSpec = spring(
+                        dampingRatio = 0.68f,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
                 )
-            )
+            } else {
+                // Changing/swapping block animation: smooth tactile slide across cells
+                launch {
+                    offsetColAnim.animateTo(
+                        targetValue = 0f,
+                        animationSpec = spring(
+                            dampingRatio = 0.78f,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    )
+                }
+                launch {
+                    offsetRowAnim.animateTo(
+                        targetValue = 0f,
+                        animationSpec = spring(
+                            dampingRatio = 0.78f,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    )
+                }
+            }
+        } else {
+            offsetColAnim.snapTo(0f)
+            offsetRowAnim.snapTo(0f)
         }
     }
 
@@ -222,17 +268,21 @@ private fun PaperBoardCell(
     LaunchedEffect(isInvalidShake) {
         if (isInvalidShake) {
             for (i in 0..3) {
-                shakeAnim.animateTo(if (i % 2 == 0) 8f else -8f, tween(45))
+                shakeAnim.animateTo(if (i % 2 == 0) 8f else -8f, tween(40))
             }
-            shakeAnim.animateTo(0f, tween(40))
+            shakeAnim.animateTo(0f, tween(35))
         } else {
             shakeAnim.snapTo(0f)
         }
     }
 
+    val isMoving = abs(offsetColAnim.value) > 0.02f || abs(offsetRowAnim.value) > 0.02f
+    val isSwappingMove = isMoving && tile.spawnDistance <= 0.001f
+
     val scale by animateFloatAsState(
         targetValue = when {
             tile.isCrushing -> 0.12f
+            isSwappingMove -> 1.15f
             isSelected -> 1.12f
             else -> 1f
         },
@@ -248,13 +298,7 @@ private fun PaperBoardCell(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .clip(cellShape)
-            .background(if (isSelected) StickyNoteYellow else cellPaperColor, cellShape)
-            .border(
-                width = if (isSelected) 1.5.dp else 0.5.dp,
-                color = if (isSelected) CardboardDark else MaskingTapeBorder.copy(alpha = 0.6f),
-                shape = cellShape
-            )
+            .zIndex(if (isMoving || isSelected) 5f else 0f)
             .pointerInput(pos) {
                 detectTapGestures(onTap = { onTap() })
             }
@@ -287,14 +331,28 @@ private fun PaperBoardCell(
             .testTag("board_tile_${pos.row}_${pos.col}"),
         contentAlignment = Alignment.Center
     ) {
+        // Stationary paper cell card background
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(cellShape)
+                .background(if (isSelected) StickyNoteYellow else cellPaperColor, cellShape)
+                .border(
+                    width = if (isSelected) 1.5.dp else 0.5.dp,
+                    color = if (isSelected) CardboardDark else MaskingTapeBorder.copy(alpha = 0.6f),
+                    shape = cellShape
+                )
+        )
+
+        // Die-cut paper game piece (unclipped by cell so it glides smoothly across cell borders when moved or dropped)
         PaperPieceVector(
             pieceType = tile.type,
             modifier = Modifier
                 .fillMaxSize(0.80f)
                 .offset {
                     IntOffset(
-                        x = shakeAnim.value.roundToInt(),
-                        y = (dropAnim.value * cellPx).roundToInt()
+                        x = (offsetColAnim.value * cellPx + shakeAnim.value).roundToInt(),
+                        y = (offsetRowAnim.value * cellPx).roundToInt()
                     )
                 }
                 .scale(scale)

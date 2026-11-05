@@ -42,6 +42,9 @@ data class BoardTile(
     val row: Int,
     val col: Int,
     val spawnDistance: Float = 0f,
+    val slideFromRowDelta: Float = 0f,
+    val slideFromColDelta: Float = 0f,
+    val animSeq: Long = 0L,
     val isCrushing: Boolean = false
 )
 
