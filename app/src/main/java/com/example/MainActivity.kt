@@ -14,9 +14,9 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
@@ -27,10 +27,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -48,7 +49,6 @@ import com.example.ui.components.PaperWorldMapOverlay
 import com.example.ui.components.rememberDeviceTilt
 import com.example.ui.theme.MyApplicationTheme
 import com.example.viewmodel.PaperCrushViewModel
-import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,6 +83,7 @@ fun PaperCraftCrushApp(
 
     // Combines hardware gravity/accelerometer tilt with subtle pointer-position tilt
     val deviceTilt = rememberDeviceTilt(pointerTiltOffset = pointerTilt)
+    val density = LocalDensity.current
 
     Box(
         modifier = Modifier
@@ -109,19 +110,19 @@ fun PaperCraftCrushApp(
         // 1. Multi-layer Paper & Origami Diorama Backdrop with tilt parallax
         PaperDioramaBackdrop(tilt = deviceTilt)
 
-        // 2. Responsive Layout (Portrait Phone vs Landscape Tablet/Desktop Diorama)
+        // 2. Adaptive Layout compatible with all phones, foldables, tablets & landscape screens
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .padding(horizontal = 10.dp, vertical = 6.dp)
         ) {
-            val isLandscape = maxWidth > maxHeight * 1.15f
-            val hudParallaxModifier = Modifier.offset {
-                IntOffset(
-                    x = (deviceTilt.x * 5f).roundToInt(),
-                    y = (deviceTilt.y * 4f).roundToInt()
-                )
+            val isLandscape = maxWidth > maxHeight * 1.12f
+            val hudTiltXPx = with(density) { (deviceTilt.x * 5f).dp.toPx() }
+            val hudTiltYPx = with(density) { (deviceTilt.y * 4f).dp.toPx() }
+            val hudParallaxModifier = Modifier.graphicsLayer {
+                translationX = hudTiltXPx
+                translationY = hudTiltYPx
             }
 
             if (isLandscape) {
@@ -133,7 +134,7 @@ fun PaperCraftCrushApp(
                     Column(
                         modifier = hudParallaxModifier
                             .weight(1f)
-                            .widthIn(max = 360.dp)
+                            .widthIn(max = 380.dp)
                             .fillMaxHeight(),
                         verticalArrangement = Arrangement.SpaceBetween,
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -150,18 +151,22 @@ fun PaperCraftCrushApp(
                         )
                     }
 
-                    Box(
+                    BoxWithConstraints(
                         modifier = Modifier
                             .weight(1.1f)
                             .fillMaxHeight(),
                         contentAlignment = Alignment.Center
                     ) {
+                        val maxBoardSide = minOf(maxWidth, maxHeight, 480.dp)
                         PaperCardboardBoard(
                             state = state,
                             onTileTapped = viewModel::onTileTapped,
                             onTileSwiped = viewModel::onTileSwiped,
                             tilt = deviceTilt,
-                            modifier = Modifier.widthIn(max = 460.dp)
+                            modifier = Modifier.sizeIn(
+                                maxWidth = maxBoardSide,
+                                maxHeight = maxBoardSide
+                            )
                         )
                     }
                 }
@@ -182,18 +187,23 @@ fun PaperCraftCrushApp(
                         modifier = hudParallaxModifier
                     )
 
-                    Box(
+                    BoxWithConstraints(
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxWidth(),
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
                         contentAlignment = Alignment.Center
                     ) {
+                        val maxBoardSide = minOf(maxWidth, maxHeight, 440.dp)
                         PaperCardboardBoard(
                             state = state,
                             onTileTapped = viewModel::onTileTapped,
                             onTileSwiped = viewModel::onTileSwiped,
                             tilt = deviceTilt,
-                            modifier = Modifier.widthIn(max = 430.dp)
+                            modifier = Modifier.sizeIn(
+                                maxWidth = maxBoardSide,
+                                maxHeight = maxBoardSide
+                            )
                         )
                     }
 

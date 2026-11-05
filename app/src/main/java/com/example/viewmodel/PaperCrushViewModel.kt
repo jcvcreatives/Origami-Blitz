@@ -1052,20 +1052,24 @@ class PaperCrushViewModel(
     private fun ensureParticleLoopRunning() {
         if (particleLoopJob?.isActive == true) return
         particleLoopJob = viewModelScope.launch {
+            var lastTimeNs = System.nanoTime()
             while (_confettiScraps.value.isNotEmpty()) {
                 delay(16)
+                val nowNs = System.nanoTime()
+                val dtScale = ((nowNs - lastTimeNs) / 16_666_667f).coerceIn(0.5f, 2.2f)
+                lastTimeNs = nowNs
                 _confettiScraps.update { current ->
                     current.mapNotNull { s ->
-                        val nextAlpha = s.alpha - 0.024f
+                        val nextAlpha = s.alpha - (0.024f * dtScale)
                         if (nextAlpha <= 0f || s.y > 1.15f) {
                             null
                         } else {
                             s.copy(
-                                x = s.x + s.vx,
-                                y = s.y + s.vy,
-                                vx = s.vx * 0.98f + ( kotlin.math.sin(s.rotation * 0.05f) * 0.0004f ),
-                                vy = s.vy + 0.00085f, // gravity
-                                rotation = s.rotation + s.vRotation,
+                                x = s.x + s.vx * dtScale,
+                                y = s.y + s.vy * dtScale,
+                                vx = s.vx * (1f - 0.02f * dtScale) + (kotlin.math.sin(s.rotation * 0.05f) * 0.0004f * dtScale),
+                                vy = s.vy + 0.00085f * dtScale, // gravity
+                                rotation = s.rotation + s.vRotation * dtScale,
                                 alpha = nextAlpha
                             )
                         }

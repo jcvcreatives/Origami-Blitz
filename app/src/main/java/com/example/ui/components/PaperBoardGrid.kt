@@ -2,14 +2,21 @@ package com.example.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -24,7 +31,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -36,6 +42,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -44,22 +51,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.example.R
 import com.example.model.BOARD_SIZE
 import com.example.model.BoardTile
+import com.example.model.FloatingScorePopup
 import com.example.model.GameStatus
 import com.example.model.GridPos
 import com.example.model.PaperGameState
@@ -73,27 +83,21 @@ import com.example.ui.theme.MaskingTapeCream
 import com.example.ui.theme.OrigamiFoxOrange
 import com.example.ui.theme.PeppermintRed
 import com.example.ui.theme.PeppermintWhite
-import com.example.ui.theme.StickyNoteYellow
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.zIndex
-import com.example.model.FloatingScorePopup
 import com.example.ui.theme.StarCardboardGold
+import com.example.ui.theme.StickyNoteYellow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.abs
-import kotlin.math.roundToInt
 import kotlin.math.sin
 
+// Realistic gravity acceleration curve (starts slow, accelerates toward landing impact)
+private val GravityDropEasing = CubicBezierEasing(0.32f, 0.0f, 0.82f, 0.94f)
+
 /**
- * 7x7 Washi & Corrugated Cardboard Board with 3D arced swap animations,
- * squash-and-stretch gravity drops, board impact punch, fever glow, and floating score popups.
+ * 7x7 Washi & Corrugated Cardboard Board engineered for locked 60fps rendering.
+ * All per-frame block animations execute inside RenderNode `graphicsLayer` lambdas
+ * to avoid layout/composition thrashing across all Android devices.
  */
 @Composable
 fun PaperCardboardBoard(
@@ -106,6 +110,19 @@ fun PaperCardboardBoard(
     val outerShape = RoundedCornerShape(16.dp)
     val innerShape = RoundedCornerShape(12.dp)
     val isFever = state.feverMovesLeft > 0
+    val density = LocalDensity.current
+
+    // Single shared infinite transition for idle hints & selection bob (avoids 49 separate clocks)
+    val infiniteTransition = rememberInfiniteTransition(label = "board_shared_pulse")
+    val sharedWaveState = infiniteTransition.animateFloat(
+        initialValue = -1f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(440, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "shared_wave"
+    )
 
     // Board impact recoil/shake on big matches, cascades, and smashes
     val boardPunchAnim = remember { Animatable(0f) }
@@ -123,18 +140,17 @@ fun PaperCardboardBoard(
         }
     }
 
-    val punchScale = 1f + (boardPunchAnim.value * 0.028f)
-    val punchOffsetY = (sin(boardPunchAnim.value * PI * 3.0) * 7.0 * state.boardPunchStrength).toFloat()
+    val tiltXPx = with(density) { (tilt.x * 10f).dp.toPx() }
+    val tiltYPx = with(density) { (tilt.y * 8f).dp.toPx() }
 
     Box(
         modifier = modifier
-            .offset {
-                IntOffset(
-                    x = (tilt.x * 10f).roundToInt(),
-                    y = (tilt.y * 8f + punchOffsetY).roundToInt()
-                )
-            }
             .graphicsLayer {
+                val punchVal = boardPunchAnim.value
+                val punchScale = 1f + (punchVal * 0.028f)
+                val punchOffsetY = (sin(punchVal * PI * 3.0) * 7.0 * state.boardPunchStrength).toFloat() * this.density
+                translationX = tiltXPx
+                translationY = tiltYPx + punchOffsetY
                 scaleX = punchScale
                 scaleY = punchScale
             }
@@ -194,9 +210,23 @@ fun PaperCardboardBoard(
                             val isInvalidShake = state.invalidSwapPair?.let {
                                 it.first == pos || it.second == pos
                             } == true
-                            val isHinted = state.hintPair?.let {
-                                it.first == pos || it.second == pos
-                            } == true
+
+                            // Compute directional vector toward the hinted partner tile
+                            val hintPartnerDelta: Offset? = state.hintPair?.let { (first, second) ->
+                                when (pos) {
+                                    first -> Offset(
+                                        (second.col - first.col).toFloat(),
+                                        (second.row - first.row).toFloat()
+                                    )
+                                    second -> Offset(
+                                        (first.col - second.col).toFloat(),
+                                        (first.row - second.row).toFloat()
+                                    )
+                                    else -> null
+                                }
+                            }
+                            val isHinted = hintPartnerDelta != null
+
                             val tileHasMotion = tile != null && (
                                 abs(tile.slideFromColDelta) > 0.01f || abs(tile.slideFromRowDelta) > 0.01f || tile.isCrushing
                             )
@@ -224,6 +254,8 @@ fun PaperCardboardBoard(
                                             cellPaperColor = cellColor,
                                             isSelected = isSelected,
                                             isHinted = isHinted,
+                                            hintPartnerDelta = hintPartnerDelta,
+                                            sharedWaveState = sharedWaveState,
                                             isInvalidShake = isInvalidShake,
                                             onTap = { onTileTapped(pos) },
                                             onSwipe = { targetPos -> onTileSwiped(pos, targetPos) }
@@ -292,28 +324,23 @@ private fun FloatingScoreBadge(
         )
     }
 
-    val p = progress.value
-    val scale = if (p < 0.22f) {
-        0.5f + (p / 0.22f) * (if (popup.isBig) 0.85f else 0.65f)
-    } else {
-        (if (popup.isBig) 1.35f else 1.15f) - (p - 0.22f) * 0.25f
-    }
-    val alpha = if (p < 0.7f) 1f else ((1f - p) / 0.3f).coerceIn(0f, 1f)
-    val risePx = -p * cellPx * 1.15f
-
     Box(
         modifier = Modifier
-            .offset {
-                IntOffset(
-                    x = ((popup.col + 0.1f) * cellPx).roundToInt(),
-                    y = ((popup.row + 0.15f) * cellPx + risePx).roundToInt()
-                )
-            }
             .zIndex(22f)
             .graphicsLayer {
+                val p = progress.value
+                val scale = if (p < 0.22f) {
+                    0.5f + (p / 0.22f) * (if (popup.isBig) 0.85f else 0.65f)
+                } else {
+                    (if (popup.isBig) 1.35f else 1.15f) - (p - 0.22f) * 0.25f
+                }
+                val alphaVal = if (p < 0.7f) 1f else ((1f - p) / 0.3f).coerceIn(0f, 1f)
+                val risePx = -p * cellPx * 1.15f
+                translationX = (popup.col + 0.1f) * cellPx
+                translationY = (popup.row + 0.15f) * cellPx + risePx
                 scaleX = scale
                 scaleY = scale
-                this.alpha = alpha
+                alpha = alphaVal
             }
             .shadow(4.dp, RoundedCornerShape(10.dp))
             .background(MaskingTapeCream, RoundedCornerShape(10.dp))
@@ -339,6 +366,8 @@ private fun PaperBoardCell(
     cellPaperColor: Color,
     isSelected: Boolean,
     isHinted: Boolean,
+    hintPartnerDelta: Offset?,
+    sharedWaveState: State<Float>,
     isInvalidShake: Boolean,
     onTap: () -> Unit,
     onSwipe: (GridPos) -> Unit
@@ -350,6 +379,7 @@ private fun PaperBoardCell(
     val offsetRowAnim = remember(tile.id) { Animatable(tile.slideFromRowDelta) }
     val swapArcProgress = remember(tile.id) { Animatable(0f) }
     val landingSquashAnim = remember(tile.id) { Animatable(0f) }
+    val impactRingAnim = remember(tile.id) { Animatable(0f) }
 
     LaunchedEffect(tile.animSeq, tile.slideFromColDelta, tile.slideFromRowDelta) {
         val hasColSlide = abs(tile.slideFromColDelta) > 0.001f
@@ -362,38 +392,52 @@ private fun PaperBoardCell(
 
             if (isGravityDrop) {
                 swapArcProgress.snapTo(0f)
-                // Stagger column/row slightly so falling blocks cascade like real domino cards
+                // Stagger column/row so falling blocks cascade like real domino cards
                 delay((pos.col * 14L) + (pos.row * 9L))
                 offsetRowAnim.animateTo(
                     targetValue = 0f,
                     animationSpec = tween(
-                        durationMillis = (155 + (tile.spawnDistance * 26f).toInt()).coerceIn(160, 270),
-                        easing = FastOutSlowInEasing
+                        durationMillis = (150 + (tile.spawnDistance * 28f).toInt()).coerceIn(155, 275),
+                        easing = GravityDropEasing
                     )
                 )
-                // Impact Squash & Rebound Bounce when the block hits its slot!
+                // Trigger expanding paper impact ring + multi-bounce squash & stretch!
+                launch {
+                    impactRingAnim.snapTo(0.01f)
+                    impactRingAnim.animateTo(1f, tween(240, easing = FastOutSlowInEasing))
+                    impactRingAnim.snapTo(0f)
+                }
                 landingSquashAnim.snapTo(1f)
                 landingSquashAnim.animateTo(
                     targetValue = 0f,
                     animationSpec = spring(
-                        dampingRatio = 0.36f,
+                        dampingRatio = 0.34f,
                         stiffness = Spring.StiffnessMedium
                     )
                 )
             } else {
-                // Popping 3D Arced Swap Animation: blocks orbit past each other with lift & spin!
+                // 3D Parabolic Origami Vault Swap Animation
                 swapArcProgress.snapTo(1f)
                 launch {
                     swapArcProgress.animateTo(
                         targetValue = 0f,
-                        animationSpec = tween(durationMillis = 225, easing = FastOutSlowInEasing)
+                        animationSpec = tween(durationMillis = 235, easing = FastOutSlowInEasing)
+                    )
+                    // Subtle landing settle when the swapped block touches down
+                    landingSquashAnim.snapTo(0.45f)
+                    landingSquashAnim.animateTo(
+                        targetValue = 0f,
+                        animationSpec = spring(
+                            dampingRatio = 0.42f,
+                            stiffness = Spring.StiffnessMedium
+                        )
                     )
                 }
                 launch {
                     offsetColAnim.animateTo(
                         targetValue = 0f,
                         animationSpec = spring(
-                            dampingRatio = 0.62f,
+                            dampingRatio = 0.64f,
                             stiffness = Spring.StiffnessMedium
                         )
                     )
@@ -402,7 +446,7 @@ private fun PaperBoardCell(
                     offsetRowAnim.animateTo(
                         targetValue = 0f,
                         animationSpec = spring(
-                            dampingRatio = 0.62f,
+                            dampingRatio = 0.64f,
                             stiffness = Spring.StiffnessMedium
                         )
                     )
@@ -415,19 +459,25 @@ private fun PaperBoardCell(
         }
     }
 
-    // Explosive Crush Pop: inflate to 1.34x first, then spin & snap to 0
+    // Explosive Crush Pop: inflate to 1.38x with 3D tilt & shockwave ring, then snap to 0
     val crushScaleAnim = remember(tile.id) { Animatable(1f) }
     val crushRotAnim = remember(tile.id) { Animatable(0f) }
+    val crushRingAnim = remember(tile.id) { Animatable(0f) }
     LaunchedEffect(tile.isCrushing) {
         if (tile.isCrushing) {
             launch {
-                crushRotAnim.animateTo(28f, tween(200))
+                crushRingAnim.snapTo(0.05f)
+                crushRingAnim.animateTo(1f, tween(210, easing = FastOutSlowInEasing))
             }
-            crushScaleAnim.animateTo(1.34f, tween(65))
-            crushScaleAnim.animateTo(0.04f, tween(140))
+            launch {
+                crushRotAnim.animateTo(32f, tween(205))
+            }
+            crushScaleAnim.animateTo(1.38f, tween(65, easing = FastOutSlowInEasing))
+            crushScaleAnim.animateTo(0.02f, tween(140, easing = FastOutSlowInEasing))
         } else {
             crushScaleAnim.snapTo(1f)
             crushRotAnim.snapTo(0f)
+            crushRingAnim.snapTo(0f)
         }
     }
 
@@ -435,7 +485,7 @@ private fun PaperBoardCell(
     LaunchedEffect(isInvalidShake) {
         if (isInvalidShake) {
             for (i in 0..3) {
-                shakeAnim.animateTo(if (i % 2 == 0) 10f else -10f, tween(38))
+                shakeAnim.animateTo(if (i % 2 == 0) 11f else -11f, tween(36))
             }
             shakeAnim.animateTo(0f, tween(35))
         } else {
@@ -443,82 +493,22 @@ private fun PaperBoardCell(
         }
     }
 
-    // Gentle idle hint pulse
-    val infiniteTransition = rememberInfiniteTransition(label = "hint_pulse")
-    val hintWave by infiniteTransition.animateFloat(
-        initialValue = -1f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(420, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "hint_wave"
-    )
-
-    val isFallingMidAir = tile.spawnDistance > 0.001f && abs(offsetRowAnim.value) > 0.14f
-    val arcSin = sin(swapArcProgress.value * PI).toFloat()
-    val arcSign = if (tile.swapArcSign != 0f) tile.swapArcSign else 1f
-
-    // Perpendicular arc offset during a block swap so the two blocks curve past each other
-    val isHorizontalSwap = abs(tile.slideFromColDelta) >= abs(tile.slideFromRowDelta)
-    val arcOffsetX = if (!isHorizontalSwap && swapArcProgress.value > 0.01f) {
-        arcSin * arcSign * 0.36f * cellPx
-    } else 0f
-    val arcOffsetY = if (isHorizontalSwap && swapArcProgress.value > 0.01f) {
-        -arcSin * arcSign * 0.36f * cellPx
-    } else 0f
-
-    // Squash & stretch + swap pop scale calculation
-    val squash = landingSquashAnim.value
-    val swapBoost = if (swapArcProgress.value > 0.01f) {
-        if (arcSign > 0f) 0.36f * arcSin else 0.16f * arcSin
-    } else 0f
-
     val baseScale by animateFloatAsState(
-        targetValue = when {
-            isSelected -> 1.15f
-            isHinted -> 1.07f + (hintWave * 0.05f)
-            else -> 1f
-        },
-        animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium),
+        targetValue = if (isSelected) 1.15f else 1f,
+        animationSpec = spring(dampingRatio = 0.52f, stiffness = Spring.StiffnessMedium),
         label = "tile_base_scale"
     )
-
-    val finalScaleX = when {
-        tile.isCrushing -> crushScaleAnim.value
-        isFallingMidAir -> 0.87f
-        squash > 0.01f -> 1f + (squash * 0.24f)
-        else -> baseScale + swapBoost
-    }
-    val finalScaleY = when {
-        tile.isCrushing -> crushScaleAnim.value
-        isFallingMidAir -> 1.17f
-        squash > 0.01f -> 1f - (squash * 0.20f)
-        else -> baseScale + swapBoost
-    }
-    val finalRotation = when {
-        tile.isCrushing -> crushRotAnim.value
-        swapArcProgress.value > 0.01f -> arcSin * arcSign * 16f
-        isHinted -> hintWave * 7f
-        isSelected -> -5f
-        else -> 0f
-    }
 
     var dragAccum by remember { mutableStateOf(Offset.Zero) }
     var swipeTriggered by remember { mutableStateOf(false) }
 
     val cellShape = RoundedCornerShape(8.dp)
+    val arcSign = if (tile.swapArcSign != 0f) tile.swapArcSign else 1f
+    val isHorizontalSwap = abs(tile.slideFromColDelta) >= abs(tile.slideFromRowDelta)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .zIndex(
-                when {
-                    swapArcProgress.value > 0.01f && arcSign > 0f -> 12f
-                    swapArcProgress.value > 0.01f || isFallingMidAir || isSelected -> 6f
-                    else -> 0f
-                }
-            )
             .pointerInput(pos) {
                 detectTapGestures(onTap = { onTap() })
             }
@@ -528,11 +518,19 @@ private fun PaperBoardCell(
                         dragAccum = Offset.Zero
                         swipeTriggered = false
                     },
+                    onDragEnd = {
+                        dragAccum = Offset.Zero
+                        swipeTriggered = false
+                    },
+                    onDragCancel = {
+                        dragAccum = Offset.Zero
+                        swipeTriggered = false
+                    },
                     onDrag = { change, dragAmount ->
                         change.consume()
                         if (!swipeTriggered) {
                             dragAccum += dragAmount
-                            val threshold = 24f
+                            val threshold = cellPx * 0.34f
                             if (abs(dragAccum.x) > threshold || abs(dragAccum.y) > threshold) {
                                 swipeTriggered = true
                                 val target = if (abs(dragAccum.x) > abs(dragAccum.y)) {
@@ -542,6 +540,7 @@ private fun PaperBoardCell(
                                     if (dragAccum.y > 0) GridPos(pos.row + 1, pos.col)
                                     else GridPos(pos.row - 1, pos.col)
                                 }
+                                dragAccum = Offset.Zero
                                 onSwipe(target)
                             }
                         }
@@ -559,7 +558,8 @@ private fun PaperBoardCell(
                 .background(
                     when {
                         isSelected -> StickyNoteYellow
-                        isHinted -> StickyNoteYellow.copy(alpha = 0.65f)
+                        isHinted -> StickyNoteYellow.copy(alpha = 0.68f)
+                        isInvalidShake -> PeppermintRed.copy(alpha = 0.22f)
                         else -> cellPaperColor
                     },
                     cellShape
@@ -575,21 +575,119 @@ private fun PaperBoardCell(
                 )
         )
 
-        // Die-cut paper game piece with 3D arced swap, squash-and-stretch drop, and crush pop
+        // Landing shockwave & match crush ring overlay (drawn purely in Canvas draw phase)
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val crushP = crushRingAnim.value
+            if (crushP > 0.01f) {
+                val maxR = size.minDimension * 0.65f
+                drawCircle(
+                    color = tile.type.primaryColor.copy(alpha = (1f - crushP) * 0.75f),
+                    radius = maxR * (0.35f + crushP * 0.75f),
+                    style = Stroke(width = size.minDimension * 0.10f * (1f - crushP * 0.5f))
+                )
+                drawCircle(
+                    color = PeppermintWhite.copy(alpha = (1f - crushP) * 0.65f),
+                    radius = maxR * (0.25f + crushP * 0.45f)
+                )
+            }
+            val impactP = impactRingAnim.value
+            if (impactP > 0.01f) {
+                drawCircle(
+                    color = StarCardboardGold.copy(alpha = (1f - impactP) * 0.48f),
+                    radius = size.minDimension * (0.25f + impactP * 0.35f),
+                    style = Stroke(width = size.minDimension * 0.055f * (1f - impactP))
+                )
+            }
+        }
+
+        // Die-cut paper game piece with GPU RenderNode 60fps transforms
         PaperPieceVector(
             pieceType = tile.type,
             modifier = Modifier
-                .fillMaxSize(0.82f)
-                .offset {
-                    IntOffset(
-                        x = (offsetColAnim.value * cellPx + arcOffsetX + shakeAnim.value).roundToInt(),
-                        y = (offsetRowAnim.value * cellPx + arcOffsetY).roundToInt()
-                    )
-                }
+                .fillMaxSize(0.84f)
                 .graphicsLayer {
-                    scaleX = finalScaleX
-                    scaleY = finalScaleY
-                    rotationZ = finalRotation
+                    val colOff = offsetColAnim.value
+                    val rowOff = offsetRowAnim.value
+                    val swapP = swapArcProgress.value
+                    val squash = landingSquashAnim.value
+                    val wave = sharedWaveState.value
+
+                    val isFallingMidAir = tile.spawnDistance > 0.001f && abs(rowOff) > 0.10f
+                    val fallRatio = if (tile.spawnDistance > 0.001f) {
+                        (abs(rowOff) / tile.spawnDistance.coerceAtLeast(1f)).coerceIn(0f, 1f)
+                    } else 0f
+                    // Velocity peaks right before impact (when fallRatio approaches 0)
+                    val fallSpeedFactor = if (isFallingMidAir) (1f - fallRatio * 0.65f) else 0f
+
+                    val arcSin = sin(swapP * PI).toFloat()
+                    val arcOffsetX = if (!isHorizontalSwap && swapP > 0.01f) {
+                        arcSin * arcSign * 0.38f * cellPx
+                    } else 0f
+                    val arcOffsetY = if (isHorizontalSwap && swapP > 0.01f) {
+                        -arcSin * arcSign * 0.38f * cellPx
+                    } else 0f
+
+                    // Directional hint nudge toward partner tile
+                    val hintNudgeFactor = ((wave + 1f) * 0.5f)
+                    val hintNudgeX = if (hintPartnerDelta != null) {
+                        hintPartnerDelta.x * hintNudgeFactor * cellPx * 0.13f
+                    } else 0f
+                    val hintNudgeY = if (hintPartnerDelta != null) {
+                        hintPartnerDelta.y * hintNudgeFactor * cellPx * 0.13f
+                    } else 0f
+
+                    // Live tactile finger drag follow before swipe threshold triggers
+                    val dragFollowX = (dragAccum.x * 0.42f).coerceIn(-cellPx * 0.28f, cellPx * 0.28f)
+                    val dragFollowY = (dragAccum.y * 0.42f).coerceIn(-cellPx * 0.28f, cellPx * 0.28f)
+                    val isDraggingNow = abs(dragFollowX) > 1f || abs(dragFollowY) > 1f
+
+                    translationX = colOff * cellPx + arcOffsetX + shakeAnim.value + hintNudgeX + dragFollowX
+                    translationY = rowOff * cellPx + arcOffsetY + hintNudgeY + dragFollowY
+
+                    val swapBoost = if (swapP > 0.01f) {
+                        if (arcSign > 0f) 0.38f * arcSin else 0.16f * arcSin
+                    } else 0f
+                    val dragBoost = if (isDraggingNow) 0.12f else 0f
+                    val hintScaleBoost = if (isHinted) 0.06f + wave * 0.04f else 0f
+                    val selectedBobBoost = if (isSelected) wave * 0.04f else 0f
+
+                    // Oscillating damped squash-and-stretch on landing
+                    val squashWave = sin(squash * PI * 1.5).toFloat() * squash
+                    scaleX = when {
+                        tile.isCrushing -> crushScaleAnim.value
+                        isFallingMidAir -> 1f - (fallSpeedFactor * 0.15f)
+                        squash > 0.01f -> 1f + (squashWave * 0.26f)
+                        else -> baseScale + swapBoost + dragBoost + hintScaleBoost + selectedBobBoost
+                    }
+                    scaleY = when {
+                        tile.isCrushing -> crushScaleAnim.value
+                        isFallingMidAir -> 1f + (fallSpeedFactor * 0.20f)
+                        squash > 0.01f -> 1f - (squashWave * 0.22f)
+                        else -> baseScale + swapBoost + dragBoost + hintScaleBoost + selectedBobBoost
+                    }
+
+                    // 3D Origami tilt & rotation
+                    cameraDistance = 14f * this.density
+                    rotationZ = when {
+                        tile.isCrushing -> crushRotAnim.value
+                        swapP > 0.01f -> arcSin * arcSign * 18f
+                        isDraggingNow -> (dragFollowX / cellPx) * 22f
+                        isHinted -> wave * 6f
+                        isSelected -> wave * 5f
+                        else -> 0f
+                    }
+                    rotationY = when {
+                        swapP > 0.01f && isHorizontalSwap -> arcSin * arcSign * 26f
+                        isDraggingNow -> (dragFollowX / cellPx) * 18f
+                        else -> 0f
+                    }
+                    rotationX = when {
+                        swapP > 0.01f && !isHorizontalSwap -> -arcSin * arcSign * 26f
+                        isFallingMidAir -> fallSpeedFactor * 12f
+                        squash > 0.01f -> -squashWave * 14f
+                        isDraggingNow -> -(dragFollowY / cellPx) * 18f
+                        else -> 0f
+                    }
                 }
         )
     }
