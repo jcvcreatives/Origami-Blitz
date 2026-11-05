@@ -7,6 +7,7 @@ import com.example.audio.PaperSoundSynthesizer
 import com.example.model.BOARD_SIZE
 import com.example.model.BoardTile
 import com.example.model.BoosterType
+import com.example.model.ConfettiDepthLayer
 import com.example.model.ConfettiScrap
 import com.example.model.FloatingScorePopup
 import com.example.model.GameStatus
@@ -15,6 +16,7 @@ import com.example.model.LevelGoal
 import com.example.model.PaperGameState
 import com.example.model.PieceType
 import com.example.model.buildGoalsForLevel
+import com.example.model.computeDioramaLandingY
 import com.example.model.getMovesForLevel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -579,7 +581,6 @@ class PaperCrushViewModel(
 
             combo += 1
             soundSynth.playComboChord(combo)
-            soundSynth.playPaperCrinkle(combo.coerceAtMost(4))
 
             val matchedTiles = matchedPositions.map { currentBoard[it.row][it.col] }
             spawnConfettiForTiles(
@@ -1022,30 +1023,39 @@ class PaperCrushViewModel(
         scrapsPerTile: Int = 15
     ) {
         val created = ArrayList<ConfettiScrap>(tiles.size * scrapsPerTile)
+        val layers = ConfettiDepthLayer.entries
         tiles.forEach { tile ->
             val centerX = (tile.col + 0.5f) / BOARD_SIZE
-            val centerY = 0.25f + ((tile.row + 0.5f) / BOARD_SIZE) * 0.52f
-            repeat(scrapsPerTile) {
+            val centerY = 0.25f + ((tile.row + 0.5f) / BOARD_SIZE) * 0.50f
+            repeat(scrapsPerTile) { idx ->
+                val depthLayer = layers[idx % layers.size]
                 val angle = Random.nextFloat() * (Math.PI * 2f).toFloat()
-                val speed = 0.004f + Random.nextFloat() * 0.014f
+                val speed = (0.0045f + Random.nextFloat() * 0.013f) * (0.85f + depthLayer.targetScale * 0.22f)
                 created.add(
                     ConfettiScrap(
                         id = nextScrapId++,
-                        x = centerX + (Random.nextFloat() - 0.5f) * 0.05f,
+                        x = (centerX + (Random.nextFloat() - 0.5f) * 0.05f).coerceIn(0.03f, 0.97f),
                         y = centerY + (Random.nextFloat() - 0.5f) * 0.05f,
                         vx = kotlin.math.cos(angle) * speed,
-                        vy = kotlin.math.sin(angle) * speed - 0.008f,
+                        vy = kotlin.math.sin(angle) * speed - 0.0085f,
                         rotation = Random.nextFloat() * 360f,
                         vRotation = (Random.nextFloat() - 0.5f) * 22f,
-                        widthDp = 7f + Random.nextFloat() * 7f,
-                        heightDp = 5f + Random.nextFloat() * 6f,
-                        color = if (it % 2 == 0) tile.type.primaryColor else tile.type.secondaryColor,
-                        foldColor = tile.type.secondaryColor
+                        widthDp = 7.5f + Random.nextFloat() * 6.5f,
+                        heightDp = 5.5f + Random.nextFloat() * 5.5f,
+                        color = if (idx % 2 == 0) tile.type.primaryColor else tile.type.secondaryColor,
+                        foldColor = tile.type.secondaryColor,
+                        depthLayer = depthLayer,
+                        depthScale = 1f,
+                        landingBandOffset = 0.08f + Random.nextFloat() * 0.84f,
+                        flutterPhase = Random.nextFloat() * (Math.PI * 2f).toFloat(),
+                        vFlutter = 0.16f + Random.nextFloat() * 0.16f,
+                        bounceCount = 0,
+                        isLanded = false
                     )
                 )
             }
         }
-        _confettiScraps.update { (it + created).takeLast(240) }
+        _confettiScraps.update { (it + created).takeLast(260) }
         ensureParticleLoopRunning()
     }
 
@@ -1060,18 +1070,69 @@ class PaperCrushViewModel(
                 lastTimeNs = nowNs
                 _confettiScraps.update { current ->
                     current.mapNotNull { s ->
-                        val nextAlpha = s.alpha - (0.024f * dtScale)
-                        if (nextAlpha <= 0f || s.y > 1.15f) {
-                            null
+                        if (s.isLanded) {
+                            // Landed scraps rest on their diorama layer contour and fade out gently
+                            val nextAlpha = s.alpha - (0.0062f * dtScale)
+                            if (nextAlpha <= 0f) {
+                                null
+                            } else {
+                                s.copy(alpha = nextAlpha)
+                            }
                         } else {
-                            s.copy(
-                                x = s.x + s.vx * dtScale,
-                                y = s.y + s.vy * dtScale,
-                                vx = s.vx * (1f - 0.02f * dtScale) + (kotlin.math.sin(s.rotation * 0.05f) * 0.0004f * dtScale),
-                                vy = s.vy + 0.00085f * dtScale, // gravity
-                                rotation = s.rotation + s.vRotation * dtScale,
-                                alpha = nextAlpha
-                            )
+                            val nextAlpha = s.alpha - (0.014f * dtScale)
+                            if (nextAlpha <= 0f || s.y > 1.12f) {
+                                null
+                            } else {
+                                val nextFlutter = s.flutterPhase + s.vFlutter * dtScale
+                                val flutterSway = kotlin.math.sin(nextFlutter) * 0.00042f * dtScale
+                                val nextVx = s.vx * (1f - 0.022f * dtScale) + flutterSway
+                                val nextVy = s.vy + (0.00084f * s.depthLayer.gravityScale * dtScale)
+                                val rawX = (s.x + nextVx * dtScale).coerceIn(0.02f, 0.98f)
+                                val rawY = s.y + nextVy * dtScale
+                                val nextScale = s.depthScale + (s.depthLayer.targetScale - s.depthScale) * (0.08f * dtScale).coerceIn(0f, 1f)
+
+                                val contourY = computeDioramaLandingY(rawX, s.depthLayer, s.landingBandOffset)
+                                if (rawY >= contourY && nextVy > 0f) {
+                                    if (s.bounceCount == 0 && nextVy > 0.0032f) {
+                                        // Crisp paper bounce on the diorama hill or craft table
+                                        s.copy(
+                                            x = rawX,
+                                            y = contourY,
+                                            vx = nextVx * 0.52f,
+                                            vy = -nextVy * 0.28f,
+                                            rotation = s.rotation + s.vRotation * dtScale,
+                                            vRotation = s.vRotation * 0.45f,
+                                            depthScale = s.depthLayer.targetScale,
+                                            flutterPhase = nextFlutter,
+                                            bounceCount = 1,
+                                            alpha = nextAlpha
+                                        )
+                                    } else {
+                                        // Settle flat onto the paper landscape layer
+                                        s.copy(
+                                            x = rawX,
+                                            y = contourY,
+                                            vx = 0f,
+                                            vy = 0f,
+                                            vRotation = 0f,
+                                            depthScale = s.depthLayer.targetScale,
+                                            isLanded = true,
+                                            alpha = nextAlpha.coerceAtLeast(0.82f)
+                                        )
+                                    }
+                                } else {
+                                    s.copy(
+                                        x = rawX,
+                                        y = rawY,
+                                        vx = nextVx,
+                                        vy = nextVy,
+                                        rotation = s.rotation + s.vRotation * dtScale,
+                                        depthScale = nextScale,
+                                        flutterPhase = nextFlutter,
+                                        alpha = nextAlpha
+                                    )
+                                }
+                            }
                         }
                     }
                 }

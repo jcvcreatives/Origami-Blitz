@@ -106,7 +106,8 @@
       will-change: background;
     }
 
-    /* Confetti Canvas Overlay */
+    /* Confetti Canvas Overlays (Backdrop Depth Plane + Foreground Burst Plane) */
+    #diorama-confetti-canvas,
     #confetti-canvas {
       position: fixed;
       top: 0;
@@ -114,6 +115,11 @@
       width: 100%;
       height: 100%;
       pointer-events: none;
+    }
+    #diorama-confetti-canvas {
+      z-index: 2;
+    }
+    #confetti-canvas {
       z-index: 30;
     }
 
@@ -1242,7 +1248,8 @@
     </div>
   </div>
 
-  <!-- 3. Full-Screen Confetti Shred Canvas & Tilt Lighting Overlay -->
+  <!-- 3. Dual-Depth Confetti Shred Canvases & Tilt Lighting Overlay -->
+  <canvas id="diorama-confetti-canvas"></canvas>
   <canvas id="confetti-canvas"></canvas>
   <div id="lighting-overlay"></div>
 
@@ -1399,14 +1406,27 @@
     class PaperAudioSynth {
       constructor() {
         this.ctx = null;
+        this.master = null;
         this.enabled = true;
+        this.tapIdx = 0;
+        this.pentatonic = [523.25, 587.33, 659.25, 783.99, 880.00, 1046.50, 1174.66, 1318.51, 1567.98];
       }
       ensureCtx() {
         if (!this.enabled) return null;
         if (!this.ctx) {
           const AC = window.AudioContext || window.webkitAudioContext;
           if (AC) {
-            try { this.ctx = new AC(); } catch (_) {}
+            try {
+              this.ctx = new AC();
+              const comp = this.ctx.createDynamicsCompressor();
+              comp.threshold.setValueAtTime(-14, this.ctx.currentTime);
+              comp.knee.setValueAtTime(18, this.ctx.currentTime);
+              comp.ratio.setValueAtTime(4, this.ctx.currentTime);
+              comp.attack.setValueAtTime(0.003, this.ctx.currentTime);
+              comp.release.setValueAtTime(0.15, this.ctx.currentTime);
+              comp.connect(this.ctx.destination);
+              this.master = comp;
+            } catch (_) {}
           }
         }
         if (this.ctx && this.ctx.state === 'suspended') {
@@ -1414,110 +1434,278 @@
         }
         return this.ctx;
       }
+      dest() {
+        return this.master || (this.ctx && this.ctx.destination);
+      }
       playCrinkle(intensity = 1) {
         const ctx = this.ensureCtx();
         if (!ctx) return;
-        const dur = 0.14 + Math.min(intensity, 4) * 0.025;
-        const bufferSize = Math.floor(ctx.sampleRate * dur);
-        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-          const t = i / ctx.sampleRate;
-          const env = Math.exp(-15 * t);
-          data[i] = (Math.random() * 2 - 1) * env * 0.45;
-        }
-        const noise = ctx.createBufferSource();
-        noise.buffer = buffer;
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'bandpass';
-        filter.frequency.value = 1700;
-        filter.Q.value = 1.4;
-        noise.connect(filter);
-        filter.connect(ctx.destination);
-        noise.start();
+        const now = ctx.currentTime;
+        const baseFreq = this.pentatonic[(this.tapIdx++ + Math.max(0, intensity - 1)) % this.pentatonic.length];
+
+        // Warm kalimba / marimba bubble-pop fundamental + 2nd harmonic
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc1.type = 'sine';
+        osc2.type = 'triangle';
+        osc1.frequency.setValueAtTime(baseFreq * 1.16, now);
+        osc1.frequency.exponentialRampToValueAtTime(baseFreq, now + 0.026);
+        osc2.frequency.setValueAtTime(baseFreq * 2.0, now);
+
+        const g2 = ctx.createGain();
+        g2.gain.setValueAtTime(0.22, now);
+        g2.gain.exponentialRampToValueAtTime(0.001, now + 0.065);
+
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.24, now + 0.004);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+
+        osc1.connect(gain);
+        osc2.connect(g2);
+        g2.connect(gain);
+        gain.connect(this.dest());
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 0.145);
+        osc2.stop(now + 0.07);
       }
       playWhoosh() {
         const ctx = this.ensureCtx();
         if (!ctx) return;
-        const osc = ctx.createOscillator();
+        const now = ctx.currentTime;
+        // Silky two-note marimba/flute glide (G4 -> D5)
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(340, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(640, ctx.currentTime + 0.14);
-        gain.gain.setValueAtTime(0.24, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.16);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.16);
-        this.playCrinkle(1);
+        osc1.type = 'sine';
+        osc2.type = 'triangle';
+        osc1.frequency.setValueAtTime(392.00, now);
+        osc1.frequency.exponentialRampToValueAtTime(587.33, now + 0.13);
+        osc2.frequency.setValueAtTime(784.00, now);
+        osc2.frequency.exponentialRampToValueAtTime(1174.66, now + 0.13);
+
+        const g2 = ctx.createGain();
+        g2.gain.setValueAtTime(0.18, now);
+        g2.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.22, now + 0.006);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.145);
+
+        osc1.connect(gain);
+        osc2.connect(g2);
+        g2.connect(gain);
+        gain.connect(this.dest());
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 0.15);
+        osc2.stop(now + 0.14);
       }
-      playBounce() {
+      playInvalidShake() {
         const ctx = this.ensureCtx();
         if (!ctx) return;
-        [0, 0.035, 0.07].forEach((delay, idx) => {
+        const now = ctx.currentTime;
+        // Cute wooden marimba double-knock (E4 -> C4)
+        [
+          { delay: 0, freq: 329.63 },
+          { delay: 0.09, freq: 261.63 }
+        ].forEach(({ delay, freq }) => {
+          const start = now + delay;
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
-          const start = ctx.currentTime + delay;
           osc.type = 'triangle';
-          osc.frequency.setValueAtTime(210 + idx * 35, start);
-          osc.frequency.exponentialRampToValueAtTime(95, start + 0.09);
-          gain.gain.setValueAtTime(0.22, start);
-          gain.gain.exponentialRampToValueAtTime(0.001, start + 0.09);
+          osc.frequency.setValueAtTime(freq, start);
+          gain.gain.setValueAtTime(0.001, start);
+          gain.gain.linearRampToValueAtTime(0.20, start + 0.004);
+          gain.gain.exponentialRampToValueAtTime(0.001, start + 0.085);
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(this.dest());
           osc.start(start);
-          osc.stop(start + 0.095);
+          osc.stop(start + 0.09);
         });
+      }
+      playBounce(tileCount = 4) {
+        const ctx = this.ensureCtx();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const hits = Math.max(2, Math.min(5, tileCount));
+        const dropNotes = [261.63, 293.66, 329.63, 392.00, 440.00];
+        for (let i = 0; i < hits; i++) {
+          const start = now + i * 0.030;
+          const f = dropNotes[i % dropNotes.length];
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(f * 0.90, start);
+          osc.frequency.exponentialRampToValueAtTime(f, start + 0.025);
+          gain.gain.setValueAtTime(0.001, start);
+          gain.gain.linearRampToValueAtTime(0.20, start + 0.004);
+          gain.gain.exponentialRampToValueAtTime(0.001, start + 0.11);
+          osc.connect(gain);
+          gain.connect(this.dest());
+          osc.start(start);
+          osc.stop(start + 0.115);
+        }
       }
       playSnip() {
         const ctx = this.ensureCtx();
         if (!ctx) return;
+        const now = ctx.currentTime;
+        // Twin silver-bell shear notes: E6 -> A6
+        [
+          { delay: 0, freq: 1318.51 },
+          { delay: 0.075, freq: 1760.00 }
+        ].forEach(({ delay, freq }) => {
+          const start = now + delay;
+          const osc = ctx.createOscillator();
+          const osc2 = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc2.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, start);
+          osc2.frequency.setValueAtTime(freq * 2, start);
+          const g2 = ctx.createGain();
+          g2.gain.setValueAtTime(0.22, start);
+          g2.gain.exponentialRampToValueAtTime(0.001, start + 0.09);
+
+          gain.gain.setValueAtTime(0.001, start);
+          gain.gain.linearRampToValueAtTime(0.24, start + 0.003);
+          gain.gain.exponentialRampToValueAtTime(0.001, start + 0.14);
+          osc.connect(gain);
+          osc2.connect(g2);
+          g2.connect(gain);
+          gain.connect(this.dest());
+          osc.start(start);
+          osc2.start(start);
+          osc.stop(start + 0.145);
+          osc2.stop(start + 0.095);
+        });
+      }
+      playGlue() {
+        const ctx = this.ensureCtx();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        // Juicy rising bubble glide (G4 -> G5) + C6 pop
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(1800, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(3200, ctx.currentTime + 0.12);
-        gain.gain.setValueAtTime(0.28, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.13);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(392.00, now);
+        osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.16);
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.25, now + 0.005);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
         osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.13);
-        this.playCrinkle(2);
+        gain.connect(this.dest());
+        osc.start(now);
+        osc.stop(now + 0.185);
+
+        const pop = ctx.createOscillator();
+        const popGain = ctx.createGain();
+        pop.type = 'triangle';
+        pop.frequency.setValueAtTime(1046.50, now + 0.09);
+        popGain.gain.setValueAtTime(0.001, now + 0.09);
+        popGain.gain.linearRampToValueAtTime(0.20, now + 0.094);
+        popGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        pop.connect(popGain);
+        popGain.connect(this.dest());
+        pop.start(now + 0.09);
+        pop.stop(now + 0.225);
       }
       playSmash() {
         const ctx = this.ensureCtx();
         if (!ctx) return;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(150, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(48, ctx.currentTime + 0.26);
-        gain.gain.setValueAtTime(0.45, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.28);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.28);
-        this.playCrinkle(4);
+        const now = ctx.currentTime;
+        // Warm sub-bass drum thump (160Hz -> 52Hz) + wooden power chord
+        const kick = ctx.createOscillator();
+        const kickGain = ctx.createGain();
+        kick.type = 'sine';
+        kick.frequency.setValueAtTime(160, now);
+        kick.frequency.exponentialRampToValueAtTime(52, now + 0.22);
+        kickGain.gain.setValueAtTime(0.001, now);
+        kickGain.gain.linearRampToValueAtTime(0.38, now + 0.004);
+        kickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.30);
+        kick.connect(kickGain);
+        kickGain.connect(this.dest());
+        kick.start(now);
+        kick.stop(now + 0.31);
+
+        [523.25, 783.99, 1046.50].forEach(freq => {
+          const osc = ctx.createOscillator();
+          const g = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now);
+          g.gain.setValueAtTime(0.001, now);
+          g.gain.linearRampToValueAtTime(0.12, now + 0.005);
+          g.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
+          osc.connect(g);
+          g.connect(this.dest());
+          osc.start(now);
+          osc.stop(now + 0.265);
+        });
       }
       playChord(step = 1) {
         const ctx = this.ensureCtx();
         if (!ctx) return;
-        const mult = Math.pow(2, Math.min(step - 1, 8) * 2 / 12);
-        [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
-          const osc = ctx.createOscillator();
+        const now = ctx.currentTime;
+        const mult = Math.pow(2, Math.min(step - 1, 10) * 2 / 12);
+        // 5-note Major 9th Celesta & Harp arpeggio (C5, E5, G5, C6, D6)
+        [523.25, 659.25, 783.99, 1046.50, 1174.66].forEach((freq, idx) => {
+          const start = now + idx * 0.036;
+          const f = freq * mult;
+          const osc1 = ctx.createOscillator();
+          const osc2 = ctx.createOscillator();
           const gain = ctx.createGain();
-          const start = ctx.currentTime + idx * 0.04;
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(freq * mult, start);
-          gain.gain.setValueAtTime(0.16, start);
-          gain.gain.exponentialRampToValueAtTime(0.001, start + 0.28);
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start(start);
-          osc.stop(start + 0.29);
+          osc1.type = 'sine';
+          osc2.type = 'triangle';
+          osc1.frequency.setValueAtTime(f, start);
+          osc2.frequency.setValueAtTime(f * 2.0, start);
+
+          const g2 = ctx.createGain();
+          g2.gain.setValueAtTime(0.20, start);
+          g2.gain.exponentialRampToValueAtTime(0.001, start + 0.16);
+
+          gain.gain.setValueAtTime(0.001, start);
+          gain.gain.linearRampToValueAtTime(0.20, start + 0.004);
+          gain.gain.exponentialRampToValueAtTime(0.001, start + 0.34);
+
+          osc1.connect(gain);
+          osc2.connect(g2);
+          g2.connect(gain);
+          gain.connect(this.dest());
+          osc1.start(start);
+          osc2.start(start);
+          osc1.stop(start + 0.35);
+          osc2.stop(start + 0.17);
+        });
+      }
+      playFanfare() {
+        const ctx = this.ensureCtx();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        // 6-note celebratory royal celesta fanfare (C5 - E5 - G5 - B5 - D6 - G6)
+        [523.25, 659.25, 783.99, 987.77, 1174.66, 1567.98].forEach((freq, idx) => {
+          const start = now + idx * 0.052;
+          const osc1 = ctx.createOscillator();
+          const osc2 = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc1.type = 'sine';
+          osc2.type = 'triangle';
+          osc1.frequency.setValueAtTime(freq, start);
+          osc2.frequency.setValueAtTime(freq * 1.003, start);
+
+          const sustain = idx === 5 ? 0.52 : 0.34;
+          gain.gain.setValueAtTime(0.001, start);
+          gain.gain.linearRampToValueAtTime(0.18, start + 0.004);
+          gain.gain.exponentialRampToValueAtTime(0.001, start + sustain);
+
+          osc1.connect(gain);
+          osc2.connect(gain);
+          gain.connect(this.dest());
+          osc1.start(start);
+          osc2.start(start);
+          osc1.stop(start + sustain + 0.01);
+          osc2.stop(start + sustain + 0.01);
         });
       }
     }
@@ -1531,6 +1719,8 @@
     const boosterLandscapeSlotEl = document.getElementById('booster-landscape-slot');
     const canvas = document.getElementById('confetti-canvas');
     const cctx = canvas.getContext('2d');
+    const dioramaCanvas = document.getElementById('diorama-confetti-canvas');
+    const dctx = dioramaCanvas.getContext('2d');
     let dpr = 1;
 
     function syncResponsiveLayout() {
@@ -1540,6 +1730,9 @@
       canvas.width = Math.floor(vw * dpr);
       canvas.height = Math.floor(vh * dpr);
       cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      dioramaCanvas.width = Math.floor(vw * dpr);
+      dioramaCanvas.height = Math.floor(vh * dpr);
+      dctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       const isLandscapeMode = (vw > vh && vh <= 620) || (vw >= 720 && vw > vh);
       if (isLandscapeMode) {
@@ -1607,36 +1800,129 @@
       slot.ringDiv.className = `cell-ring ${ringType}`;
     }
 
-    /* Unified 60fps Master Animation & Confetti Loop (Cross-Browser Delta-Time Engine) */
+    /* Unified 60fps Master Animation & Depth-Layered Confetti Loop */
     let scraps = [];
     const activeTileAnims = new Map();
     let boardPunchState = null;
     let activeDragPreview = null; // { r, c, dxPx, dyPx }
     let lastFrameTime = performance.now();
+    let currentTiltX = 0;
+    let currentTiltY = 0;
+
+    // 3 Paper Landscape Depth Layers matching the SVG Diorama (Far Hill, Near Hill, Craft Table)
+    const CONFETTI_DEPTH_LAYERS = [
+      { id: 0, name: 'FAR_HILL', targetScale: 0.66, gravityScale: 0.72, parallaxX: 22, parallaxY: 14 },
+      { id: 1, name: 'NEAR_HILL', targetScale: 0.92, gravityScale: 0.95, parallaxX: 34, parallaxY: 20 },
+      { id: 2, name: 'CRAFT_TABLE', targetScale: 1.22, gravityScale: 1.18, parallaxX: 44, parallaxY: 24 }
+    ];
+
+    function computeDioramaLandingY(pxX, layerId, bandOffset, vw, vh) {
+      const nx = Math.max(0, Math.min(1, pxX / Math.max(1, vw)));
+      const t = (nx + 0.08) / 1.16;
+      const waveSin = Math.sin(t * Math.PI * 2.0);
+      if (layerId === 0) {
+        // Far Mint-Emerald Pine Hill contour
+        const ridgeY = 0.58 + waveSin * 0.04;
+        return (ridgeY + 0.008 + bandOffset * 0.068) * vh;
+      } else if (layerId === 1) {
+        // Near Meadow Hill contour
+        const ridgeY = 0.70 - waveSin * 0.035;
+        return (ridgeY + 0.010 + bandOffset * 0.092) * vh;
+      } else {
+        // Foreground Kraft Craft-Table contour
+        const ridgeY = 0.84 + waveSin * 0.012;
+        return (ridgeY + 0.012 + bandOffset * 0.105) * vh;
+      }
+    }
+
+    function isScrapInBackdropPlane(s, vh) {
+      if (s.isLanded || s.bounceCount > 0) return true;
+      const ny = s.y / Math.max(1, vh);
+      if (s.layer.id === 0) return s.vy > 0 && ny >= 0.46;
+      if (s.layer.id === 1) return s.vy > 0 && ny >= 0.58;
+      return false;
+    }
+
+    function drawScrapOnContext(ctx, s) {
+      const px = s.x + currentTiltX * s.layer.parallaxX;
+      const py = s.y + currentTiltY * s.layer.parallaxY;
+      const sc = s.depthScale;
+      const sw = s.w * sc;
+      const sh = s.h * sc;
+      const flutterScaleY = s.isLanded ? 0.76 : (0.34 + 0.66 * Math.abs(Math.cos(s.flutterPhase)));
+      const shadowMult = s.isLanded ? 0.35 : 0.85;
+      const shX = (-currentTiltX * 6 + 3) * sc * shadowMult;
+      const shY = (-currentTiltY * 6 + 4) * sc * shadowMult;
+
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, s.alpha));
+      ctx.translate(px, py);
+      ctx.rotate((s.rot * Math.PI) / 180);
+      ctx.scale(1, flutterScaleY);
+
+      // Soft paper contact / drop shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+      ctx.beginPath();
+      ctx.moveTo(-sw * 0.5 + shX, -sh * 0.4 + shY);
+      ctx.lineTo(sw * 0.45 + shX, -sh * 0.5 + shY);
+      ctx.lineTo(sw * 0.55 + shX, sh * 0.35 + shY);
+      ctx.lineTo(-sw * 0.35 + shX, sh * 0.5 + shY);
+      ctx.closePath();
+      ctx.fill();
+
+      // Primary paper scrap body
+      ctx.fillStyle = s.color;
+      ctx.beginPath();
+      ctx.moveTo(-sw * 0.5, -sh * 0.4);
+      ctx.lineTo(sw * 0.45, -sh * 0.5);
+      ctx.lineTo(sw * 0.55, sh * 0.35);
+      ctx.lineTo(-sw * 0.35, sh * 0.5);
+      ctx.closePath();
+      ctx.fill();
+
+      // Origami fold facet
+      ctx.fillStyle = s.foldColor;
+      ctx.beginPath();
+      ctx.moveTo(-sw * 0.5, -sh * 0.4);
+      ctx.lineTo(sw * 0.45, -sh * 0.5);
+      ctx.lineTo(0, 0);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.restore();
+    }
 
     function spawnConfettiAtCell(r, c, piece, count = 16) {
       const rect = boardGridEl.getBoundingClientRect();
       const cx = rect.left + ((c + 0.5) / BOARD_SIZE) * rect.width;
       const cy = rect.top + ((r + 0.5) / BOARD_SIZE) * rect.height;
       for (let i = 0; i < count; i++) {
+        const layer = CONFETTI_DEPTH_LAYERS[i % CONFETTI_DEPTH_LAYERS.length];
         const angle = Math.random() * Math.PI * 2;
-        const speed = 2.6 + Math.random() * 7.6;
+        const speed = (2.6 + Math.random() * 7.4) * (0.85 + layer.targetScale * 0.22);
         scraps.push({
           x: cx + (Math.random() - 0.5) * 18,
           y: cy + (Math.random() - 0.5) * 18,
           vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed - 4.2,
+          vy: Math.sin(angle) * speed - 4.4,
           rot: Math.random() * 360,
           vRot: (Math.random() - 0.5) * 19,
-          w: 7 + Math.random() * 8,
-          h: 5 + Math.random() * 7,
+          w: 7.5 + Math.random() * 7.5,
+          h: 5.5 + Math.random() * 6.5,
           color: i % 2 === 0 ? piece.c1 : piece.c2,
           foldColor: piece.c2,
-          alpha: 1
+          alpha: 1,
+          layer,
+          depthScale: 1,
+          landingBandOffset: 0.08 + Math.random() * 0.84,
+          flutterPhase: Math.random() * Math.PI * 2,
+          vFlutter: 0.16 + Math.random() * 0.16,
+          bounceCount: 0,
+          isLanded: false
         });
       }
-      if (scraps.length > 240) {
-        scraps.splice(0, scraps.length - 240);
+      if (scraps.length > 260) {
+        scraps.splice(0, scraps.length - 260);
       }
     }
 
@@ -1669,45 +1955,71 @@
       const dtMs = Math.min(40, Math.max(4, now - lastFrameTime));
       const dtScale = dtMs / 16.6667;
       lastFrameTime = now;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
 
-      // 1. Update Confetti Particles on High-DPI Canvas
+      // 1. Update Depth-Layered Confetti Particles & Render across Backdrop + Foreground Canvases
+      cctx.clearRect(0, 0, vw, vh);
+      dctx.clearRect(0, 0, vw, vh);
+
       if (scraps.length > 0) {
-        cctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
         for (let i = scraps.length - 1; i >= 0; i--) {
           const s = scraps[i];
-          s.x += s.vx * dtScale;
-          s.y += s.vy * dtScale;
-          s.vx *= (1 - 0.02 * dtScale);
-          s.vy += 0.32 * dtScale;
-          s.rot += s.vRot * dtScale;
-          s.alpha -= 0.022 * dtScale;
-          if (s.alpha <= 0.02 || s.y > window.innerHeight + 40) {
-            scraps.splice(i, 1);
-            continue;
+          if (s.isLanded) {
+            s.y = computeDioramaLandingY(s.x, s.layer.id, s.landingBandOffset, vw, vh);
+            s.alpha -= 0.0062 * dtScale;
+            if (s.alpha <= 0.01) {
+              scraps.splice(i, 1);
+            }
+          } else {
+            s.flutterPhase += s.vFlutter * dtScale;
+            const flutterSway = Math.sin(s.flutterPhase) * 0.24 * dtScale;
+            s.vx = s.vx * (1 - 0.022 * dtScale) + flutterSway;
+            s.vy += 0.31 * s.layer.gravityScale * dtScale;
+            s.x = Math.max(12, Math.min(vw - 12, s.x + s.vx * dtScale));
+            s.y += s.vy * dtScale;
+            s.rot += s.vRot * dtScale;
+            s.depthScale += (s.layer.targetScale - s.depthScale) * Math.min(1, 0.08 * dtScale);
+            s.alpha -= 0.014 * dtScale;
+
+            const contourY = computeDioramaLandingY(s.x, s.layer.id, s.landingBandOffset, vw, vh);
+            if (s.y >= contourY && s.vy > 0) {
+              if (s.bounceCount === 0 && s.vy > 1.8) {
+                s.y = contourY;
+                s.vx *= 0.52;
+                s.vy = -s.vy * 0.28;
+                s.vRot *= 0.45;
+                s.depthScale = s.layer.targetScale;
+                s.bounceCount = 1;
+              } else {
+                s.y = contourY;
+                s.vx = 0;
+                s.vy = 0;
+                s.vRot = 0;
+                s.depthScale = s.layer.targetScale;
+                s.isLanded = true;
+                s.alpha = Math.max(s.alpha, 0.82);
+              }
+            }
+
+            if (s.alpha <= 0.02 || s.y > vh + 40) {
+              scraps.splice(i, 1);
+            }
           }
-          cctx.save();
-          cctx.globalAlpha = Math.max(0, s.alpha);
-          cctx.translate(s.x, s.y);
-          cctx.rotate((s.rot * Math.PI) / 180);
-          cctx.fillStyle = s.color;
-          cctx.beginPath();
-          cctx.moveTo(-s.w * 0.5, -s.h * 0.4);
-          cctx.lineTo(s.w * 0.45, -s.h * 0.5);
-          cctx.lineTo(s.w * 0.55, s.h * 0.35);
-          cctx.lineTo(-s.w * 0.35, s.h * 0.5);
-          cctx.closePath();
-          cctx.fill();
-          cctx.fillStyle = s.foldColor;
-          cctx.beginPath();
-          cctx.moveTo(-s.w * 0.5, -s.h * 0.4);
-          cctx.lineTo(s.w * 0.45, -s.h * 0.5);
-          cctx.lineTo(0, 0);
-          cctx.closePath();
-          cctx.fill();
-          cctx.restore();
         }
-      } else {
-        cctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+        // Draw back-to-front by depth layer (0: FAR_HILL, 1: NEAR_HILL, 2: CRAFT_TABLE)
+        for (let layerId = 0; layerId < 3; layerId++) {
+          for (let i = 0; i < scraps.length; i++) {
+            const s = scraps[i];
+            if (s.layer.id !== layerId) continue;
+            if (isScrapInBackdropPlane(s, vh)) {
+              drawScrapOnContext(dctx, s);
+            } else {
+              drawScrapOnContext(cctx, s);
+            }
+          }
+        }
       }
 
       // 2. Update Board Recoil / Punch
@@ -1890,6 +2202,8 @@
     function applyTiltLighting(tx, ty) {
       const clampedX = Math.max(-1, Math.min(1, tx));
       const clampedY = Math.max(-1, Math.min(1, ty));
+      currentTiltX = clampedX;
+      currentTiltY = clampedY;
       const lx = 50 + clampedX * 32;
       const ly = 38 + clampedY * 28;
       lightingEl.style.background = `
@@ -2312,9 +2626,9 @@
         if (matched.size === 0) break;
         combo++;
         audio.playChord(combo);
-        audio.playCrinkle(combo);
 
         if (colorStorm) {
+          audio.playFanfare();
           const keys = ['SCISSORS', 'GLUE', 'HAMMER'];
           const rk = keys[Math.floor(Math.random() * keys.length)];
           state.boosters[rk] = (state.boosters[rk] || 0) + 1;
@@ -2338,7 +2652,7 @@
         renderBoard(matched);
         await sleep(225);
         const dropMotion = dropAndRefill(matched);
-        audio.playBounce();
+        audio.playBounce(matched.size);
         renderAll(dropMotion);
         await sleep(340);
       }
@@ -2379,7 +2693,7 @@
         state.feverCharge = 0;
         state.feverMoves = Math.max(state.feverMoves, 3);
         triggeredFever = true;
-        audio.playChord(5);
+        audio.playFanfare();
       }
 
       if (set.size > 0) {
@@ -2437,6 +2751,7 @@
       if (won || state.moves <= 0) {
         clearTimeout(hintTimer);
         if (won) {
+          audio.playFanfare();
           const stars = (state.moves >= 9 || state.score >= 2200)
             ? 3
             : (state.moves >= 4 || state.score >= 1300) ? 2 : 1;
@@ -2687,7 +3002,7 @@
           state.glueFirst = null;
           state.boosters.GLUE--;
           state.activeBooster = null;
-          audio.playWhoosh();
+          audio.playGlue();
           const tmp = state.board[a.r][a.c];
           state.board[a.r][a.c] = state.board[r][c];
           state.board[r][c] = tmp;
@@ -2747,6 +3062,7 @@
       const { matched } = analyzeMatches(state.board);
       if (matched.size === 0) {
         state.streak = 0;
+        audio.playInvalidShake();
         renderBoard(new Set(), [a, b]);
         await sleep(200);
         audio.playWhoosh();

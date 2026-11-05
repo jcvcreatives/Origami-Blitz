@@ -11,8 +11,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.withTransform
+import com.example.model.ConfettiDepthLayer
 import com.example.model.ConfettiScrap
 import com.example.ui.theme.CardboardDark
 import com.example.ui.theme.CardboardLight
@@ -26,14 +26,18 @@ import com.example.ui.theme.PeppermintWhite
 import com.example.ui.theme.SkyBluePaper
 import com.example.ui.theme.SkyHorizonPaper
 import com.example.ui.theme.StarCardboardGold
+import kotlin.math.abs
+import kotlin.math.cos
 
 /**
- * Multi-layered paper diorama backdrop with tilt-driven parallax offsets and dynamic
- * drop-shadow shifts that accentuate the 3D depth of each construction paper layer.
+ * Multi-layered paper diorama backdrop with tilt-driven parallax offsets, dynamic
+ * drop-shadow shifts, and depth-interleaved confetti shreds that land and rest directly
+ * on the Far Hill, Near Meadow Hill, and Foreground Kraft Craft Table layers.
  */
 @Composable
 fun PaperDioramaBackdrop(
     tilt: DeviceTilt = DeviceTilt(),
+    scraps: List<ConfettiScrap> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     Canvas(modifier = modifier.fillMaxSize()) {
@@ -85,7 +89,7 @@ fun PaperDioramaBackdrop(
         drawCircle(Color(0xFFFFEA79), radius = w * 0.075f, center = sunCenter)
         drawCircle(StarCardboardGold, radius = w * 0.055f, center = sunCenter)
 
-        // 4. Far mint-emerald paper hill + pine trees (Parallax depth: 0.60x)
+        // 4. Far mint-emerald paper hill + pine trees + FAR_HILL confetti shreds (Parallax depth: 0.60x)
         withTransform({
             translate(left = tilt.x * maxShiftX * 0.60f, top = tilt.y * maxShiftY * 0.55f)
         }) {
@@ -105,9 +109,22 @@ fun PaperDioramaBackdrop(
 
             drawPaperPineTree(cx = w * 0.11f, baseY = h * 0.60f, scale = w * 0.085f, shadowShiftX = shadowShiftX)
             drawPaperPineTree(cx = w * 0.89f, baseY = h * 0.58f, scale = w * 0.095f, shadowShiftX = shadowShiftX)
+
+            // Confetti shreds that have settled or descended into the Far Hill layer
+            scraps.forEach { scrap ->
+                if (scrap.depthLayer == ConfettiDepthLayer.FAR_HILL && isScrapInBackdropPlane(scrap)) {
+                    drawConfettiScrapWithDepth(
+                        scrap = scrap,
+                        w = w,
+                        h = h,
+                        shadowShiftX = shadowShiftX * 0.35f,
+                        shadowShiftY = shadowShiftY * 0.35f
+                    )
+                }
+            }
         }
 
-        // 5. Near meadow-green paper hill + peeking origami critters (Parallax depth: 0.90x)
+        // 5. Near meadow-green paper hill + origami critters + NEAR_HILL confetti shreds (Parallax depth: 0.90x)
         withTransform({
             translate(left = tilt.x * maxShiftX * 0.90f, top = tilt.y * maxShiftY * 0.85f)
         }) {
@@ -127,9 +144,22 @@ fun PaperDioramaBackdrop(
 
             drawPeekingOrigamiBear(cx = w * 0.11f, cy = h * 0.71f, sizePx = w.coerceAtMost(h) * 0.12f)
             drawPeekingOrigamiSquirrel(cx = w * 0.89f, cy = h * 0.70f, sizePx = w.coerceAtMost(h) * 0.12f)
+
+            // Confetti shreds that have settled or descended into the Near Meadow Hill layer
+            scraps.forEach { scrap ->
+                if (scrap.depthLayer == ConfettiDepthLayer.NEAR_HILL && isScrapInBackdropPlane(scrap)) {
+                    drawConfettiScrapWithDepth(
+                        scrap = scrap,
+                        w = w,
+                        h = h,
+                        shadowShiftX = shadowShiftX * 0.50f,
+                        shadowShiftY = shadowShiftY * 0.50f
+                    )
+                }
+            }
         }
 
-        // 6. Warm Kraft craft-table foreground mat (Parallax depth: 1.15x)
+        // 6. Warm Kraft craft-table foreground mat + landed CRAFT_TABLE confetti shreds (Parallax depth: 1.15x)
         withTransform({
             translate(left = tilt.x * maxShiftX * 1.15f, top = tilt.y * maxShiftY * 1.10f)
         }) {
@@ -137,7 +167,140 @@ fun PaperDioramaBackdrop(
             drawPath(tableTear, PeppermintWhite.copy(alpha = 0.88f))
             val tableMat = buildTornWavePath(w, h, baseY = h * 0.84f, amp = h * 0.012f, offsetY = 0f)
             drawPath(tableMat, CraftTableKraft)
+
+            // Confetti shreds resting on the foreground Kraft craft table
+            scraps.forEach { scrap ->
+                if (scrap.depthLayer == ConfettiDepthLayer.CRAFT_TABLE && isScrapInBackdropPlane(scrap)) {
+                    drawConfettiScrapWithDepth(
+                        scrap = scrap,
+                        w = w,
+                        h = h,
+                        shadowShiftX = shadowShiftX * 0.65f,
+                        shadowShiftY = shadowShiftY * 0.65f
+                    )
+                }
+            }
         }
+    }
+}
+
+/**
+ * Determines whether a scrap has transitioned from the foreground board burst into its
+ * assigned diorama landscape layer (either landed, bounced on the contour, or falling onto the slope).
+ */
+private fun isScrapInBackdropPlane(scrap: ConfettiScrap): Boolean {
+    if (scrap.isLanded || scrap.bounceCount > 0) return true
+    return when (scrap.depthLayer) {
+        ConfettiDepthLayer.FAR_HILL -> scrap.vy > 0f && scrap.y >= 0.46f
+        ConfettiDepthLayer.NEAR_HILL -> scrap.vy > 0f && scrap.y >= 0.58f
+        ConfettiDepthLayer.CRAFT_TABLE -> false // Craft table scraps stay in foreground overlay until they land
+    }
+}
+
+/**
+ * Full-screen confetti shred overlay for airborne particles bursting out of the cardboard board,
+ * with depth-scaled perspective, 3D paper flutter, and tilt-reactive parallax.
+ */
+@Composable
+fun ConfettiShredOverlay(
+    scraps: List<ConfettiScrap>,
+    tilt: DeviceTilt = DeviceTilt(),
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier.fillMaxSize()) {
+        val w = size.width
+        val h = size.height
+        val maxShiftX = w * 0.032f
+        val maxShiftY = h * 0.022f
+        val shadowShiftX = -tilt.x * 6f + 3f
+        val shadowShiftY = -tilt.y * 6f + 4f
+
+        // Render airborne particles ordered back-to-front by depth layer
+        for (layer in ConfettiDepthLayer.entries) {
+            scraps.forEach { scrap ->
+                if (scrap.depthLayer == layer && !isScrapInBackdropPlane(scrap)) {
+                    withTransform({
+                        translate(
+                            left = tilt.x * maxShiftX * layer.parallaxFactorX,
+                            top = tilt.y * maxShiftY * layer.parallaxFactorY
+                        )
+                    }) {
+                        drawConfettiScrapWithDepth(
+                            scrap = scrap,
+                            w = w,
+                            h = h,
+                            shadowShiftX = shadowShiftX * scrap.depthScale,
+                            shadowShiftY = shadowShiftY * scrap.depthScale
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun DrawScope.drawConfettiScrapWithDepth(
+    scrap: ConfettiScrap,
+    w: Float,
+    h: Float,
+    shadowShiftX: Float,
+    shadowShiftY: Float
+) {
+    val px = scrap.x * w
+    val py = scrap.y * h
+    val depthSc = scrap.depthScale
+    val sw = scrap.widthDp * density * depthSc
+    val sh = scrap.heightDp * density * depthSc
+    // 3D paper tumble foreshortening in mid-air; flat perspective when resting on a hill/table
+    val flutterScaleY = if (scrap.isLanded) {
+        0.76f
+    } else {
+        0.34f + 0.66f * abs(cos(scrap.flutterPhase))
+    }
+    val alpha = scrap.alpha.coerceIn(0f, 1f)
+    val shadowMult = if (scrap.isLanded) 0.35f else 0.85f
+
+    withTransform({
+        translate(left = px, top = py)
+        rotate(degrees = scrap.rotation, pivot = Offset.Zero)
+        scale(scaleX = 1f, scaleY = flutterScaleY, pivot = Offset.Zero)
+    }) {
+        val sx = shadowShiftX * shadowMult
+        val sy = shadowShiftY * shadowMult
+        val shadowPath = Path().apply {
+            moveTo(-sw * 0.5f + sx, -sh * 0.4f + sy)
+            lineTo(sw * 0.45f + sx, -sh * 0.5f + sy)
+            lineTo(sw * 0.55f + sx, sh * 0.35f + sy)
+            lineTo(-sw * 0.35f + sx, sh * 0.5f + sy)
+            close()
+        }
+        drawPath(
+            path = shadowPath,
+            color = Color.Black.copy(alpha = (alpha * 0.22f).coerceIn(0f, 1f))
+        )
+
+        val bodyPath = Path().apply {
+            moveTo(-sw * 0.5f, -sh * 0.4f)
+            lineTo(sw * 0.45f, -sh * 0.5f)
+            lineTo(sw * 0.55f, sh * 0.35f)
+            lineTo(-sw * 0.35f, sh * 0.5f)
+            close()
+        }
+        drawPath(
+            path = bodyPath,
+            color = scrap.color.copy(alpha = alpha)
+        )
+
+        val foldPath = Path().apply {
+            moveTo(-sw * 0.5f, -sh * 0.4f)
+            lineTo(sw * 0.45f, -sh * 0.5f)
+            lineTo(0f, 0f)
+            close()
+        }
+        drawPath(
+            path = foldPath,
+            color = scrap.foldColor.copy(alpha = (alpha * 0.88f).coerceIn(0f, 1f))
+        )
     }
 }
 
@@ -313,47 +476,4 @@ private fun DrawScope.drawPeekingOrigamiSquirrel(cx: Float, cy: Float, sizePx: F
     drawPath(head, OrigamiFoxOrange)
     drawPath(head, PeppermintWhite.copy(alpha = 0.4f), style = Stroke(width = 2f))
     drawCircle(InkBrown, radius = r * 0.08f, center = Offset(cx - r * 0.24f, cy - r * 0.10f))
-}
-
-/**
- * Full-screen pointer-events-none confetti shred overlay bursting colorful paper scraps.
- */
-@Composable
-fun ConfettiShredOverlay(
-    scraps: List<ConfettiScrap>,
-    modifier: Modifier = Modifier
-) {
-    Canvas(modifier = modifier.fillMaxSize()) {
-        val w = size.width
-        val h = size.height
-        scraps.forEach { scrap ->
-            val px = scrap.x * w
-            val py = scrap.y * h
-            val sw = scrap.widthDp * density
-            val sh = scrap.heightDp * density
-            rotate(degrees = scrap.rotation, pivot = Offset(px, py)) {
-                val path = Path().apply {
-                    moveTo(px - sw * 0.5f, py - sh * 0.4f)
-                    lineTo(px + sw * 0.45f, py - sh * 0.5f)
-                    lineTo(px + sw * 0.55f, py + sh * 0.35f)
-                    lineTo(px - sw * 0.35f, py + sh * 0.5f)
-                    close()
-                }
-                drawPath(
-                    path = path,
-                    color = scrap.color.copy(alpha = scrap.alpha.coerceIn(0f, 1f))
-                )
-                val fold = Path().apply {
-                    moveTo(px - sw * 0.5f, py - sh * 0.4f)
-                    lineTo(px + sw * 0.45f, py - sh * 0.5f)
-                    lineTo(px, py)
-                    close()
-                }
-                drawPath(
-                    path = fold,
-                    color = scrap.foldColor.copy(alpha = (scrap.alpha * 0.85f).coerceIn(0f, 1f))
-                )
-            }
-        }
-    }
 }

@@ -78,10 +78,65 @@ data class LevelGoal(
         get() = collectedCount >= targetCount
 }
 
+enum class ConfettiDepthLayer(
+    val parallaxFactorX: Float,
+    val parallaxFactorY: Float,
+    val targetScale: Float,
+    val gravityScale: Float
+) {
+    FAR_HILL(
+        parallaxFactorX = 0.60f,
+        parallaxFactorY = 0.55f,
+        targetScale = 0.66f,
+        gravityScale = 0.72f
+    ),
+    NEAR_HILL(
+        parallaxFactorX = 0.90f,
+        parallaxFactorY = 0.85f,
+        targetScale = 0.92f,
+        gravityScale = 0.95f
+    ),
+    CRAFT_TABLE(
+        parallaxFactorX = 1.15f,
+        parallaxFactorY = 1.10f,
+        targetScale = 1.22f,
+        gravityScale = 1.18f
+    )
+}
+
+/**
+ * Computes the normalized Y coordinate (0f..1f) of the torn-paper diorama contour
+ * at normalized horizontal position [nx] for the given [layer], plus a [bandOffset] (0f..1f)
+ * so particles scatter across the visible surface of each paper landscape layer.
+ */
+fun computeDioramaLandingY(
+    nx: Float,
+    layer: ConfettiDepthLayer,
+    bandOffset: Float
+): Float {
+    // Matches buildTornWavePath: extraW = 0.08f, t = (nx + 0.08f) / 1.16f
+    val t = ((nx.coerceIn(0f, 1f) + 0.08f) / 1.16f)
+    val waveSin = kotlin.math.sin(t * Math.PI * 2.0).toFloat()
+    return when (layer) {
+        ConfettiDepthLayer.FAR_HILL -> {
+            val ridgeY = 0.58f + waveSin * 0.04f
+            ridgeY + 0.008f + bandOffset.coerceIn(0f, 1f) * 0.068f
+        }
+        ConfettiDepthLayer.NEAR_HILL -> {
+            val ridgeY = 0.70f - waveSin * 0.035f
+            ridgeY + 0.010f + bandOffset.coerceIn(0f, 1f) * 0.092f
+        }
+        ConfettiDepthLayer.CRAFT_TABLE -> {
+            val ridgeY = 0.84f + waveSin * 0.012f
+            ridgeY + 0.012f + bandOffset.coerceIn(0f, 1f) * 0.105f
+        }
+    }
+}
+
 data class ConfettiScrap(
     val id: Long,
-    val x: Float, // normalized 0..1 of board or screen width
-    val y: Float, // normalized 0..1 of board or screen height
+    val x: Float, // normalized 0..1 of screen width
+    val y: Float, // normalized 0..1 of screen height
     val vx: Float,
     val vy: Float,
     val rotation: Float,
@@ -91,7 +146,13 @@ data class ConfettiScrap(
     val color: Color,
     val foldColor: Color,
     val alpha: Float = 1f,
-    val shapeVariant: Int = 0
+    val depthLayer: ConfettiDepthLayer = ConfettiDepthLayer.NEAR_HILL,
+    val depthScale: Float = 1f,
+    val landingBandOffset: Float = 0.4f,
+    val flutterPhase: Float = 0f,
+    val vFlutter: Float = 0.22f,
+    val bounceCount: Int = 0,
+    val isLanded: Boolean = false
 )
 
 enum class GameStatus {

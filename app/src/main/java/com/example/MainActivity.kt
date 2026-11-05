@@ -107,8 +107,11 @@ fun PaperCraftCrushApp(
                 }
             }
     ) {
-        // 1. Multi-layer Paper & Origami Diorama Backdrop with tilt parallax
-        PaperDioramaBackdrop(tilt = deviceTilt)
+        // 1. Multi-layer Paper & Origami Diorama Backdrop with tilt parallax & landed depth confetti
+        PaperDioramaBackdrop(
+            tilt = deviceTilt,
+            scraps = confettiScraps
+        )
 
         // 2. Adaptive Layout compatible with all phones, foldables, tablets & landscape screens
         BoxWithConstraints(
@@ -216,8 +219,11 @@ fun PaperCraftCrushApp(
             }
         }
 
-        // 3. Full-Screen Confetti Shred Particle Overlay
-        ConfettiShredOverlay(scraps = confettiScraps)
+        // 3. Full-Screen Confetti Shred Particle Overlay (airborne depth-sorted particles)
+        ConfettiShredOverlay(
+            scraps = confettiScraps,
+            tilt = deviceTilt
+        )
 
         // 4. Subtle Global Tilt-Reactive Lighting & Paper Specular Sheen Overlay
         GlobalPaperLightingOverlay(tilt = deviceTilt)
