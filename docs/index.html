@@ -631,7 +631,7 @@
       background: var(--tape-cream);
       border: 2px solid var(--tape-border);
       border-radius: 16px;
-      padding: 24px;
+      padding: 22px;
       max-width: 360px;
       width: 100%;
       text-align: center;
@@ -639,13 +639,27 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
+    }
+    .modal-stage-tag {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--thumbtack-red);
+      letter-spacing: 0.5px;
     }
     .modal-title {
       font-size: 24px;
       font-weight: 700;
       color: var(--ink-brown);
     }
+    .modal-stars {
+      display: flex;
+      gap: 6px;
+      font-size: 30px;
+      line-height: 1;
+    }
+    .modal-stars .star-on { color: #FFB703; text-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+    .modal-stars .star-off { color: #E2D5C1; }
     #modal-icon svg {
       width: 100%;
       height: 100%;
@@ -653,16 +667,300 @@
     }
     .modal-btn {
       width: 100%;
-      height: 48px;
+      height: 46px;
       border: none;
       border-radius: 10px;
       background: #FF6B35;
       color: #fff;
       font-family: 'Fredoka', sans-serif;
-      font-size: 18px;
+      font-size: 17px;
       font-weight: 700;
       cursor: pointer;
       box-shadow: 0 4px 10px rgba(0,0,0,0.22);
+    }
+    .modal-btn.secondary {
+      background: var(--sticky-yellow);
+      color: var(--ink-brown);
+      border: 1.5px solid var(--cardboard-dark);
+      height: 42px;
+      font-size: 16px;
+    }
+
+    /* Map Pill Button in Top HUD */
+    .hud-left-btns {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .map-pill-btn {
+      height: 40px;
+      padding: 0 12px;
+      border-radius: 99px;
+      background: var(--sticky-yellow);
+      border: 1.5px solid var(--cardboard-dark);
+      font-family: 'Fredoka', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink-brown);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.16);
+    }
+    .tape-strips {
+      cursor: pointer;
+    }
+
+    /* Candy Crush-style Paper Craft Saga World Map Overlay */
+    #world-map-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 45;
+      background: linear-gradient(180deg, #BDE0FE 0%, #D8F3DC 55%, #F3E5D0 100%);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px 12px;
+    }
+    #world-map-modal.visible {
+      display: flex;
+    }
+    .map-shell {
+      width: 100%;
+      max-width: 520px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .map-header-bar {
+      background: var(--tape-cream);
+      border: 2px solid var(--cardboard-dark);
+      border-radius: 14px;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.18);
+      flex-shrink: 0;
+    }
+    .map-stars-pill {
+      background: var(--cardboard-dark);
+      color: #fff;
+      border-radius: 99px;
+      padding: 4px 10px;
+      font-size: 14px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .map-header-title {
+      text-align: center;
+    }
+    .map-header-title .t1 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--ink-brown);
+    }
+    .map-header-title .t2 {
+      font-family: 'Patrick Hand', cursive;
+      font-size: 14px;
+      color: var(--thumbtack-red);
+      font-weight: 700;
+    }
+    #map-scroll-area {
+      flex: 1;
+      overflow-y: auto;
+      background: rgba(247, 239, 225, 0.94);
+      border: 2.5px solid var(--cardboard-dark);
+      border-radius: 18px;
+      padding: 12px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: inset 0 3px 10px rgba(0,0,0,0.12);
+    }
+    .stage-card {
+      background: var(--tape-cream);
+      border: 2px solid var(--tape-border);
+      border-radius: 16px;
+      padding: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+    }
+    .stage-card.active-stage {
+      border: 2.5px solid var(--thumbtack-red);
+      box-shadow: 0 6px 16px rgba(255, 51, 85, 0.2);
+    }
+    .stage-banner {
+      border: 1.5px solid var(--cardboard-dark);
+      border-radius: 10px;
+      padding: 7px 10px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.16);
+    }
+    .stage-banner-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .stage-mascot {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--tape-cream);
+      border: 1.5px solid var(--cardboard-dark);
+      padding: 3px;
+      flex-shrink: 0;
+    }
+    .stage-trail-box {
+      position: relative;
+      width: 100%;
+      height: 390px;
+      margin-top: 8px;
+    }
+    .stage-trail-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    .map-node-wrap {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      width: 96px;
+      height: 78px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .map-node-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 2.5px solid var(--cardboard-dark);
+      font-family: 'Fredoka', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.24);
+      position: relative;
+      z-index: 2;
+      transition: transform 0.16s ease;
+    }
+    .map-node-btn.selected-node {
+      transform: scale(1.14);
+      border-color: var(--sticky-yellow);
+      box-shadow: 0 0 0 3px var(--cardboard-dark), 0 6px 12px rgba(0,0,0,0.3);
+    }
+    .map-node-btn.locked-node {
+      background: #E6CCB2 !important;
+      color: var(--ink-soft);
+      cursor: not-allowed;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.12);
+    }
+    .map-node-halo {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: rgba(255, 234, 121, 0.55);
+      border: 2px solid var(--thumbtack-red);
+      animation: nodeHaloPulse 0.7s ease-in-out infinite alternate;
+      z-index: 1;
+    }
+    @keyframes nodeHaloPulse {
+      0% { transform: scale(0.95); }
+      100% { transform: scale(1.14); }
+    }
+    .map-you-badge {
+      position: absolute;
+      top: -10px;
+      background: var(--sticky-yellow);
+      border: 1.5px solid var(--cardboard-dark);
+      border-radius: 99px;
+      padding: 1px 6px;
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--thumbtack-red);
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      z-index: 4;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.22);
+      animation: youBounce 0.55s ease-in-out infinite alternate;
+    }
+    .map-you-badge svg {
+      width: 14px;
+      height: 14px;
+    }
+    @keyframes youBounce {
+      0% { transform: translateY(0px); }
+      100% { transform: translateY(-5px); }
+    }
+    .map-node-stars {
+      position: absolute;
+      bottom: 0px;
+      background: var(--tape-cream);
+      border: 1px solid var(--cardboard-dark);
+      border-radius: 99px;
+      padding: 0px 5px;
+      font-size: 11px;
+      line-height: 1.2;
+      z-index: 3;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.18);
+    }
+    .map-inspector-card {
+      background: var(--sticky-yellow);
+      border: 2px solid var(--cardboard-dark);
+      border-radius: 14px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      box-shadow: 0 5px 12px rgba(0,0,0,0.22);
+      flex-shrink: 0;
+    }
+    .map-inspector-goals {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 3px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .map-inspector-goals .g-chip {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .map-inspector-goals .g-chip svg {
+      width: 20px;
+      height: 20px;
+    }
+    .map-play-btn {
+      background: var(--thumbtack-red);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 10px 16px;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.22);
+      white-space: nowrap;
     }
   </style>
 </head>
@@ -721,11 +1019,16 @@
   <div id="app-shell">
     <div id="hud-column">
       <div class="top-tape-row">
-        <button id="btn-sound" class="round-paper-btn" title="Toggle Paper SFX" aria-label="Toggle Paper SFX">
-          🔊
-        </button>
-        <div class="tape-strips">
-          <div class="tape-strip torn-tape">Paper Craft</div>
+        <div class="hud-left-btns">
+          <button id="btn-sound" class="round-paper-btn" title="Toggle Paper SFX" aria-label="Toggle Paper SFX">
+            🔊
+          </button>
+          <button id="btn-open-map" class="map-pill-btn" title="Open World Map">
+            🗺️ Map
+          </button>
+        </div>
+        <div id="header-tapes-group" class="tape-strips" title="Tap to view World Map">
+          <div id="stage-tape" class="tape-strip torn-tape">Stage 1</div>
           <div id="level-tape" class="tape-strip level-tape torn-tape">Torn Level 1</div>
         </div>
         <button id="btn-retry" class="round-paper-btn" title="Retry Level" aria-label="Retry Level">
@@ -828,13 +1131,45 @@
   <!-- 4. Win / Lose Modal -->
   <div id="status-modal">
     <div class="modal-card">
+      <div id="modal-stage-tag" class="modal-stage-tag">STAGE 1 • LEVEL 1</div>
       <div id="modal-title" class="modal-title">Level Complete!</div>
-      <div id="modal-icon" style="width:64px;height:64px;"></div>
-      <div id="modal-subtitle" style="font-family:'Patrick Hand',cursive;font-size:19px;">
+      <div id="modal-stars" class="modal-stars"></div>
+      <div id="modal-icon" style="width:58px;height:58px;"></div>
+      <div id="modal-subtitle" style="font-family:'Patrick Hand',cursive;font-size:18px;">
         You crafted all goal pieces and earned +1 booster bonus!
       </div>
-      <div id="modal-score" style="font-size:20px;color:#FF6B35;font-weight:700;">SCORE: 0</div>
+      <div id="modal-score" style="font-size:19px;color:#FF6B35;font-weight:700;">SCORE: 0</div>
       <button id="modal-action-btn" class="modal-btn">Next Torn Level</button>
+      <button id="modal-map-btn" class="modal-btn secondary">🗺️ World Map</button>
+    </div>
+  </div>
+
+  <!-- 5. Candy Crush-style Paper Craft Saga World Map Overlay -->
+  <div id="world-map-modal">
+    <div class="map-shell">
+      <div class="map-header-bar">
+        <div class="map-stars-pill">
+          <span style="color:#FFEA79;">★</span>
+          <span id="map-total-stars">0</span>
+        </div>
+        <div class="map-header-title">
+          <div class="t1">Paper Craft Trail</div>
+          <div id="map-current-stage-label" class="t2">Stage 1: Whispering Pine Woods</div>
+        </div>
+        <button id="btn-close-map" class="round-paper-btn" title="Resume Game">✕</button>
+      </div>
+
+      <div id="map-scroll-area"></div>
+
+      <div class="map-inspector-card">
+        <div>
+          <div id="map-insp-title" style="font-size:15px;font-weight:700;color:var(--ink-brown);">
+            Stage 1 • Level 1
+          </div>
+          <div id="map-insp-goals" class="map-inspector-goals"></div>
+        </div>
+        <button id="map-play-btn" class="map-play-btn">▶ Play Level 1</button>
+      </div>
     </div>
   </div>
 
@@ -1180,8 +1515,44 @@
       setTimeout(() => el.remove(), 730);
     }
 
+    const LEVELS_PER_STAGE = 5;
+    const STAGE_THEMES = [
+      { title: 'Whispering Pine Woods', subtitle: 'Woodland Origami Trail', color: '#52B788', pieceIdx: 4 },
+      { title: 'Peppermint Boardwalk', subtitle: 'Sweet Paper Pinwheel Pier', color: '#FF3355', pieceIdx: 0 },
+      { title: 'Golden Cardboard Canyon', subtitle: 'Corrugated Mesa Ridge', color: '#FFB703', pieceIdx: 3 },
+      { title: 'Starlight Origami Summit', subtitle: 'Cloud-Folded Sky Peaks', color: '#8B5CF6', pieceIdx: 5 }
+    ];
+
+    function getStageInfo(lvl) {
+      const stageNumber = Math.floor((lvl - 1) / LEVELS_PER_STAGE) + 1;
+      const theme = STAGE_THEMES[(stageNumber - 1) % STAGE_THEMES.length];
+      return {
+        stageNumber,
+        title: theme.title,
+        subtitle: theme.subtitle,
+        color: theme.color,
+        mascot: PIECES[theme.pieceIdx]
+      };
+    }
+
+    function getGoalsConfigForLevel(lvl) {
+      const p1 = PIECES[(lvl - 1) % PIECES.length];
+      const p2 = PIECES[(lvl + 2) % PIECES.length];
+      return {
+        moves: Math.min(30, 24 + (lvl % 3)),
+        goals: [
+          { piece: p1, target: 10 + Math.min(lvl * 2, 24), count: 0 },
+          { piece: p2, target: 8 + Math.min(lvl * 2, 20), count: 0 }
+        ]
+      };
+    }
+
     let state = {
       level: 1,
+      highestLevel: 1,
+      levelStars: {},
+      lastEarnedStars: 0,
+      mapSelectedLevel: 1,
       score: 0,
       highScore: 0,
       moves: 25,
@@ -1239,6 +1610,8 @@
         if (raw) {
           const parsed = JSON.parse(raw);
           state.level = parsed.level || 1;
+          state.highestLevel = Math.max(state.level, parsed.highestLevel || state.level);
+          state.levelStars = parsed.levelStars || {};
           state.highScore = parsed.highScore || 0;
           if (parsed.boosters) state.boosters = parsed.boosters;
           if (typeof parsed.sound === 'boolean') audio.enabled = parsed.sound;
@@ -1250,6 +1623,8 @@
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
           level: state.level,
+          highestLevel: state.highestLevel,
+          levelStars: state.levelStars,
           highScore: state.highScore,
           boosters: state.boosters,
           sound: audio.enabled
@@ -1282,8 +1657,12 @@
     function startLevel(lvl) {
       clearTimeout(hintTimer);
       state.level = lvl;
+      state.highestLevel = Math.max(state.highestLevel, lvl);
+      state.mapSelectedLevel = lvl;
       state.score = 0;
-      state.moves = Math.min(30, 24 + (lvl % 3));
+      const cfg = getGoalsConfigForLevel(lvl);
+      state.moves = cfg.moves;
+      state.goals = cfg.goals;
       state.activeBooster = null;
       state.glueFirst = null;
       state.selected = null;
@@ -1292,20 +1671,17 @@
       state.feverCharge = 0;
       state.feverMoves = 0;
       state.busy = false;
-      const p1 = PIECES[(lvl - 1) % PIECES.length];
-      const p2 = PIECES[(lvl + 2) % PIECES.length];
-      state.goals = [
-        { piece: p1, target: 10 + Math.min(lvl * 2, 24), count: 0 },
-        { piece: p2, target: 8 + Math.min(lvl * 2, 20), count: 0 }
-      ];
       state.board = generateBoard();
       document.getElementById('status-modal').classList.remove('visible');
+      document.getElementById('world-map-modal').classList.remove('visible');
       saveProgress();
       renderAll();
       scheduleIdleHint();
     }
 
     function renderAll(motionMap = null) {
+      const stg = getStageInfo(state.level);
+      document.getElementById('stage-tape').textContent = `Stage ${stg.stageNumber}`;
       document.getElementById('level-tape').textContent = `Torn Level ${state.level}`;
       document.getElementById('score-val').textContent = state.score;
       document.getElementById('best-val').textContent = `BEST: ${state.highScore}`;
@@ -1652,8 +2028,29 @@
       const won = state.goals.every(g => g.count >= g.target);
       if (won || state.moves <= 0) {
         clearTimeout(hintTimer);
+        if (won) {
+          const stars = (state.moves >= 9 || state.score >= 2200)
+            ? 3
+            : (state.moves >= 4 || state.score >= 1300) ? 2 : 1;
+          state.lastEarnedStars = stars;
+          state.levelStars[state.level] = Math.max(state.levelStars[state.level] || 0, stars);
+          state.highestLevel = Math.max(state.highestLevel, state.level + 1);
+          saveProgress();
+        }
+        const stg = getStageInfo(state.level);
         const modal = document.getElementById('status-modal');
+        document.getElementById('modal-stage-tag').textContent = `STAGE ${stg.stageNumber} • LEVEL ${state.level}`;
         document.getElementById('modal-title').textContent = won ? 'Level Complete!' : 'Out of Moves!';
+        const starsEl = document.getElementById('modal-stars');
+        if (won) {
+          const earned = state.lastEarnedStars || 1;
+          starsEl.innerHTML = [1, 2, 3].map(s =>
+            `<span class="${s <= earned ? 'star-on' : 'star-off'}">★</span>`
+          ).join('');
+          starsEl.style.display = 'flex';
+        } else {
+          starsEl.style.display = 'none';
+        }
         document.getElementById('modal-icon').innerHTML = state.goals[0].piece.svg;
         document.getElementById('modal-subtitle').textContent = won
           ? 'You crafted all goal pieces and earned +1 booster bonus!'
@@ -1670,8 +2067,172 @@
             startLevel(state.level);
           }
         };
+        document.getElementById('modal-map-btn').onclick = () => {
+          modal.classList.remove('visible');
+          openWorldMap();
+        };
         modal.classList.add('visible');
       }
+    }
+
+    function openWorldMap() {
+      clearTimeout(hintTimer);
+      audio.playCrinkle(1);
+      state.mapSelectedLevel = state.level;
+      renderWorldMap();
+      document.getElementById('world-map-modal').classList.add('visible');
+      const activeCard = document.querySelector('.stage-card.active-stage');
+      if (activeCard) {
+        setTimeout(() => activeCard.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
+      }
+    }
+
+    function closeWorldMap() {
+      audio.playCrinkle(1);
+      document.getElementById('world-map-modal').classList.remove('visible');
+      scheduleIdleHint();
+    }
+
+    function renderWorldMap() {
+      const totalStars = Object.values(state.levelStars).reduce((a, b) => a + b, 0);
+      document.getElementById('map-total-stars').textContent = totalStars;
+      const curStg = getStageInfo(state.level);
+      document.getElementById('map-current-stage-label').textContent =
+        `Stage ${curStg.stageNumber}: ${curStg.title}`;
+
+      const totalStages = Math.max(4, Math.floor((state.highestLevel + 4) / LEVELS_PER_STAGE) + 1);
+      const scrollArea = document.getElementById('map-scroll-area');
+      scrollArea.innerHTML = '';
+
+      for (let s = 1; s <= totalStages; s++) {
+        const firstLvl = (s - 1) * LEVELS_PER_STAGE + 1;
+        const stg = getStageInfo(firstLvl);
+        const levels = Array.from({ length: LEVELS_PER_STAGE }, (_, i) => firstLvl + i);
+        const stageStars = levels.reduce((acc, l) => acc + (state.levelStars[l] || 0), 0);
+        const isCurrentStage = state.level >= firstLvl && state.level < firstLvl + LEVELS_PER_STAGE;
+        const isStageUnlocked = state.highestLevel >= firstLvl;
+
+        const card = document.createElement('div');
+        card.className = `stage-card${isCurrentStage ? ' active-stage' : ''}`;
+
+        const coords = levels.map((lvl, idx) => {
+          const phase = lvl * 1.15 + (s % 2 === 0 ? 0.8 : 0);
+          const xPct = Math.max(18, Math.min(82, 50 + Math.sin(phase) * 28));
+          const yPct = ((idx + 0.5) / LEVELS_PER_STAGE) * 100;
+          return { lvl, xPct, yPct };
+        });
+
+        let pathD = `M ${coords[0].xPct * 3.6} ${coords[0].yPct * 3.9}`;
+        for (let i = 0; i < coords.length - 1; i++) {
+          const p0 = coords[i];
+          const p1 = coords[i + 1];
+          const x0 = p0.xPct * 3.6, y0 = p0.yPct * 3.9;
+          const x1 = p1.xPct * 3.6, y1 = p1.yPct * 3.9;
+          const midY = (y0 + y1) * 0.5;
+          pathD += ` C ${x0} ${midY}, ${x1} ${midY}, ${x1} ${y1}`;
+        }
+
+        const nodesHtml = coords.map(({ lvl, xPct, yPct }) => {
+          const unlocked = lvl <= state.highestLevel;
+          const isPlaying = lvl === state.level;
+          const isFrontier = lvl === state.highestLevel;
+          const isSel = lvl === state.mapSelectedLevel;
+          const stars = state.levelStars[lvl] || 0;
+          const bg = !unlocked
+            ? '#E6CCB2'
+            : isPlaying
+              ? '#FF3355'
+              : isFrontier
+                ? '#FF6B35'
+                : stars > 0
+                  ? stg.color
+                  : '#FFEA79';
+          const textColor = (!unlocked || (!isPlaying && !isFrontier && stars === 0)) ? '#3B2314' : '#FFFFFF';
+          const starsHtml = unlocked
+            ? `<div class="map-node-stars">${[1, 2, 3].map(n =>
+                `<span style="color:${n <= stars ? '#FFB703' : '#D9C7B2'}">★</span>`
+              ).join('')}</div>`
+            : '';
+          const youHtml = isPlaying
+            ? `<div class="map-you-badge">${PIECES[4].svg}<span>YOU</span></div>`
+            : '';
+          const haloHtml = (isPlaying || isFrontier) ? `<div class="map-node-halo"></div>` : '';
+
+          return `
+            <div class="map-node-wrap" style="left:${xPct}%;top:${yPct}%;">
+              ${haloHtml}
+              ${youHtml}
+              <button class="map-node-btn${isSel ? ' selected-node' : ''}${!unlocked ? ' locked-node' : ''}"
+                      data-lvl="${lvl}"
+                      style="background:${bg};color:${textColor};">
+                ${unlocked ? lvl : `🔒<span style="font-size:10px">${lvl}</span>`}
+              </button>
+              ${starsHtml}
+            </div>
+          `;
+        }).join('');
+
+        card.innerHTML = `
+          <div class="stage-banner" style="background:${isStageUnlocked ? stg.color : '#B88B64'}">
+            <div class="stage-banner-left">
+              <div class="stage-mascot">${stg.mascot.svg}</div>
+              <div>
+                <div style="font-size:12px;font-weight:800;">STAGE ${s} • ${stg.title.toUpperCase()}</div>
+                <div style="font-family:'Patrick Hand',cursive;font-size:13px;color:#FFEA79;">${stg.subtitle}</div>
+              </div>
+            </div>
+            <div style="background:rgba(0,0,0,0.25);padding:3px 8px;border-radius:99px;font-size:12px;font-weight:700;">
+              ★ ${stageStars}/${LEVELS_PER_STAGE * 3}
+            </div>
+          </div>
+          <div class="stage-trail-box">
+            <svg class="stage-trail-svg" viewBox="0 0 360 390" preserveAspectRatio="none">
+              <path d="${pathD}" fill="none" stroke="rgba(212,163,115,0.65)" stroke-width="18" stroke-linecap="round"/>
+              <path d="${pathD}" fill="none" stroke="#FFFDF7" stroke-width="11" stroke-linecap="round"/>
+              <path d="${pathD}" fill="none" stroke="${stg.color}" stroke-width="3.5" stroke-dasharray="10,8" stroke-linecap="round"/>
+            </svg>
+            ${nodesHtml}
+          </div>
+        `;
+        scrollArea.appendChild(card);
+      }
+
+      scrollArea.querySelectorAll('.map-node-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const lvl = Number(btn.dataset.lvl);
+          if (lvl <= state.highestLevel) {
+            audio.playCrinkle(1);
+            state.mapSelectedLevel = lvl;
+            renderWorldMap();
+          }
+        });
+      });
+
+      updateMapInspector();
+    }
+
+    function updateMapInspector() {
+      const sel = state.mapSelectedLevel;
+      const stg = getStageInfo(sel);
+      const cfg = getGoalsConfigForLevel(sel);
+      const stars = state.levelStars[sel] || 0;
+      const starStr = [1, 2, 3].map(s => `<span style="color:${s <= stars ? '#FF6B35' : '#D4C29A'}">★</span>`).join('');
+      document.getElementById('map-insp-title').innerHTML =
+        `Stage ${stg.stageNumber} • Level ${sel} &nbsp;${starStr}`;
+      document.getElementById('map-insp-goals').innerHTML =
+        cfg.goals.map(g => `<div class="g-chip">${g.piece.svg}<span>${g.target}</span></div>`).join('') +
+        `<span style="color:var(--thumbtack-red);">• ${cfg.moves} Moves</span>`;
+      const playBtn = document.getElementById('map-play-btn');
+      const isResuming = sel === state.level && state.score > 0;
+      playBtn.textContent = isResuming ? `▶ Resume Level ${sel}` : `▶ Play Level ${sel}`;
+      playBtn.onclick = () => {
+        audio.playWhoosh();
+        if (isResuming) {
+          closeWorldMap();
+        } else {
+          startLevel(sel);
+        }
+      };
     }
 
     async function handleTileInteraction(r, c) {
@@ -1860,6 +2421,10 @@
       saveProgress();
       renderAll();
     });
+
+    document.getElementById('btn-open-map').addEventListener('click', openWorldMap);
+    document.getElementById('header-tapes-group').addEventListener('click', openWorldMap);
+    document.getElementById('btn-close-map').addEventListener('click', closeWorldMap);
 
     document.getElementById('btn-retry').addEventListener('click', () => {
       if (!state.busy) startLevel(state.level);

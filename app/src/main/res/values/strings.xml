@@ -23,4 +23,9 @@
     <string name="dialog_win_subtitle">You crafted all goal pieces and earned +1 booster bonus!</string>
     <string name="dialog_lose_title">Out of Moves!</string>
     <string name="dialog_lose_subtitle">The paper diorama still needs a few more matches.</string>
+    <string name="btn_world_map">World Map</string>
+    <string name="title_world_map">Paper Craft Trail</string>
+    <string name="label_stage_level">Stage %1$d • Level %2$d</string>
+    <string name="btn_play_level">Play Level %1$d</string>
+    <string name="btn_back_to_game">Resume Game</string>
 </resources>

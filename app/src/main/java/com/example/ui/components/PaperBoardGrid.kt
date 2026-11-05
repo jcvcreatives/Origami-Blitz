@@ -600,16 +600,18 @@ fun PaperStatusModal(
     state: PaperGameState,
     onNextLevel: () -> Unit,
     onRetryLevel: () -> Unit,
+    onOpenWorldMap: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     AnimatedVisibility(
-        visible = state.status != GameStatus.PLAYING,
+        visible = state.status != GameStatus.PLAYING && !state.showWorldMap,
         enter = scaleIn(spring(dampingRatio = 0.7f)) + fadeIn(),
         exit = scaleOut() + fadeOut(),
         modifier = modifier
     ) {
         val isWin = state.status == GameStatus.WON
         val cardShape = RoundedCornerShape(16.dp)
+        val stageInfo = state.currentStage
 
         Box(
             modifier = Modifier
@@ -628,8 +630,17 @@ fun PaperStatusModal(
                     .padding(24.dp)
                     .testTag("game_status_modal"),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                Text(
+                    text = "STAGE ${stageInfo.stageNumber} • LEVEL ${state.level}",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = PeppermintRed
+                )
+
                 Text(
                     text = if (isWin) {
                         stringResource(R.string.dialog_win_title)
@@ -640,9 +651,27 @@ fun PaperStatusModal(
                     color = InkBrown
                 )
 
+                if (isWin) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        for (s in 1..3) {
+                            val earned = s <= state.lastEarnedStars.coerceAtLeast(1)
+                            Text(
+                                text = "★",
+                                style = MaterialTheme.typography.headlineLarge.copy(
+                                    fontSize = if (s == 2) 34.sp else 28.sp
+                                ),
+                                color = if (earned) StarCardboardGold else CardboardLight
+                            )
+                        }
+                    }
+                }
+
                 PaperPieceVector(
                     pieceType = state.goal.targetPiece,
-                    modifier = Modifier.size(60.dp)
+                    modifier = Modifier.size(56.dp)
                 )
 
                 Text(
@@ -682,6 +711,24 @@ fun PaperStatusModal(
                         } else {
                             stringResource(R.string.btn_retry_level)
                         },
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+
+                Button(
+                    onClick = onOpenWorldMap,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = StickyNoteYellow,
+                        contentColor = InkBrown
+                    ),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .testTag("modal_world_map_button")
+                ) {
+                    Text(
+                        text = stringResource(R.string.btn_world_map),
                         style = MaterialTheme.typography.titleMedium
                     )
                 }

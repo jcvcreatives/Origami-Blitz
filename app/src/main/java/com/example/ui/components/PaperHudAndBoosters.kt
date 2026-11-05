@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
@@ -74,6 +75,7 @@ fun PaperTopHud(
     state: PaperGameState,
     onToggleSound: () -> Unit,
     onResetProgress: () -> Unit,
+    onOpenWorldMap: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val animatedScore by animateIntAsState(
@@ -81,6 +83,7 @@ fun PaperTopHud(
         animationSpec = tween(durationMillis = 350),
         label = "score_counter"
     )
+    val stageInfo = state.currentStage
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -92,33 +95,69 @@ fun PaperTopHud(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            IconButton(
-                onClick = onToggleSound,
-                modifier = Modifier
-                    .minimumInteractiveComponentSize()
-                    .shadow(3.dp, CircleShape)
-                    .background(MaskingTapeCream, CircleShape)
-                    .border(1.5.dp, CardboardMedium, CircleShape)
-                    .testTag("toggle_sound_button")
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Icon(
-                    imageVector = if (state.soundEnabled) {
-                        Icons.AutoMirrored.Filled.VolumeUp
-                    } else {
-                        Icons.AutoMirrored.Filled.VolumeOff
-                    },
-                    contentDescription = if (state.soundEnabled) {
-                        stringResource(R.string.btn_sound_on)
-                    } else {
-                        stringResource(R.string.btn_sound_off)
-                    },
-                    tint = InkBrown
-                )
+                IconButton(
+                    onClick = onToggleSound,
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .shadow(3.dp, CircleShape)
+                        .background(MaskingTapeCream, CircleShape)
+                        .border(1.5.dp, CardboardMedium, CircleShape)
+                        .testTag("toggle_sound_button")
+                ) {
+                    Icon(
+                        imageVector = if (state.soundEnabled) {
+                            Icons.AutoMirrored.Filled.VolumeUp
+                        } else {
+                            Icons.AutoMirrored.Filled.VolumeOff
+                        },
+                        contentDescription = if (state.soundEnabled) {
+                            stringResource(R.string.btn_sound_on)
+                        } else {
+                            stringResource(R.string.btn_sound_off)
+                        },
+                        tint = InkBrown
+                    )
+                }
+
+                // World Map Button (Candy Crush Saga Trail)
+                Row(
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .shadow(3.dp, RoundedCornerShape(99.dp))
+                        .clip(RoundedCornerShape(99.dp))
+                        .background(StickyNoteYellow, RoundedCornerShape(99.dp))
+                        .border(1.5.dp, CardboardDark, RoundedCornerShape(99.dp))
+                        .clickable(onClick = onOpenWorldMap)
+                        .padding(horizontal = 10.dp, vertical = 7.dp)
+                        .testTag("open_world_map_button"),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Map,
+                        contentDescription = stringResource(R.string.btn_world_map),
+                        tint = PeppermintRed,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "Map",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        ),
+                        color = InkBrown
+                    )
+                }
             }
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.clickable(onClick = onOpenWorldMap)
             ) {
                 Box(
                     modifier = Modifier
@@ -126,12 +165,15 @@ fun PaperTopHud(
                         .shadow(3.dp, TornPaperShape(teethCount = 6, toothDepthPx = 7f))
                         .background(MaskingTapeCream, TornPaperShape(teethCount = 6, toothDepthPx = 7f))
                         .border(1.dp, MaskingTapeBorder, TornPaperShape(teethCount = 6, toothDepthPx = 7f))
-                        .padding(horizontal = 14.dp, vertical = 4.dp)
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
                         .testTag("header_paper_craft_tape")
                 ) {
                     Text(
-                        text = stringResource(R.string.header_paper_craft),
-                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp),
+                        text = "Stage ${stageInfo.stageNumber}",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        ),
                         color = InkBrown
                     )
                 }
@@ -141,12 +183,12 @@ fun PaperTopHud(
                         .shadow(3.dp, TornPaperShape(teethCount = 6, toothDepthPx = 7f))
                         .background(StickyNoteYellow, TornPaperShape(teethCount = 6, toothDepthPx = 7f))
                         .border(1.5.dp, StickyNoteShadow, TornPaperShape(teethCount = 6, toothDepthPx = 7f))
-                        .padding(horizontal = 14.dp, vertical = 4.dp)
+                        .padding(horizontal = 11.dp, vertical = 4.dp)
                         .testTag("header_level_tape")
                 ) {
                     Text(
                         text = stringResource(R.string.header_torn_level, state.level),
-                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
+                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp),
                         color = PeppermintRed
                     )
                 }

@@ -100,8 +100,73 @@ enum class GameStatus {
     LOST
 }
 
+data class PaperStageInfo(
+    val stageNumber: Int,
+    val title: String,
+    val subtitle: String,
+    val bannerColor: Color,
+    val accentColor: Color,
+    val mascotPiece: PieceType
+)
+
+const val LEVELS_PER_STAGE = 5
+
+fun getStageInfoForLevel(level: Int): PaperStageInfo {
+    val stageNum = ((level - 1) / LEVELS_PER_STAGE) + 1
+    return when ((stageNum - 1) % 4) {
+        0 -> PaperStageInfo(
+            stageNumber = stageNum,
+            title = "Whispering Pine Woods",
+            subtitle = "Woodland Origami Trail",
+            bannerColor = Color(0xFF52B788),
+            accentColor = OrigamiFoxOrange,
+            mascotPiece = PieceType.ORIGAMI_FOX
+        )
+        1 -> PaperStageInfo(
+            stageNumber = stageNum,
+            title = "Peppermint Boardwalk",
+            subtitle = "Sweet Paper Pinwheel Pier",
+            bannerColor = PeppermintRed,
+            accentColor = CupcakeFrostingPink,
+            mascotPiece = PieceType.PEPPERMINT
+        )
+        2 -> PaperStageInfo(
+            stageNumber = stageNum,
+            title = "Golden Cardboard Canyon",
+            subtitle = "Corrugated Mesa Ridge",
+            bannerColor = StarCardboardGold,
+            accentColor = OrigamiFoxOrange,
+            mascotPiece = PieceType.CARDBOARD_STAR
+        )
+        else -> PaperStageInfo(
+            stageNumber = stageNum,
+            title = "Starlight Origami Summit",
+            subtitle = "Cloud-Folded Sky Peaks",
+            bannerColor = WrappedCandyPurple,
+            accentColor = OrigamiCraneCyan,
+            mascotPiece = PieceType.ORIGAMI_CRANE
+        )
+    }
+}
+
+fun buildGoalsForLevel(level: Int): Pair<LevelGoal, LevelGoal> {
+    val pieces = PieceType.entries
+    val primaryType = pieces[(level - 1) % pieces.size]
+    val secondaryType = pieces[(level + 2) % pieces.size]
+    val primaryCount = 10 + (level * 2).coerceAtMost(24)
+    val secondaryCount = 8 + (level * 2).coerceAtMost(20)
+    return LevelGoal(primaryType, primaryCount, 0) to LevelGoal(secondaryType, secondaryCount, 0)
+}
+
+fun getMovesForLevel(level: Int): Int = (24 + (level % 3)).coerceIn(20, 30)
+
 data class PaperGameState(
     val level: Int = 1,
+    val highestUnlockedLevel: Int = 1,
+    val levelStars: Map<Int, Int> = emptyMap(),
+    val lastEarnedStars: Int = 0,
+    val showWorldMap: Boolean = false,
+    val mapSelectedLevel: Int = 1,
     val score: Int = 0,
     val highScore: Int = 0,
     val movesRemaining: Int = 25,
@@ -129,4 +194,10 @@ data class PaperGameState(
     val isAnimating: Boolean = false,
     val soundEnabled: Boolean = true,
     val status: GameStatus = GameStatus.PLAYING
-)
+) {
+    val currentStage: PaperStageInfo
+        get() = getStageInfoForLevel(level)
+
+    val totalStars: Int
+        get() = levelStars.values.sum()
+}

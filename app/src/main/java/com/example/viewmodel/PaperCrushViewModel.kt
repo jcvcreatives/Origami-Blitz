@@ -14,6 +14,8 @@ import com.example.model.GridPos
 import com.example.model.LevelGoal
 import com.example.model.PaperGameState
 import com.example.model.PieceType
+import com.example.model.buildGoalsForLevel
+import com.example.model.getMovesForLevel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,15 +50,20 @@ class PaperCrushViewModel(
 
     private fun loadSavedStateAndStart() {
         val savedLevel = prefs?.getInt(KEY_LEVEL, 1)?.coerceAtLeast(1) ?: 1
+        val savedHighest = prefs?.getInt(KEY_HIGHEST_LEVEL, savedLevel)?.coerceAtLeast(savedLevel) ?: savedLevel
         val savedHighScore = prefs?.getInt(KEY_HIGH_SCORE, 0) ?: 0
         val savedScissors = prefs?.getInt(KEY_SCISSORS, 3) ?: 3
         val savedGlue = prefs?.getInt(KEY_GLUE, 3) ?: 3
         val savedHammer = prefs?.getInt(KEY_HAMMER, 2) ?: 2
         val savedSound = prefs?.getBoolean(KEY_SOUND, true) ?: true
+        val savedStarsRaw = prefs?.getString(KEY_LEVEL_STARS, "") ?: ""
+        val parsedStars = parseStarsMap(savedStarsRaw)
 
         soundSynth.isEnabled = savedSound
         startLevel(
             level = savedLevel,
+            highestUnlockedLevel = savedHighest,
+            levelStars = parsedStars,
             carryHighScore = savedHighScore,
             boosters = mapOf(
                 BoosterType.SCISSORS to savedScissors,
@@ -69,33 +76,97 @@ class PaperCrushViewModel(
 
     fun startLevel(
         level: Int,
+        highestUnlockedLevel: Int = maxOf(_uiState.value.highestUnlockedLevel, level),
+        levelStars: Map<Int, Int> = _uiState.value.levelStars,
         carryHighScore: Int = _uiState.value.highScore,
         boosters: Map<BoosterType, Int> = _uiState.value.boosters,
-        soundEnabled: Boolean = _uiState.value.soundEnabled
+        soundEnabled: Boolean = _uiState.value.soundEnabled,
+        showMap: Boolean = false
     ) {
         idleHintJob?.cancel()
-        val pieces = PieceType.entries
-        val primaryType = pieces[(level - 1) % pieces.size]
-        val secondaryType = pieces[(level + 2) % pieces.size]
-        val primaryCount = 10 + (level * 2).coerceAtMost(24)
-        val secondaryCount = 8 + (level * 2).coerceAtMost(20)
-        val moves = (24 + (level % 3)).coerceIn(20, 30)
+        val (primaryGoal, secondaryGoal) = buildGoalsForLevel(level)
+        val moves = getMovesForLevel(level)
 
         val initialBoard = generatePlayableBoard()
         _uiState.value = PaperGameState(
             level = level,
+            highestUnlockedLevel = highestUnlockedLevel,
+            levelStars = levelStars,
+            lastEarnedStars = 0,
+            showWorldMap = showMap,
+            mapSelectedLevel = level,
             score = 0,
             highScore = carryHighScore,
             movesRemaining = moves,
-            goal = LevelGoal(primaryType, primaryCount, 0),
-            secondaryGoal = LevelGoal(secondaryType, secondaryCount, 0),
+            goal = primaryGoal,
+            secondaryGoal = secondaryGoal,
             board = initialBoard,
             boosters = boosters,
             soundEnabled = soundEnabled,
             status = GameStatus.PLAYING
         )
         persistProgress()
-        scheduleIdleHint()
+        if (!showMap) {
+            scheduleIdleHint()
+        }
+    }
+
+    fun openWorldMap() {
+        idleHintJob?.cancel()
+        soundSynth.playPaperCrinkle(1)
+        _uiState.update {
+            it.copy(
+                showWorldMap = true,
+                mapSelectedLevel = it.level,
+                activeBooster = null,
+                selectedPos = null,
+                glueFirstPos = null,
+                hintPair = null
+            )
+        }
+    }
+
+    fun closeWorldMap() {
+        soundSynth.playPaperCrinkle(1)
+        _uiState.update { it.copy(showWorldMap = false) }
+        if (_uiState.value.status == GameStatus.PLAYING) {
+            scheduleIdleHint()
+        }
+    }
+
+    fun selectLevelOnMap(level: Int) {
+        val current = _uiState.value
+        if (level in 1..current.highestUnlockedLevel) {
+            soundSynth.playPaperCrinkle(1)
+            _uiState.update { it.copy(mapSelectedLevel = level) }
+        } else {
+            soundSynth.playInvalidShake()
+        }
+    }
+
+    fun playLevelFromMap(level: Int) {
+        val current = _uiState.value
+        if (level !in 1..current.highestUnlockedLevel) {
+            soundSynth.playInvalidShake()
+            return
+        }
+        soundSynth.playSwapWhoosh()
+        if (level == current.level && current.status == GameStatus.PLAYING && current.score > 0) {
+            // Resume active level if already playing it
+            _uiState.update { it.copy(showWorldMap = false, mapSelectedLevel = level) }
+            scheduleIdleHint()
+        } else {
+            val refreshedBoosters = current.boosters.mapValues { (_, count) -> count.coerceAtLeast(1) }
+            startLevel(
+                level = level,
+                highestUnlockedLevel = current.highestUnlockedLevel,
+                levelStars = current.levelStars,
+                carryHighScore = current.highScore,
+                boosters = refreshedBoosters,
+                soundEnabled = current.soundEnabled,
+                showMap = false
+            )
+        }
     }
 
     fun toggleSound() {
@@ -110,6 +181,8 @@ class PaperCrushViewModel(
         val refreshedBoosters = current.boosters.mapValues { (_, count) -> count.coerceAtLeast(1) }
         startLevel(
             level = current.level,
+            highestUnlockedLevel = current.highestUnlockedLevel,
+            levelStars = current.levelStars,
             carryHighScore = current.highScore,
             boosters = refreshedBoosters,
             soundEnabled = current.soundEnabled
@@ -119,6 +192,7 @@ class PaperCrushViewModel(
     fun advanceToNextLevel() {
         val current = _uiState.value
         val nextLevel = current.level + 1
+        val nextHighest = maxOf(current.highestUnlockedLevel, nextLevel)
         val rewardedBoosters = current.boosters.toMutableMap().apply {
             put(BoosterType.SCISSORS, (get(BoosterType.SCISSORS) ?: 0) + 1)
             val bonusType = if (nextLevel % 2 == 0) BoosterType.HAMMER else BoosterType.GLUE
@@ -126,6 +200,8 @@ class PaperCrushViewModel(
         }
         startLevel(
             level = nextLevel,
+            highestUnlockedLevel = nextHighest,
+            levelStars = current.levelStars,
             carryHighScore = current.highScore,
             boosters = rewardedBoosters,
             soundEnabled = current.soundEnabled
@@ -587,8 +663,20 @@ class PaperCrushViewModel(
             else -> GameStatus.PLAYING
         }
 
+        var earnedStars = postState.lastEarnedStars
+        var updatedStarsMap = postState.levelStars
+        var updatedHighestLevel = postState.highestUnlockedLevel
+
         if (nextStatus == GameStatus.WON) {
             soundSynth.playFeverFanfare()
+            earnedStars = when {
+                postState.movesRemaining >= 9 || postState.score >= 2200 -> 3
+                postState.movesRemaining >= 4 || postState.score >= 1300 -> 2
+                else -> 1
+            }
+            val prevBest = updatedStarsMap[postState.level] ?: 0
+            updatedStarsMap = updatedStarsMap + (postState.level to maxOf(prevBest, earnedStars))
+            updatedHighestLevel = maxOf(updatedHighestLevel, postState.level + 1)
         }
 
         _uiState.update {
@@ -597,7 +685,10 @@ class PaperCrushViewModel(
                 isAnimating = false,
                 comboCount = 0,
                 comboBannerText = null,
-                status = nextStatus
+                status = nextStatus,
+                lastEarnedStars = earnedStars,
+                levelStars = updatedStarsMap,
+                highestUnlockedLevel = updatedHighestLevel
             )
         }
         persistProgress()
@@ -989,10 +1080,32 @@ class PaperCrushViewModel(
         return entries[Random.nextInt(entries.size)]
     }
 
+    private fun parseStarsMap(raw: String): Map<Int, Int> {
+        if (raw.isBlank()) return emptyMap()
+        val result = mutableMapOf<Int, Int>()
+        raw.split(",").forEach { entry ->
+            val parts = entry.split(":")
+            if (parts.size == 2) {
+                val lvl = parts[0].toIntOrNull()
+                val stars = parts[1].toIntOrNull()
+                if (lvl != null && stars != null) {
+                    result[lvl] = stars.coerceIn(1, 3)
+                }
+            }
+        }
+        return result
+    }
+
+    private fun serializeStarsMap(map: Map<Int, Int>): String {
+        return map.entries.joinToString(",") { "${it.key}:${it.value}" }
+    }
+
     private fun persistProgress() {
         val state = _uiState.value
         prefs?.edit()?.apply {
             putInt(KEY_LEVEL, state.level)
+            putInt(KEY_HIGHEST_LEVEL, state.highestUnlockedLevel)
+            putString(KEY_LEVEL_STARS, serializeStarsMap(state.levelStars))
             putInt(KEY_HIGH_SCORE, state.highScore)
             putInt(KEY_SCISSORS, state.boosters[BoosterType.SCISSORS] ?: 0)
             putInt(KEY_GLUE, state.boosters[BoosterType.GLUE] ?: 0)
@@ -1005,6 +1118,8 @@ class PaperCrushViewModel(
     companion object {
         const val PREFS_NAME = "paper_craft_crush_storage"
         private const val KEY_LEVEL = "current_level"
+        private const val KEY_HIGHEST_LEVEL = "highest_unlocked_level"
+        private const val KEY_LEVEL_STARS = "level_stars_map"
         private const val KEY_HIGH_SCORE = "high_score"
         private const val KEY_SCISSORS = "booster_scissors"
         private const val KEY_GLUE = "booster_glue"

@@ -44,6 +44,7 @@ import com.example.ui.components.PaperCardboardBoard
 import com.example.ui.components.PaperDioramaBackdrop
 import com.example.ui.components.PaperStatusModal
 import com.example.ui.components.PaperTopHud
+import com.example.ui.components.PaperWorldMapOverlay
 import com.example.ui.components.rememberDeviceTilt
 import com.example.ui.theme.MyApplicationTheme
 import com.example.viewmodel.PaperCrushViewModel
@@ -140,7 +141,8 @@ fun PaperCraftCrushApp(
                         PaperTopHud(
                             state = state,
                             onToggleSound = viewModel::toggleSound,
-                            onResetProgress = viewModel::retryOrResetLevel
+                            onResetProgress = viewModel::retryOrResetLevel,
+                            onOpenWorldMap = viewModel::openWorldMap
                         )
                         PaperBoosterBar(
                             state = state,
@@ -176,6 +178,7 @@ fun PaperCraftCrushApp(
                         state = state,
                         onToggleSound = viewModel::toggleSound,
                         onResetProgress = viewModel::retryOrResetLevel,
+                        onOpenWorldMap = viewModel::openWorldMap,
                         modifier = hudParallaxModifier
                     )
 
@@ -213,7 +216,16 @@ fun PaperCraftCrushApp(
         PaperStatusModal(
             state = state,
             onNextLevel = viewModel::advanceToNextLevel,
-            onRetryLevel = viewModel::retryOrResetLevel
+            onRetryLevel = viewModel::retryOrResetLevel,
+            onOpenWorldMap = viewModel::openWorldMap
+        )
+
+        // 6. Candy Crush-style Paper Craft Saga World Map Overlay
+        PaperWorldMapOverlay(
+            state = state,
+            onSelectLevel = viewModel::selectLevelOnMap,
+            onPlayLevel = viewModel::playLevelFromMap,
+            onCloseMap = viewModel::closeWorldMap
         )
     }
 }
