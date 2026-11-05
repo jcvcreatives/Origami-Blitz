@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Paper Craft Crush — Origami &amp; Paper Diorama Match-3</title>
+  <title>Paper Craft Crush</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Patrick+Hand&display=swap" rel="stylesheet">
@@ -95,15 +95,15 @@
       z-index: 30;
     }
 
-    /* Main Responsive App Shell */
+    /* Centered Vertical App Shell matching the Android layout */
     #app-shell {
       position: relative;
       z-index: 10;
       width: 100%;
-      height: 100%;
-      max-width: 1020px;
+      height: 100dvh;
+      max-width: 480px;
       margin: 0 auto;
-      padding: 10px 14px;
+      padding: 12px 14px 14px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -111,33 +111,12 @@
       gap: 8px;
     }
 
-    @media (min-aspect-ratio: 12/10) and (min-width: 720px) {
-      #app-shell {
-        flex-direction: row;
-        justify-content: center;
-        gap: 28px;
-        padding: 18px 28px;
-      }
-      #hud-column {
-        width: 340px;
-        height: 100%;
-        max-height: 540px;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-      }
-      #board-wrapper {
-        flex: 1;
-        max-width: 490px;
-      }
-    }
-
     #hud-column {
       width: 100%;
-      max-width: 480px;
       display: flex;
       flex-direction: column;
       gap: 8px;
+      flex-shrink: 0;
     }
 
     /* Top Bar Controls + Torn Masking Tape Header */
@@ -161,7 +140,9 @@
       justify-content: center;
       cursor: pointer;
       color: var(--ink-brown);
+      font-size: 18px;
       transition: transform 0.12s ease;
+      flex-shrink: 0;
     }
     .round-paper-btn:active {
       transform: scale(0.92);
@@ -171,7 +152,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       justify-content: center;
     }
 
@@ -183,6 +164,7 @@
       font-weight: 700;
       box-shadow: 0 3px 6px rgba(0,0,0,0.14);
       transform: rotate(-1.5deg);
+      white-space: nowrap;
     }
     .tape-strip.level-tape {
       background: var(--sticky-yellow);
@@ -254,12 +236,13 @@
       display: flex;
       align-items: center;
       gap: 4px;
-      font-size: 16px;
+      font-size: 17px;
       font-weight: 700;
     }
     .goal-chip svg {
       width: 24px;
       height: 24px;
+      display: block;
       filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.18));
     }
 
@@ -295,7 +278,7 @@
       background: var(--sticky-yellow);
       border: 1.5px solid var(--sticky-border);
       border-radius: 4px;
-      padding: 11px 6px 8px;
+      padding: 10px 6px 7px;
       text-align: center;
       font-family: 'Patrick Hand', cursive;
       font-size: 20px;
@@ -306,15 +289,18 @@
       color: var(--thumbtack-red);
     }
 
-    /* 7x7 Corrugated Cardboard Box Lid Board */
+    /* 7x7 Corrugated Cardboard Box Lid Board - Guaranteed Square Size */
     #board-wrapper {
-      width: 100%;
-      max-width: 440px;
-      aspect-ratio: 1 / 1;
+      width: min(92vw, calc(100dvh - 230px), 430px);
+      height: min(92vw, calc(100dvh - 230px), 430px);
+      min-width: 270px;
+      min-height: 270px;
+      flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
       position: relative;
+      transition: transform 80ms linear;
     }
 
     #cardboard-lid {
@@ -330,7 +316,7 @@
       border: 3.5px solid var(--cardboard-dark);
       border-radius: 18px;
       padding: 9px;
-      box-shadow: 0 12px 24px rgba(59, 35, 20, 0.28);
+      box-shadow: 0 12px 26px rgba(59, 35, 20, 0.30);
       position: relative;
       display: flex;
     }
@@ -342,14 +328,16 @@
       border-radius: 12px;
       padding: 5px;
       display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      grid-template-rows: repeat(7, 1fr);
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      grid-template-rows: repeat(7, minmax(0, 1fr));
       gap: 4px;
       box-shadow: inset 0 3px 8px rgba(0,0,0,0.45);
       position: relative;
     }
 
     .board-cell {
+      width: 100%;
+      height: 100%;
       position: relative;
       border-radius: 8px;
       display: flex;
@@ -358,7 +346,8 @@
       cursor: pointer;
       transition: transform 0.14s ease, background-color 0.14s ease;
       box-shadow: 0 1px 2px rgba(0,0,0,0.18);
-      overflow: visible;
+      border: 0.5px solid rgba(224, 210, 188, 0.65);
+      overflow: hidden;
     }
     .board-cell.cell-even {
       background: var(--cell-light);
@@ -368,22 +357,27 @@
     }
     .board-cell.selected {
       background: var(--sticky-yellow);
-      outline: 2.5px solid var(--thumbtack-red);
+      border: 2px solid var(--cardboard-dark);
       z-index: 3;
     }
 
     .tile-piece {
-      width: 84%;
-      height: 84%;
+      width: 82%;
+      height: 82%;
       display: flex;
       align-items: center;
       justify-content: center;
       transition: transform 0.22s cubic-bezier(0.22, 1.35, 0.36, 1), opacity 0.18s ease;
-      filter: drop-shadow(1px 3px 3px rgba(0,0,0,0.22));
+      filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.22));
       pointer-events: none;
     }
+    .tile-piece svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
     .board-cell.selected .tile-piece {
-      transform: scale(1.14);
+      transform: scale(1.12);
     }
     .tile-piece.crushing {
       transform: scale(0.1) rotate(25deg);
@@ -405,32 +399,32 @@
       position: absolute;
       top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%) rotate(-3deg) scale(0);
-      background: var(--sticky-yellow);
-      border: 2.5px solid var(--thumbtack-red);
-      padding: 7px 20px;
-      border-radius: 10px;
-      font-size: 21px;
+      transform: translate(-50%, -50%) scale(0);
+      background: var(--tape-cream);
+      border: 2px solid var(--cardboard-dark);
+      padding: 6px 18px;
+      border-radius: 12px;
+      font-size: 19px;
       font-weight: 700;
-      color: var(--thumbtack-red);
-      box-shadow: 0 8px 18px rgba(0,0,0,0.28);
+      color: var(--ink-brown);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.26);
       pointer-events: none;
       z-index: 15;
       transition: transform 0.2s cubic-bezier(0.22, 1.4, 0.36, 1);
       white-space: nowrap;
     }
     #combo-banner.visible {
-      transform: translate(-50%, -50%) rotate(-3deg) scale(1);
+      transform: translate(-50%, -50%) scale(1);
     }
 
     /* Bottom Booster Bar */
     #booster-section {
       width: 100%;
-      max-width: 480px;
       display: flex;
       flex-direction: column;
       gap: 6px;
       align-items: center;
+      flex-shrink: 0;
     }
 
     #booster-hint {
@@ -439,7 +433,7 @@
       border-radius: 8px;
       padding: 4px 14px;
       font-family: 'Patrick Hand', cursive;
-      font-size: 16px;
+      font-size: 15px;
       text-align: center;
       box-shadow: 0 3px 6px rgba(0,0,0,0.16);
       display: none;
@@ -485,12 +479,14 @@
     .booster-left svg {
       width: 28px;
       height: 28px;
+      display: block;
       flex-shrink: 0;
     }
     .booster-action {
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 700;
       line-height: 1.1;
+      color: var(--ink-brown);
     }
     .booster-name {
       font-family: 'Patrick Hand', cursive;
@@ -510,13 +506,14 @@
       align-items: center;
       justify-content: center;
       box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      flex-shrink: 0;
     }
 
     /* Win / Lose Modal */
     #status-modal {
       position: fixed;
       inset: 0;
-      background: rgba(38, 23, 16, 0.55);
+      background: rgba(46, 42, 37, 0.55);
       z-index: 40;
       display: none;
       align-items: center;
@@ -528,7 +525,7 @@
     }
     .modal-card {
       background: var(--tape-cream);
-      border: 3px solid var(--cardboard-dark);
+      border: 2px solid var(--tape-border);
       border-radius: 16px;
       padding: 24px;
       max-width: 360px;
@@ -541,12 +538,14 @@
       gap: 12px;
     }
     .modal-title {
-      background: var(--sticky-yellow);
-      border: 1.5px solid var(--cardboard-dark);
-      border-radius: 8px;
-      padding: 6px 16px;
-      font-size: 22px;
-      transform: rotate(-2deg);
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--ink-brown);
+    }
+    #modal-icon svg {
+      width: 100%;
+      height: 100%;
+      display: block;
     }
     .modal-btn {
       width: 100%;
@@ -568,34 +567,27 @@
   <!-- 1. Layered Paper & Origami Woodland Diorama SVG Backdrop -->
   <svg id="diorama-backdrop" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice">
     <rect width="1000" height="1000" fill="#BDE0FE" />
-    <!-- Cloud layer -->
     <g id="layer-clouds">
       <path d="M-50,0 L1050,0 L1050,210 L980,218 L910,204 L840,216 L770,202 L700,218 L630,205 L560,216 L490,202 L420,218 L350,204 L280,216 L210,202 L140,218 L70,204 L-50,215 Z" fill="#E2F1FF" />
     </g>
-    <!-- Cutout Sun -->
     <g id="layer-sun">
       <circle cx="854" cy="136" r="72" fill="rgba(0,0,0,0.14)" />
       <circle cx="850" cy="130" r="72" fill="#FFEA79" />
       <circle cx="850" cy="130" r="52" fill="#FFB703" />
     </g>
-    <!-- Far Hill & Paper Pine Trees -->
     <g id="layer-far-hill">
       <path d="M-60,575 Q250,530 500,575 T1060,575 L1060,1050 L-60,1050 Z" fill="#FFFFFF" opacity="0.9" />
       <path d="M-60,582 Q250,537 500,582 T1060,582 L1060,1050 L-60,1050 Z" fill="#74C69D" />
-      <!-- Left Pine Tree -->
       <rect x="100" y="555" width="22" height="45" fill="#7F4F24" />
       <polygon points="111,465 62,565 111,565" fill="#2EC4B6" />
       <polygon points="111,465 160,565 111,565" fill="#0F9F90" />
-      <!-- Right Pine Tree -->
       <rect x="878" y="545" width="24" height="48" fill="#7F4F24" />
       <polygon points="890,445 838,555 890,555" fill="#2EC4B6" />
       <polygon points="890,445 942,555 890,555" fill="#0F9F90" />
     </g>
-    <!-- Near Hill & Peeking Origami Bear and Squirrel -->
     <g id="layer-near-hill">
       <path d="M-60,694 Q250,735 500,694 T1060,694 L1060,1050 L-60,1050 Z" fill="#FFFFFF" opacity="0.9" />
       <path d="M-60,700 Q250,741 500,700 T1060,700 L1060,1050 L-60,1050 Z" fill="#52B788" />
-      <!-- Peeking Origami Bear (Left) -->
       <g transform="translate(110, 710)">
         <circle cx="-36" cy="-35" r="20" fill="#7F4F24" />
         <circle cx="36" cy="-35" r="20" fill="#7F4F24" />
@@ -607,14 +599,12 @@
         <circle cx="-20" cy="-8" r="4.5" fill="#3B2314" />
         <circle cx="20" cy="-8" r="4.5" fill="#3B2314" />
       </g>
-      <!-- Peeking Origami Squirrel (Right) -->
       <g transform="translate(890, 700)">
         <polygon points="14,28 62,-10 45,-50 10,-18" fill="#E0531F" />
         <polygon points="-30,-42 -8,-24 14,-42 23,25 -36,25" fill="#FF6B35" />
         <circle cx="-14" cy="-6" r="4.5" fill="#3B2314" />
       </g>
     </g>
-    <!-- Foreground Kraft Table Mat -->
     <g id="layer-table">
       <path d="M-60,835 Q500,820 1060,835 L1060,1050 L-60,1050 Z" fill="#FFFFFF" opacity="0.85" />
       <path d="M-60,840 Q500,825 1060,840 L1060,1050 L-60,1050 Z" fill="#F3E5D0" />
@@ -623,10 +613,9 @@
 
   <div id="paper-grain"></div>
 
-  <!-- 2. Main Responsive Game Layout -->
+  <!-- 2. Main Vertical Game Layout (Matches Android App Preview) -->
   <div id="app-shell">
     <div id="hud-column">
-      <!-- Top Masking Tape Row -->
       <div class="top-tape-row">
         <button id="btn-sound" class="round-paper-btn" title="Toggle Paper SFX" aria-label="Toggle Paper SFX">
           🔊
@@ -640,7 +629,6 @@
         </button>
       </div>
 
-      <!-- Score Banner, Goal Note, Moves Sticky Note -->
       <div class="hud-stats-row">
         <div class="score-banner torn-tape">
           <div class="label">★ SCORE ★</div>
@@ -660,11 +648,11 @@
       </div>
     </div>
 
-    <!-- 7x7 Corrugated Cardboard Box Lid Grid -->
+    <!-- Centered 7x7 Corrugated Cardboard Box Lid Grid -->
     <div id="board-wrapper">
       <div id="cardboard-lid">
         <div id="board-grid"></div>
-        <div id="combo-banner" class="torn-tape">ORIGAMI COMBO!</div>
+        <div id="combo-banner">ORIGAMI COMBO!</div>
       </div>
     </div>
 
@@ -674,7 +662,7 @@
       <div class="booster-row">
         <button id="booster-scissors" class="booster-btn" data-booster="SCISSORS">
           <div class="booster-left">
-            <svg viewBox="0 0 40 40">
+            <svg viewBox="0 0 40 40" width="28" height="28">
               <line x1="12" y1="26" x2="33" y2="7" stroke="#90A4AE" stroke-width="4" stroke-linecap="round"/>
               <line x1="28" y1="26" x2="7" y2="7" stroke="#78909C" stroke-width="4" stroke-linecap="round"/>
               <circle cx="12" cy="30" r="6.5" fill="none" stroke="#FF3355" stroke-width="3.2"/>
@@ -691,7 +679,7 @@
 
         <button id="booster-glue" class="booster-btn" data-booster="GLUE">
           <div class="booster-left">
-            <svg viewBox="0 0 40 40">
+            <svg viewBox="0 0 40 40" width="28" height="28">
               <rect x="10" y="15" width="20" height="20" rx="4" fill="#FFFFFF" stroke="#3B2314" stroke-width="2"/>
               <rect x="10" y="21" width="20" height="8" fill="#0284C7"/>
               <polygon points="15,15 25,15 22,5 18,5" fill="#FF9F1C"/>
@@ -706,7 +694,7 @@
 
         <button id="booster-hammer" class="booster-btn" data-booster="HAMMER">
           <div class="booster-left">
-            <svg viewBox="0 0 40 40">
+            <svg viewBox="0 0 40 40" width="28" height="28">
               <line x1="9" y1="33" x2="25" y2="15" stroke="#7F4F24" stroke-width="4.5" stroke-linecap="round"/>
               <g transform="rotate(-42 25 14)">
                 <rect x="14" y="7" width="21" height="13" rx="3" fill="#FFB703" stroke="#3B2314" stroke-width="2"/>
@@ -731,7 +719,7 @@
   <div id="status-modal">
     <div class="modal-card">
       <div id="modal-title" class="modal-title">Level Complete!</div>
-      <div id="modal-icon" style="width:68px;height:68px;"></div>
+      <div id="modal-icon" style="width:64px;height:64px;"></div>
       <div id="modal-subtitle" style="font-family:'Patrick Hand',cursive;font-size:19px;">
         You crafted all goal pieces and earned +1 booster bonus!
       </div>
@@ -742,7 +730,7 @@
 
   <script>
     const BOARD_SIZE = 7;
-    const STORAGE_KEY = 'paper_craft_crush_web_v1';
+    const STORAGE_KEY = 'paper_craft_crush_web_v2';
 
     const PIECES = [
       {
@@ -750,7 +738,7 @@
         name: 'Peppermint',
         c1: '#FF3355',
         c2: '#FFFFFF',
-        svg: `<svg viewBox="0 0 100 100">
+        svg: `<svg viewBox="0 0 100 100" width="100%" height="100%">
           <circle cx="50" cy="50" r="43" fill="#FFFFFF"/>
           <circle cx="50" cy="50" r="38" fill="#FF3355"/>
           <g fill="#FFFFFF">
@@ -771,14 +759,15 @@
         name: 'Cupcake',
         c1: '#FF5D9E',
         c2: '#29B6F6',
-        svg: `<svg viewBox="0 0 100 100">
+        svg: `<svg viewBox="0 0 100 100" width="100%" height="100%">
+          <circle cx="50" cy="45" r="34" fill="#FFFFFF"/>
           <polygon points="23,52 77,52 67,85 33,85" fill="#29B6F6" stroke="#3B2314" stroke-width="3" stroke-linejoin="round"/>
           <line x1="36" y1="55" x2="41" y2="82" stroke="#0288D1" stroke-width="3" stroke-linecap="round"/>
           <line x1="50" y1="55" x2="50" y2="82" stroke="#0288D1" stroke-width="3" stroke-linecap="round"/>
           <line x1="64" y1="55" x2="59" y2="82" stroke="#0288D1" stroke-width="3" stroke-linecap="round"/>
           <rect x="19" y="39" width="62" height="18" rx="9" fill="#FF5D9E" stroke="#3B2314" stroke-width="3"/>
           <rect x="26" y="27" width="48" height="16" rx="8" fill="#FF85B3" stroke="#3B2314" stroke-width="3"/>
-          <circle cx="50" cy="19" r="8.5" fill="#FF3355" stroke="#3B2314" stroke-width="2.5"/>
+          <circle cx="50" cy="19" r="8.5" fill="#FF3355"/>
           <circle cx="48" cy="17" r="2.8" fill="#FFFFFF"/>
         </svg>`
       },
@@ -787,7 +776,7 @@
         name: 'Wrapped Candy',
         c1: '#8B5CF6',
         c2: '#FF9F1C',
-        svg: `<svg viewBox="0 0 100 100">
+        svg: `<svg viewBox="0 0 100 100" width="100%" height="100%">
           <g transform="rotate(-24 50 50)">
             <polygon points="28,50 8,29 14,50 8,71" fill="#FF9F1C" stroke="#3B2314" stroke-width="3" stroke-linejoin="round"/>
             <polygon points="72,50 92,29 86,50 92,71" fill="#FF9F1C" stroke="#3B2314" stroke-width="3" stroke-linejoin="round"/>
@@ -801,8 +790,8 @@
         id: 'CARDBOARD_STAR',
         name: 'Cardboard Star',
         c1: '#FFB703',
-        c2: '#FB8500',
-        svg: `<svg viewBox="0 0 100 100">
+        c2: '#7F4F24',
+        svg: `<svg viewBox="0 0 100 100" width="100%" height="100%">
           <polygon points="50,8 61,35 90,38 68,57 75,86 50,71 25,86 32,57 10,38 39,35" fill="#FFB703" stroke="#3B2314" stroke-width="3" stroke-linejoin="round"/>
           <polygon points="50,21 58,39 77,41 62,54 67,73 50,63 33,73 38,54 23,41 42,39" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-dasharray="6,4"/>
         </svg>`
@@ -812,7 +801,7 @@
         name: 'Origami Fox',
         c1: '#FF6B35',
         c2: '#10B981',
-        svg: `<svg viewBox="0 0 100 100">
+        svg: `<svg viewBox="0 0 100 100" width="100%" height="100%">
           <polygon points="15,64 50,89 85,64 70,48 30,48" fill="#10B981" stroke="#3B2314" stroke-width="2.8" stroke-linejoin="round"/>
           <polygon points="20,15 42,35 17,48" fill="#E04F16" stroke="#3B2314" stroke-width="2.8" stroke-linejoin="round"/>
           <polygon points="80,15 58,35 83,48" fill="#E04F16" stroke="#3B2314" stroke-width="2.8" stroke-linejoin="round"/>
@@ -830,7 +819,7 @@
         name: 'Origami Crane',
         c1: '#0284C7',
         c2: '#38BDF8',
-        svg: `<svg viewBox="0 0 100 100">
+        svg: `<svg viewBox="0 0 100 100" width="100%" height="100%">
           <polygon points="48,52 78,16 64,56" fill="#0284C7" stroke="#3B2314" stroke-width="2.8" stroke-linejoin="round"/>
           <polygon points="34,62 14,26 24,68" fill="#0284C7" stroke="#3B2314" stroke-width="2.8" stroke-linejoin="round"/>
           <polygon points="50,44 70,62 48,76 24,68" fill="#0284C7" stroke="#3B2314" stroke-width="2.8" stroke-linejoin="round"/>
@@ -840,7 +829,6 @@
       }
     ];
 
-    /* Web Audio API Procedural Paper Sound Synthesizer */
     class PaperAudioSynth {
       constructor() {
         this.ctx = null;
@@ -933,7 +921,6 @@
 
     const audio = new PaperAudioSynth();
 
-    /* Confetti Shred Particle System */
     const canvas = document.getElementById('confetti-canvas');
     const cctx = canvas.getContext('2d');
     let scraps = [];
@@ -998,6 +985,7 @@
 
     /* Tilt Parallax & Global Lighting Overlay */
     const lightingEl = document.getElementById('lighting-overlay');
+    const boardWrapperEl = document.getElementById('board-wrapper');
     function applyTiltLighting(tx, ty) {
       const clampedX = Math.max(-1, Math.min(1, tx));
       const clampedY = Math.max(-1, Math.min(1, ty));
@@ -1007,6 +995,7 @@
         radial-gradient(circle at ${lx}% ${ly}%, rgba(255,253,245,0.24) 0%, rgba(255,248,225,0.08) 45%, transparent 75%),
         linear-gradient(${135 + clampedX * 35}deg, rgba(255,255,255,0.14) 0%, transparent 50%, rgba(43,24,10,0.14) 100%)
       `;
+      boardWrapperEl.style.transform = `translate(${clampedX * 8}px, ${clampedY * 6}px)`;
       document.getElementById('layer-clouds').setAttribute('transform', `translate(${clampedX * 10}, ${clampedY * 6})`);
       document.getElementById('layer-sun').setAttribute('transform', `translate(${clampedX * 16}, ${clampedY * 12})`);
       document.getElementById('layer-far-hill').setAttribute('transform', `translate(${clampedX * 22}, ${clampedY * 14})`);
@@ -1014,8 +1003,8 @@
       document.getElementById('layer-table').setAttribute('transform', `translate(${clampedX * 44}, ${clampedY * 24})`);
     }
     window.addEventListener('pointermove', e => {
-      const tx = (e.clientX / window.innerWidth - 0.5) * 1.2;
-      const ty = (e.clientY / window.innerHeight - 0.5) * 1.2;
+      const tx = (e.clientX / window.innerWidth - 0.5) * 1.1;
+      const ty = (e.clientY / window.innerHeight - 0.5) * 1.1;
       applyTiltLighting(tx, ty);
     });
     window.addEventListener('deviceorientation', e => {
@@ -1023,9 +1012,8 @@
         applyTiltLighting(e.gamma / 35, (e.beta - 35) / 35);
       }
     });
-    applyTiltLighting(0.15, -0.1);
+    applyTiltLighting(0, 0);
 
-    /* Core Game State & Persistence */
     let state = {
       level: 1,
       score: 0,
@@ -1089,7 +1077,7 @@
     function startLevel(lvl) {
       state.level = lvl;
       state.score = 0;
-      state.moves = Math.min(30, 23 + (lvl % 4));
+      state.moves = Math.min(30, 24 + (lvl % 3));
       state.activeBooster = null;
       state.glueFirst = null;
       state.selected = null;
@@ -1097,8 +1085,8 @@
       const p1 = PIECES[(lvl - 1) % PIECES.length];
       const p2 = PIECES[(lvl + 2) % PIECES.length];
       state.goals = [
-        { piece: p1, target: 10 + Math.min(lvl * 2, 20), count: 0 },
-        { piece: p2, target: 8 + Math.min(lvl * 2, 18), count: 0 }
+        { piece: p1, target: 10 + Math.min(lvl * 2, 24), count: 0 },
+        { piece: p2, target: 8 + Math.min(lvl * 2, 20), count: 0 }
       ];
       state.board = generateBoard();
       document.getElementById('status-modal').classList.remove('visible');
@@ -1115,14 +1103,12 @@
       movesEl.classList.toggle('low-moves', state.moves <= 5);
       document.getElementById('btn-sound').textContent = audio.enabled ? '🔊' : '🔇';
 
-      // Goals
       const goalsContainer = document.getElementById('goal-chips');
       goalsContainer.innerHTML = state.goals.map(g => {
         const rem = Math.max(0, g.target - g.count);
         return `<div class="goal-chip">${g.piece.svg}<span>${rem === 0 ? '✓' : rem}</span></div>`;
       }).join('');
 
-      // Boosters
       ['SCISSORS', 'GLUE', 'HAMMER'].forEach(key => {
         const btn = document.getElementById(`booster-${key.toLowerCase()}`);
         const badge = document.getElementById(`badge-${key.toLowerCase()}`);
@@ -1182,7 +1168,6 @@
 
     function findMatches(board) {
       const matched = new Set();
-      // Horizontal
       for (let r = 0; r < BOARD_SIZE; r++) {
         let c = 0;
         while (c < BOARD_SIZE) {
@@ -1195,7 +1180,6 @@
           c = end;
         }
       }
-      // Vertical
       for (let c = 0; c < BOARD_SIZE; c++) {
         let r = 0;
         while (r < BOARD_SIZE) {
@@ -1406,7 +1390,6 @@
       }
     }
 
-    /* Pointer Drag / Swipe & Tap Handling on the 7x7 Grid */
     let dragStartCell = null;
     let dragStartPt = null;
     let swipeHandled = false;
@@ -1444,7 +1427,6 @@
       dragStartPt = null;
     });
 
-    /* UI Button Wiring */
     document.querySelectorAll('.booster-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         if (state.busy) return;
