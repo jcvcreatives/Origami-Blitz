@@ -8,6 +8,7 @@ import com.example.model.BOARD_SIZE
 import com.example.model.BoardTile
 import com.example.model.BoosterType
 import com.example.model.ConfettiScrap
+import com.example.model.FloatingScorePopup
 import com.example.model.GameStatus
 import com.example.model.GridPos
 import com.example.model.LevelGoal
@@ -30,7 +31,10 @@ class PaperCrushViewModel(
     private var nextTileId = 1L
     private var nextScrapId = 1L
     private var nextAnimSeq = 1L
+    private var nextPopupId = 1L
+    private var nextPunchSeq = 1L
     private var particleLoopJob: Job? = null
+    private var idleHintJob: Job? = null
 
     private val _uiState = MutableStateFlow(PaperGameState())
     val uiState: StateFlow<PaperGameState> = _uiState.asStateFlow()
@@ -69,6 +73,7 @@ class PaperCrushViewModel(
         boosters: Map<BoosterType, Int> = _uiState.value.boosters,
         soundEnabled: Boolean = _uiState.value.soundEnabled
     ) {
+        idleHintJob?.cancel()
         val pieces = PieceType.entries
         val primaryType = pieces[(level - 1) % pieces.size]
         val secondaryType = pieces[(level + 2) % pieces.size]
@@ -90,6 +95,7 @@ class PaperCrushViewModel(
             status = GameStatus.PLAYING
         )
         persistProgress()
+        scheduleIdleHint()
     }
 
     fun toggleSound() {
@@ -101,7 +107,6 @@ class PaperCrushViewModel(
 
     fun retryOrResetLevel() {
         val current = _uiState.value
-        // Ensure player has at least 1 of each booster if they ran out on retry
         val refreshedBoosters = current.boosters.mapValues { (_, count) -> count.coerceAtLeast(1) }
         startLevel(
             level = current.level,
@@ -114,7 +119,6 @@ class PaperCrushViewModel(
     fun advanceToNextLevel() {
         val current = _uiState.value
         val nextLevel = current.level + 1
-        // Reward +1 Scissors and +1 Glue or Hammer on level victory
         val rewardedBoosters = current.boosters.toMutableMap().apply {
             put(BoosterType.SCISSORS, (get(BoosterType.SCISSORS) ?: 0) + 1)
             val bonusType = if (nextLevel % 2 == 0) BoosterType.HAMMER else BoosterType.GLUE
@@ -131,9 +135,13 @@ class PaperCrushViewModel(
     fun selectBooster(booster: BoosterType) {
         val state = _uiState.value
         if (state.isAnimating || state.status != GameStatus.PLAYING) return
+        idleHintJob?.cancel()
         val count = state.boosters[booster] ?: 0
         if (state.activeBooster == booster) {
-            _uiState.update { it.copy(activeBooster = null, glueFirstPos = null, selectedPos = null) }
+            _uiState.update {
+                it.copy(activeBooster = null, glueFirstPos = null, selectedPos = null, hintPair = null)
+            }
+            scheduleIdleHint()
             return
         }
         if (count <= 0) return
@@ -142,7 +150,8 @@ class PaperCrushViewModel(
             it.copy(
                 activeBooster = booster,
                 glueFirstPos = null,
-                selectedPos = null
+                selectedPos = null,
+                hintPair = null
             )
         }
     }
@@ -151,6 +160,7 @@ class PaperCrushViewModel(
         val state = _uiState.value
         if (state.isAnimating || state.status != GameStatus.PLAYING) return
         if (pos.row !in 0 until BOARD_SIZE || pos.col !in 0 until BOARD_SIZE) return
+        idleHintJob?.cancel()
 
         // Handle active booster first
         when (state.activeBooster) {
@@ -166,7 +176,7 @@ class PaperCrushViewModel(
                 val first = state.glueFirstPos
                 if (first == null) {
                     soundSynth.playPaperCrinkle(1)
-                    _uiState.update { it.copy(glueFirstPos = pos) }
+                    _uiState.update { it.copy(glueFirstPos = pos, hintPair = null) }
                 } else if (first == pos) {
                     _uiState.update { it.copy(glueFirstPos = null) }
                 } else {
@@ -181,14 +191,17 @@ class PaperCrushViewModel(
         val currentSelected = state.selectedPos
         if (currentSelected == null) {
             soundSynth.playPaperCrinkle(1)
-            _uiState.update { it.copy(selectedPos = pos) }
+            _uiState.update { it.copy(selectedPos = pos, hintPair = null) }
+            scheduleIdleHint()
         } else if (currentSelected == pos) {
             _uiState.update { it.copy(selectedPos = null) }
+            scheduleIdleHint()
         } else if (currentSelected.isAdjacentTo(pos)) {
             attemptSwap(currentSelected, pos)
         } else {
             soundSynth.playPaperCrinkle(1)
-            _uiState.update { it.copy(selectedPos = pos) }
+            _uiState.update { it.copy(selectedPos = pos, hintPair = null) }
+            scheduleIdleHint()
         }
     }
 
@@ -205,35 +218,42 @@ class PaperCrushViewModel(
             to.col in 0 until BOARD_SIZE &&
             from.isAdjacentTo(to)
         ) {
+            idleHintJob?.cancel()
             attemptSwap(from, to)
         }
     }
 
     private fun attemptSwap(posA: GridPos, posB: GridPos) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isAnimating = true, selectedPos = null) }
-            soundSynth.playPaperCrinkle(1)
+            _uiState.update {
+                it.copy(isAnimating = true, selectedPos = null, hintPair = null)
+            }
+            soundSynth.playSwapWhoosh()
             val swappedBoard = swapPositions(_uiState.value.board, posA, posB)
             val matches = findMatchedPositions(swappedBoard)
 
             if (matches.isEmpty()) {
-                // Step 1: Animate the two blocks sliding across to each other's positions
+                // Step 1: Animate the two blocks arcing across to each other's positions
                 _uiState.update {
                     it.copy(
                         board = swappedBoard,
                         invalidSwapPair = null
                     )
                 }
-                delay(220)
+                delay(240)
 
                 // Step 2: Brief invalid shake at swapped position
                 soundSynth.playInvalidShake()
                 _uiState.update {
-                    it.copy(invalidSwapPair = posA to posB)
+                    it.copy(
+                        invalidSwapPair = posA to posB,
+                        streakCount = 0
+                    )
                 }
-                delay(180)
+                delay(170)
 
-                // Step 3: Animate the two blocks sliding back to their original positions
+                // Step 3: Animate the two blocks arcing back to their original positions
+                soundSynth.playSwapWhoosh()
                 val restoredBoard = swapPositions(swappedBoard, posA, posB)
                 _uiState.update {
                     it.copy(
@@ -241,7 +261,7 @@ class PaperCrushViewModel(
                         invalidSwapPair = null
                     )
                 }
-                delay(220)
+                delay(230)
 
                 val settledBoard = clearTileMotion(restoredBoard)
                 _uiState.update {
@@ -250,16 +270,19 @@ class PaperCrushViewModel(
                         isAnimating = false
                     )
                 }
+                scheduleIdleHint()
             } else {
-                // Valid swap: animate the two blocks sliding into place, then run match & cascade loop
+                // Valid swap: animate the two blocks arcing into place, then run match & cascade loop
                 soundSynth.playPaperCrinkle(2)
                 _uiState.update {
                     it.copy(
                         board = swappedBoard,
-                        movesRemaining = (it.movesRemaining - 1).coerceAtLeast(0)
+                        movesRemaining = (it.movesRemaining - 1).coerceAtLeast(0),
+                        streakCount = it.streakCount + 1,
+                        feverMovesLeft = (it.feverMovesLeft - 1).coerceAtLeast(0)
                     )
                 }
-                delay(230)
+                delay(245)
                 val settledSwapBoard = clearTileMotion(swappedBoard)
                 _uiState.update { it.copy(board = settledSwapBoard) }
                 resolveCascades(settledSwapBoard)
@@ -281,11 +304,14 @@ class PaperCrushViewModel(
                 it.copy(
                     isAnimating = true,
                     activeBooster = null,
+                    hintPair = null,
                     boosters = updatedBoosters,
-                    comboBannerText = "SNIP!"
+                    comboBannerText = "SNIP!",
+                    boardPunchSeq = nextPunchSeq++,
+                    boardPunchStrength = 0.55f
                 )
             }
-            crushPositionsAndCascade(setOf(pos), bonusPerTile = 60)
+            crushPositionsAndCascade(setOf(pos), bonusPerTile = 65)
         }
     }
 
@@ -296,6 +322,7 @@ class PaperCrushViewModel(
             if (count <= 0) return@launch
 
             soundSynth.playGlueSwap()
+            soundSynth.playSwapWhoosh()
             val updatedBoosters = current.boosters.toMutableMap().apply {
                 put(BoosterType.GLUE, count - 1)
             }
@@ -310,11 +337,12 @@ class PaperCrushViewModel(
                     isAnimating = true,
                     activeBooster = null,
                     glueFirstPos = null,
+                    hintPair = null,
                     boosters = updatedBoosters,
                     comboBannerText = "GLUE SWAP!"
                 )
             }
-            delay(260)
+            delay(270)
             val settledSwapBoard = clearTileMotion(swappedBoard)
             _uiState.update { it.copy(board = settledSwapBoard) }
             resolveCascades(settledSwapBoard)
@@ -345,11 +373,14 @@ class PaperCrushViewModel(
                 it.copy(
                     isAnimating = true,
                     activeBooster = null,
+                    hintPair = null,
                     boosters = updatedBoosters,
-                    comboBannerText = "CARDBOARD SMASH!"
+                    comboBannerText = "CARDBOARD SMASH!",
+                    boardPunchSeq = nextPunchSeq++,
+                    boardPunchStrength = 1.15f
                 )
             }
-            crushPositionsAndCascade(smashedPositions, bonusPerTile = 50)
+            crushPositionsAndCascade(smashedPositions, bonusPerTile = 55)
         }
     }
 
@@ -359,7 +390,7 @@ class PaperCrushViewModel(
     ) {
         val board = _uiState.value.board
         val crushedTiles = positions.map { board[it.row][it.col] }
-        spawnConfettiForTiles(crushedTiles, scrapsPerTile = 16)
+        spawnConfettiForTiles(crushedTiles, scrapsPerTile = 18)
 
         val markedBoard = board.mapIndexed { r, rowList ->
             rowList.mapIndexed { c, tile ->
@@ -368,16 +399,94 @@ class PaperCrushViewModel(
         }
         applyProgressForClearedTiles(crushedTiles, comboStep = 1, pointsPerTile = bonusPerTile)
         _uiState.update { it.copy(board = markedBoard) }
-        delay(200)
+        delay(220)
 
         val cascadedBoard = dropAndRefillBoard(markedBoard, positions)
-        soundSynth.playPaperCrinkle(1)
+        soundSynth.playDropBounce(positions.size)
         _uiState.update { it.copy(board = cascadedBoard) }
-        delay(290)
+        delay(340)
 
         val settledBoard = clearTileMotion(cascadedBoard)
         _uiState.update { it.copy(board = settledBoard) }
         resolveCascades(settledBoard, startCombo = 1)
+    }
+
+    private data class MatchAnalysis(
+        val allMatched: Set<GridPos>,
+        val maxRunLength: Int,
+        val triggeredLineRip: Boolean,
+        val triggeredColorStorm: Boolean
+    )
+
+    private fun analyzeMatchesWithSpecials(board: List<List<BoardTile>>): MatchAnalysis {
+        if (board.size != BOARD_SIZE) return MatchAnalysis(emptySet(), 0, false, false)
+        val matched = mutableSetOf<GridPos>()
+        var maxRun = 0
+        val ripRows = mutableSetOf<Int>()
+        val ripCols = mutableSetOf<Int>()
+        val stormTypes = mutableSetOf<PieceType>()
+
+        // Horizontal runs
+        for (r in 0 until BOARD_SIZE) {
+            var c = 0
+            while (c < BOARD_SIZE) {
+                val type = board[r][c].type
+                var end = c + 1
+                while (end < BOARD_SIZE && board[r][end].type == type) end++
+                val len = end - c
+                if (len >= 3) {
+                    maxRun = maxOf(maxRun, len)
+                    for (k in c until end) matched.add(GridPos(r, k))
+                    if (len == 4) ripRows.add(r)
+                    if (len >= 5) stormTypes.add(type)
+                }
+                c = end
+            }
+        }
+
+        // Vertical runs
+        for (c in 0 until BOARD_SIZE) {
+            var r = 0
+            while (r < BOARD_SIZE) {
+                val type = board[r][c].type
+                var end = r + 1
+                while (end < BOARD_SIZE && board[end][c].type == type) end++
+                val len = end - r
+                if (len >= 3) {
+                    maxRun = maxOf(maxRun, len)
+                    for (k in r until end) matched.add(GridPos(k, c))
+                    if (len == 4) ripCols.add(c)
+                    if (len >= 5) stormTypes.add(type)
+                }
+                r = end
+            }
+        }
+
+        // Expand 4-in-a-row into full Row/Column Paper Rip
+        for (r in ripRows) {
+            for (c in 0 until BOARD_SIZE) matched.add(GridPos(r, c))
+        }
+        for (c in ripCols) {
+            for (r in 0 until BOARD_SIZE) matched.add(GridPos(r, c))
+        }
+
+        // Expand 5-in-a-row into full-board Origami Color Storm
+        if (stormTypes.isNotEmpty()) {
+            for (r in 0 until BOARD_SIZE) {
+                for (c in 0 until BOARD_SIZE) {
+                    if (board[r][c].type in stormTypes) {
+                        matched.add(GridPos(r, c))
+                    }
+                }
+            }
+        }
+
+        return MatchAnalysis(
+            allMatched = matched,
+            maxRunLength = maxRun,
+            triggeredLineRip = ripRows.isNotEmpty() || ripCols.isNotEmpty(),
+            triggeredColorStorm = stormTypes.isNotEmpty()
+        )
     }
 
     private suspend fun resolveCascades(
@@ -388,7 +497,8 @@ class PaperCrushViewModel(
         var combo = startCombo
 
         while (true) {
-            val matchedPositions = findMatchedPositions(currentBoard)
+            val analysis = analyzeMatchesWithSpecials(currentBoard)
+            val matchedPositions = analysis.allMatched
             if (matchedPositions.isEmpty()) break
 
             combo += 1
@@ -398,20 +508,44 @@ class PaperCrushViewModel(
             val matchedTiles = matchedPositions.map { currentBoard[it.row][it.col] }
             spawnConfettiForTiles(
                 tiles = matchedTiles,
-                scrapsPerTile = if (matchedTiles.size >= 5) 18 else 15
+                scrapsPerTile = when {
+                    analysis.triggeredColorStorm -> 22
+                    analysis.triggeredLineRip || combo >= 2 -> 18
+                    else -> 15
+                }
             )
 
+            // Reward +1 random booster on a 5-match Color Storm!
+            if (analysis.triggeredColorStorm) {
+                soundSynth.playFeverFanfare()
+                _uiState.update { st ->
+                    val rewardKey = BoosterType.entries[Random.nextInt(BoosterType.entries.size)]
+                    val nextBoosters = st.boosters.toMutableMap().apply {
+                        put(rewardKey, (get(rewardKey) ?: 0) + 1)
+                    }
+                    st.copy(boosters = nextBoosters)
+                }
+            }
+
             val matchLengthBonus = when {
-                matchedTiles.size >= 5 -> 55
-                matchedTiles.size == 4 -> 40
-                else -> 30
+                analysis.triggeredColorStorm -> 65
+                analysis.triggeredLineRip -> 48
+                else -> 32
             }
             val banner = when {
-                combo >= 3 -> "ORIGAMI COMBO x$combo!"
-                matchedTiles.size >= 5 -> "5-PIECE MASTERPIECE!"
-                matchedTiles.size == 4 -> "4-FOLD CRUSH!"
+                analysis.triggeredColorStorm -> "5-FOLD COLOR STORM! +1 BOOSTER"
+                analysis.triggeredLineRip -> "4-FOLD LINE RIP!"
+                combo >= 3 -> "ORIGAMI FEVER COMBO x$combo!"
                 combo == 2 -> "DOUBLE FOLD x2!"
+                _uiState.value.streakCount >= 3 -> "HOT STREAK x${_uiState.value.streakCount}!"
                 else -> null
+            }
+
+            val punchStrength = when {
+                analysis.triggeredColorStorm -> 1.25f
+                analysis.triggeredLineRip || combo >= 3 -> 0.9f
+                combo == 2 -> 0.55f
+                else -> 0.28f
             }
 
             val crushingBoard = currentBoard.mapIndexed { r, row ->
@@ -424,15 +558,17 @@ class PaperCrushViewModel(
                 it.copy(
                     board = crushingBoard,
                     comboCount = combo,
-                    comboBannerText = banner
+                    comboBannerText = banner,
+                    boardPunchSeq = nextPunchSeq++,
+                    boardPunchStrength = punchStrength
                 )
             }
-            delay(210)
+            delay(225)
 
             val refilledBoard = dropAndRefillBoard(crushingBoard, matchedPositions)
-            soundSynth.playPaperCrinkle(1)
+            soundSynth.playDropBounce(matchedPositions.size)
             _uiState.update { it.copy(board = refilledBoard) }
-            delay(290)
+            delay(345)
 
             currentBoard = clearTileMotion(refilledBoard)
             _uiState.update { it.copy(board = currentBoard) }
@@ -452,7 +588,7 @@ class PaperCrushViewModel(
         }
 
         if (nextStatus == GameStatus.WON) {
-            soundSynth.playComboChord(5)
+            soundSynth.playFeverFanfare()
         }
 
         _uiState.update {
@@ -465,6 +601,9 @@ class PaperCrushViewModel(
             )
         }
         persistProgress()
+        if (nextStatus == GameStatus.PLAYING) {
+            scheduleIdleHint()
+        }
     }
 
     private fun applyProgressForClearedTiles(
@@ -472,24 +611,71 @@ class PaperCrushViewModel(
         comboStep: Int,
         pointsPerTile: Int
     ) {
+        if (clearedTiles.isEmpty()) return
+        val popupId = nextPopupId++
+
         _uiState.update { state ->
             val primaryHits = clearedTiles.count { it.type == state.goal.targetPiece }
             val secondaryHits = state.secondaryGoal?.let { sec ->
                 clearedTiles.count { it.type == sec.targetPiece }
             } ?: 0
 
-            val gainedScore = clearedTiles.size * pointsPerTile * comboStep
+            val isFeverActive = state.feverMovesLeft > 0
+            val feverMult = if (isFeverActive) 2 else 1
+            val gainedScore = clearedTiles.size * pointsPerTile * comboStep * feverMult
             val newScore = state.score + gainedScore
             val newHigh = maxOf(state.highScore, newScore)
+
+            // Charge Fever Meter
+            val chargeDelta = (clearedTiles.size * 0.065f) + (if (comboStep >= 2) 0.14f else 0f)
+            val rawNextCharge = state.feverCharge + chargeDelta
+            val triggeredNewFever = rawNextCharge >= 1f
+            if (triggeredNewFever) {
+                soundSynth.playFeverFanfare()
+            }
+            val nextCharge = if (triggeredNewFever) 0f else rawNextCharge.coerceIn(0f, 1f)
+            val nextFeverMoves = if (triggeredNewFever) {
+                maxOf(state.feverMovesLeft, 3)
+            } else {
+                state.feverMovesLeft
+            }
+
+            // Compute average row/col for floating score popup
+            val avgRow = clearedTiles.map { it.row }.average().toFloat()
+            val avgCol = clearedTiles.map { it.col }.average().toFloat()
+            val popupText = when {
+                triggeredNewFever -> "+$gainedScore FEVER 2x!"
+                isFeverActive -> "+$gainedScore (2x!)"
+                comboStep >= 2 -> "+$gainedScore x$comboStep!"
+                else -> "+$gainedScore"
+            }
+            val popup = FloatingScorePopup(
+                id = popupId,
+                row = avgRow,
+                col = avgCol,
+                text = popupText,
+                color = clearedTiles.first().type.primaryColor,
+                isBig = isFeverActive || comboStep >= 2 || clearedTiles.size >= 4
+            )
 
             state.copy(
                 score = newScore,
                 highScore = newHigh,
+                feverCharge = nextCharge,
+                feverMovesLeft = nextFeverMoves,
+                floatingPopups = (state.floatingPopups + popup).takeLast(6),
                 goal = state.goal.copy(collectedCount = state.goal.collectedCount + primaryHits),
                 secondaryGoal = state.secondaryGoal?.copy(
                     collectedCount = state.secondaryGoal.collectedCount + secondaryHits
                 )
             )
+        }
+
+        viewModelScope.launch {
+            delay(760)
+            _uiState.update { st ->
+                st.copy(floatingPopups = st.floatingPopups.filterNot { it.id == popupId })
+            }
         }
     }
 
@@ -556,7 +742,7 @@ class PaperCrushViewModel(
             // Top new tiles cascading down from above the board rim
             for (i in 0 until missingCount) {
                 val targetRow = i
-                val fallDistance = (missingCount - i + 0.65f) + i.toFloat()
+                val fallDistance = (missingCount - i + 0.85f) + (i * 0.45f)
                 colResult.add(
                     BoardTile(
                         id = nextTileId++,
@@ -566,6 +752,7 @@ class PaperCrushViewModel(
                         spawnDistance = fallDistance,
                         slideFromRowDelta = -fallDistance,
                         slideFromColDelta = 0f,
+                        swapArcSign = 0f,
                         animSeq = nextAnimSeq++
                     )
                 )
@@ -584,6 +771,7 @@ class PaperCrushViewModel(
                         spawnDistance = dropRows,
                         slideFromRowDelta = -dropRows,
                         slideFromColDelta = 0f,
+                        swapArcSign = 0f,
                         animSeq = if (dropRows > 0f) nextAnimSeq++ else oldTile.animSeq,
                         isCrushing = false
                     )
@@ -617,6 +805,7 @@ class PaperCrushViewModel(
                         spawnDistance = 0f,
                         slideFromRowDelta = (b.row - a.row).toFloat(),
                         slideFromColDelta = (b.col - a.col).toFloat(),
+                        swapArcSign = -1f,
                         animSeq = seqA
                     )
                     b -> tileA.copy(
@@ -625,12 +814,14 @@ class PaperCrushViewModel(
                         spawnDistance = 0f,
                         slideFromRowDelta = (a.row - b.row).toFloat(),
                         slideFromColDelta = (a.col - b.col).toFloat(),
+                        swapArcSign = 1f,
                         animSeq = seqB
                     )
                     else -> tile.copy(
                         spawnDistance = 0f,
                         slideFromRowDelta = 0f,
-                        slideFromColDelta = 0f
+                        slideFromColDelta = 0f,
+                        swapArcSign = 0f
                     )
                 }
             }
@@ -643,10 +834,49 @@ class PaperCrushViewModel(
                 tile.copy(
                     spawnDistance = 0f,
                     slideFromRowDelta = 0f,
-                    slideFromColDelta = 0f
+                    slideFromColDelta = 0f,
+                    swapArcSign = 0f
                 )
             }
         }
+    }
+
+    private fun scheduleIdleHint() {
+        idleHintJob?.cancel()
+        idleHintJob = viewModelScope.launch {
+            delay(3500)
+            val st = _uiState.value
+            if (!st.isAnimating && st.status == GameStatus.PLAYING && st.selectedPos == null && st.activeBooster == null) {
+                val hint = findFirstValidMove(st.board)
+                if (hint != null) {
+                    _uiState.update { it.copy(hintPair = hint) }
+                }
+            }
+        }
+    }
+
+    private fun findFirstValidMove(board: List<List<BoardTile>>): Pair<GridPos, GridPos>? {
+        val goalTypes = setOfNotNull(_uiState.value.goal.targetPiece, _uiState.value.secondaryGoal?.targetPiece)
+        var fallbackPair: Pair<GridPos, GridPos>? = null
+        for (r in 0 until BOARD_SIZE) {
+            for (c in 0 until BOARD_SIZE) {
+                val here = GridPos(r, c)
+                val neighbors = listOfNotNull(
+                    if (c + 1 < BOARD_SIZE) GridPos(r, c + 1) else null,
+                    if (r + 1 < BOARD_SIZE) GridPos(r + 1, c) else null
+                )
+                for (next in neighbors) {
+                    val swapped = swapPositions(board, here, next)
+                    val matches = findMatchedPositions(swapped)
+                    if (matches.isNotEmpty()) {
+                        val hitsGoal = matches.any { swapped[it.row][it.col].type in goalTypes }
+                        if (hitsGoal) return here to next
+                        if (fallbackPair == null) fallbackPair = here to next
+                    }
+                }
+            }
+        }
+        return fallbackPair
     }
 
     private fun generatePlayableBoard(): List<List<BoardTile>> {

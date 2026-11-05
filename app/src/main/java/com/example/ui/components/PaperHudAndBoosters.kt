@@ -1,6 +1,9 @@
 package com.example.ui.components
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -10,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -36,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -55,6 +60,7 @@ import com.example.ui.theme.InkSoftBrown
 import com.example.ui.theme.MaskingTapeBorder
 import com.example.ui.theme.MaskingTapeCream
 import com.example.ui.theme.OrigamiFoxGreen
+import com.example.ui.theme.OrigamiFoxOrange
 import com.example.ui.theme.PeppermintRed
 import com.example.ui.theme.PeppermintWhite
 import com.example.ui.theme.StarCardboardGold
@@ -79,7 +85,7 @@ fun PaperTopHud(
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -185,6 +191,70 @@ fun PaperTopHud(
                 modifier = Modifier.weight(0.95f)
             )
         }
+
+        OrigamiFeverStrip(
+            feverCharge = state.feverCharge,
+            feverMovesLeft = state.feverMovesLeft,
+            streakCount = state.streakCount
+        )
+    }
+}
+
+@Composable
+private fun OrigamiFeverStrip(
+    feverCharge: Float,
+    feverMovesLeft: Int,
+    streakCount: Int
+) {
+    val isFever = feverMovesLeft > 0
+    val animatedFill by animateFloatAsState(
+        targetValue = if (isFever) 1f else feverCharge.coerceIn(0.05f, 1f),
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+        label = "fever_fill"
+    )
+    val barShape = RoundedCornerShape(10.dp)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(22.dp)
+            .shadow(3.dp, barShape)
+            .clip(barShape)
+            .background(MaskingTapeCream, barShape)
+            .border(
+                width = if (isFever) 2.dp else 1.dp,
+                color = if (isFever) PeppermintRed else CardboardDark,
+                shape = barShape
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(animatedFill)
+                .align(Alignment.CenterStart)
+                .background(
+                    Brush.horizontalGradient(
+                        if (isFever) {
+                            listOf(PeppermintRed, OrigamiFoxOrange, StarCardboardGold)
+                        } else {
+                            listOf(StickyNoteYellow, StarCardboardGold, OrigamiFoxOrange)
+                        }
+                    )
+                )
+        )
+        Text(
+            text = when {
+                isFever -> "★ ORIGAMI FEVER 2x SCORE! ($feverMovesLeft MOVES) ★"
+                streakCount >= 2 -> "FEVER METER • HOT STREAK x$streakCount!"
+                else -> "FEVER METER • MATCH 4+ FOR LINE RIP!"
+            },
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            ),
+            color = if (isFever) PeppermintWhite else InkBrown
+        )
     }
 }
 

@@ -161,6 +161,80 @@ class PaperSoundSynthesizer {
         }
     }
 
+    fun playSwapWhoosh() {
+        if (!isEnabled) return
+        scope.launch {
+            val durationSec = 0.17f
+            val numSamples = (sampleRate * durationSec).toInt()
+            val samples = ShortArray(numSamples)
+            var prev = 0f
+            for (i in 0 until numSamples) {
+                val t = i.toFloat() / sampleRate
+                val norm = t / durationSec
+                // Rising-then-falling air whoosh + crisp cardstock pop at midpoint
+                val whooshEnv = sin(PI * norm).toFloat()
+                val raw = Random.nextFloat() * 2f - 1f
+                val filtered = raw - prev * 0.78f
+                prev = raw
+                val popFreq = 380.0 + 260.0 * norm
+                val popTone = sin(2.0 * PI * popFreq * t).toFloat() * exp(-18.0 * t).toFloat() * 0.45f
+                val sample = (filtered * whooshEnv * 0.48f + popTone).coerceIn(-1f, 1f)
+                samples[i] = (sample * Short.MAX_VALUE * 0.52f).toInt().toShort()
+            }
+            playPcmBuffer(samples)
+        }
+    }
+
+    fun playDropBounce(tileCount: Int = 3) {
+        if (!isEnabled) return
+        scope.launch {
+            val durationSec = 0.24f
+            val numSamples = (sampleRate * durationSec).toInt()
+            val samples = ShortArray(numSamples)
+            val hits = tileCount.coerceIn(2, 5)
+            for (i in 0 until numSamples) {
+                val t = i.toFloat() / sampleRate
+                var acc = 0f
+                for (h in 0 until hits) {
+                    val delay = h * 0.032f
+                    if (t >= delay) {
+                        val lt = t - delay
+                        val thudFreq = (195.0 + h * 28.0) * exp(-22.0 * lt) + 85.0
+                        val env = exp(-26.0 * lt).toFloat()
+                        acc += sin(2.0 * PI * thudFreq * lt).toFloat() * env * 0.45f
+                    }
+                }
+                val value = acc.coerceIn(-1f, 1f)
+                samples[i] = (value * Short.MAX_VALUE * 0.55f).toInt().toShort()
+            }
+            playPcmBuffer(samples)
+        }
+    }
+
+    fun playFeverFanfare() {
+        if (!isEnabled) return
+        scope.launch {
+            val durationSec = 0.48f
+            val numSamples = (sampleRate * durationSec).toInt()
+            val samples = ShortArray(numSamples)
+            val notes = doubleArrayOf(587.33, 739.99, 880.0, 1174.66) // D5, F#5, A5, D6
+            for (i in 0 until numSamples) {
+                val t = i.toFloat() / sampleRate
+                var mix = 0f
+                for (idx in notes.indices) {
+                    val start = idx * 0.055f
+                    if (t >= start) {
+                        val lt = t - start
+                        val env = exp(-7.5 * lt).toFloat()
+                        mix += sin(2.0 * PI * notes[idx] * lt).toFloat() * env * 0.30f
+                    }
+                }
+                samples[i] = (mix.coerceIn(-1f, 1f) * Short.MAX_VALUE * 0.55f).toInt().toShort()
+            }
+            playPcmBuffer(samples)
+        }
+    }
+
     private fun playPcmBuffer(samples: ShortArray) {
         try {
             val byteSize = samples.size * 2

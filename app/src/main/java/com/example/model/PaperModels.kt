@@ -44,8 +44,18 @@ data class BoardTile(
     val spawnDistance: Float = 0f,
     val slideFromRowDelta: Float = 0f,
     val slideFromColDelta: Float = 0f,
+    val swapArcSign: Float = 0f,
     val animSeq: Long = 0L,
     val isCrushing: Boolean = false
+)
+
+data class FloatingScorePopup(
+    val id: Long,
+    val row: Float,
+    val col: Float,
+    val text: String,
+    val color: Color,
+    val isBig: Boolean = false
 )
 
 enum class BoosterType(
@@ -101,6 +111,7 @@ data class PaperGameState(
     val selectedPos: GridPos? = null,
     val glueFirstPos: GridPos? = null,
     val invalidSwapPair: Pair<GridPos, GridPos>? = null,
+    val hintPair: Pair<GridPos, GridPos>? = null,
     val activeBooster: BoosterType? = null,
     val boosters: Map<BoosterType, Int> = mapOf(
         BoosterType.SCISSORS to 3,
@@ -108,6 +119,12 @@ data class PaperGameState(
         BoosterType.HAMMER to 2
     ),
     val comboCount: Int = 0,
+    val streakCount: Int = 0,
+    val feverCharge: Float = 0f,
+    val feverMovesLeft: Int = 0,
+    val boardPunchSeq: Long = 0L,
+    val boardPunchStrength: Float = 0f,
+    val floatingPopups: List<FloatingScorePopup> = emptyList(),
     val comboBannerText: String? = null,
     val isAnimating: Boolean = false,
     val soundEnabled: Boolean = true,
