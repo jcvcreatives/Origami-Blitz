@@ -253,12 +253,13 @@ private fun DrawScope.drawConfettiScrapWithDepth(
     val sh = scrap.heightDp * density * depthSc
     // 3D paper tumble foreshortening in mid-air; flat perspective when resting on a hill/table
     val flutterScaleY = if (scrap.isLanded) {
-        0.76f
+        0.78f
     } else {
         0.34f + 0.66f * abs(cos(scrap.flutterPhase))
     }
     val alpha = scrap.alpha.coerceIn(0f, 1f)
     val shadowMult = if (scrap.isLanded) 0.35f else 0.85f
+    val shapeVariant = ((scrap.id % 4L) + 4L).toInt() % 4
 
     withTransform({
         translate(left = px, top = py)
@@ -267,40 +268,138 @@ private fun DrawScope.drawConfettiScrapWithDepth(
     }) {
         val sx = shadowShiftX * shadowMult
         val sy = shadowShiftY * shadowMult
-        val shadowPath = Path().apply {
-            moveTo(-sw * 0.5f + sx, -sh * 0.4f + sy)
-            lineTo(sw * 0.45f + sx, -sh * 0.5f + sy)
-            lineTo(sw * 0.55f + sx, sh * 0.35f + sy)
-            lineTo(-sw * 0.35f + sx, sh * 0.5f + sy)
-            close()
-        }
-        drawPath(
-            path = shadowPath,
-            color = Color.Black.copy(alpha = (alpha * 0.22f).coerceIn(0f, 1f))
-        )
+        val shadowAlpha = (alpha * 0.24f).coerceIn(0f, 1f)
+        val mainColor = scrap.color.copy(alpha = alpha)
+        val foldColor = scrap.foldColor.copy(alpha = (alpha * 0.92f).coerceIn(0f, 1f))
+        val creaseColor = PeppermintWhite.copy(alpha = (alpha * 0.82f).coerceIn(0f, 1f))
 
-        val bodyPath = Path().apply {
-            moveTo(-sw * 0.5f, -sh * 0.4f)
-            lineTo(sw * 0.45f, -sh * 0.5f)
-            lineTo(sw * 0.55f, sh * 0.35f)
-            lineTo(-sw * 0.35f, sh * 0.5f)
-            close()
-        }
-        drawPath(
-            path = bodyPath,
-            color = scrap.color.copy(alpha = alpha)
-        )
+        when (shapeVariant) {
+            0 -> {
+                // 0: Folded Origami Paper Dart / Crane Wing (two-tone wings + center valley fold)
+                val shadowDart = Path().apply {
+                    moveTo(sw * 0.65f + sx, sy)
+                    lineTo(-sw * 0.55f + sx, -sh * 0.62f + sy)
+                    lineTo(-sw * 0.32f + sx, sy)
+                    lineTo(-sw * 0.55f + sx, sh * 0.62f + sy)
+                    close()
+                }
+                drawPath(shadowDart, Color.Black.copy(alpha = shadowAlpha))
 
-        val foldPath = Path().apply {
-            moveTo(-sw * 0.5f, -sh * 0.4f)
-            lineTo(sw * 0.45f, -sh * 0.5f)
-            lineTo(0f, 0f)
-            close()
+                val topWing = Path().apply {
+                    moveTo(sw * 0.65f, 0f)
+                    lineTo(-sw * 0.55f, -sh * 0.62f)
+                    lineTo(-sw * 0.32f, 0f)
+                    close()
+                }
+                val botWing = Path().apply {
+                    moveTo(sw * 0.65f, 0f)
+                    lineTo(-sw * 0.32f, 0f)
+                    lineTo(-sw * 0.55f, sh * 0.62f)
+                    close()
+                }
+                drawPath(topWing, mainColor)
+                drawPath(botWing, foldColor)
+                drawLine(
+                    color = creaseColor,
+                    start = Offset(-sw * 0.32f, 0f),
+                    end = Offset(sw * 0.65f, 0f),
+                    strokeWidth = 1.4f
+                )
+            }
+            1 -> {
+                // 1: V-Notched Washi Masking-Tape Strip with center fold-stitch
+                val shadowTape = Path().apply {
+                    moveTo(-sw * 0.62f + sx, -sh * 0.42f + sy)
+                    lineTo(sw * 0.62f + sx, -sh * 0.42f + sy)
+                    lineTo(sw * 0.42f + sx, sy)
+                    lineTo(sw * 0.62f + sx, sh * 0.42f + sy)
+                    lineTo(-sw * 0.62f + sx, sh * 0.42f + sy)
+                    lineTo(-sw * 0.42f + sx, sy)
+                    close()
+                }
+                drawPath(shadowTape, Color.Black.copy(alpha = shadowAlpha))
+
+                val tapePath = Path().apply {
+                    moveTo(-sw * 0.62f, -sh * 0.42f)
+                    lineTo(sw * 0.62f, -sh * 0.42f)
+                    lineTo(sw * 0.42f, 0f)
+                    lineTo(sw * 0.62f, sh * 0.42f)
+                    lineTo(-sw * 0.62f, sh * 0.42f)
+                    lineTo(-sw * 0.42f, 0f)
+                    close()
+                }
+                drawPath(tapePath, mainColor)
+                drawLine(
+                    color = foldColor,
+                    start = Offset(-sw * 0.36f, 0f),
+                    end = Offset(sw * 0.36f, 0f),
+                    strokeWidth = 1.6f
+                )
+            }
+            2 -> {
+                // 2: 4-Point Origami Paper Pinwheel Star
+                val rOuter = maxOf(sw, sh) * 0.58f
+                val rInner = rOuter * 0.38f
+                val starShadow = Path().apply {
+                    moveTo(sx, -rOuter + sy)
+                    lineTo(rInner + sx, -rInner + sy)
+                    lineTo(rOuter + sx, sy)
+                    lineTo(rInner + sx, rInner + sy)
+                    lineTo(sx, rOuter + sy)
+                    lineTo(-rInner + sx, rInner + sy)
+                    lineTo(-rOuter + sx, sy)
+                    lineTo(-rInner + sx, -rInner + sy)
+                    close()
+                }
+                drawPath(starShadow, Color.Black.copy(alpha = shadowAlpha))
+
+                val starBody = Path().apply {
+                    moveTo(0f, -rOuter)
+                    lineTo(rInner, -rInner)
+                    lineTo(rOuter, 0f)
+                    lineTo(rInner, rInner)
+                    lineTo(0f, rOuter)
+                    lineTo(-rInner, rInner)
+                    lineTo(-rOuter, 0f)
+                    lineTo(-rInner, -rInner)
+                    close()
+                }
+                drawPath(starBody, mainColor)
+                drawCircle(color = foldColor, radius = rInner * 0.55f, center = Offset.Zero)
+            }
+            else -> {
+                // 3: Two-Tone Creased Origami Diamond Square
+                val shadowDiamond = Path().apply {
+                    moveTo(sx, -sh * 0.58f + sy)
+                    lineTo(sw * 0.58f + sx, sy)
+                    lineTo(sx, sh * 0.58f + sy)
+                    lineTo(-sw * 0.58f + sx, sy)
+                    close()
+                }
+                drawPath(shadowDiamond, Color.Black.copy(alpha = shadowAlpha))
+
+                val leftFacet = Path().apply {
+                    moveTo(0f, -sh * 0.58f)
+                    lineTo(0f, sh * 0.58f)
+                    lineTo(-sw * 0.58f, 0f)
+                    close()
+                }
+                val rightFacet = Path().apply {
+                    moveTo(0f, -sh * 0.58f)
+                    lineTo(sw * 0.58f, 0f)
+                    lineTo(0f, sh * 0.58f)
+                    close()
+                }
+                drawPath(leftFacet, mainColor)
+                drawPath(rightFacet, foldColor)
+                drawLine(
+                    color = creaseColor,
+                    start = Offset(0f, -sh * 0.58f),
+                    end = Offset(0f, sh * 0.58f),
+                    strokeWidth = 1.4f
+                )
+            }
         }
-        drawPath(
-            path = foldPath,
-            color = scrap.foldColor.copy(alpha = (alpha * 0.88f).coerceIn(0f, 1f))
-        )
     }
 }
 

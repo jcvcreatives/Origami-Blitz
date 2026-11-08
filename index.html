@@ -603,88 +603,98 @@
       line-height: 1;
     }
 
-    /* Shockwave Ring inside each cell for landing impact & match crush */
+    /* Bespoke Origami 8-Point Star-Crease & Scissor-Cut Perforation Burst inside each cell */
     .cell-ring {
       position: absolute;
       top: 50%;
       left: 50%;
-      width: 82%;
-      height: 82%;
-      border-radius: 50%;
-      transform: translate3d(-50%, -50%, 0) scale(0);
+      width: 92%;
+      height: 92%;
+      transform: translate3d(-50%, -50%, 0) scale(0) rotate(0deg);
       opacity: 0;
       pointer-events: none;
       z-index: 1;
       will-change: transform, opacity;
+      clip-path: polygon(
+        50% 0%, 63% 26%, 93% 14%, 76% 41%,
+        100% 50%, 76% 59%, 93% 86%, 63% 74%,
+        50% 100%, 37% 74%, 7% 86%, 24% 59%,
+        0% 50%, 24% 41%, 7% 14%, 37% 26%
+      );
     }
-    .cell-ring.crush-ring {
-      border: 3.5px solid #FF3B5C;
-      background: radial-gradient(circle, rgba(255,255,255,0.75) 0%, rgba(255,234,121,0.35) 60%, transparent 100%);
-      animation: cellCrushWave 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-    .cell-ring.impact-ring {
-      border: 2.5px solid #FFB703;
-      animation: cellImpactWave 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-    .cell-ring.impact-ring.combo-2 {
-      border: 3px solid #F27D3A;
-      background: radial-gradient(circle, rgba(242,125,58,0.28) 0%, transparent 72%);
-      animation: cellImpactWaveCombo 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-    .cell-ring.impact-ring.combo-3 {
-      border: 3.5px solid #E63956;
-      background: radial-gradient(circle, rgba(230,57,86,0.34) 0%, transparent 75%);
-      animation: cellImpactWaveCombo 0.31s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-    .cell-ring.impact-ring.combo-4 {
-      border: 4px solid #8A56AC;
-      background: radial-gradient(circle, rgba(138,86,172,0.38) 0%, transparent 78%);
-      animation: cellImpactWaveCombo 0.34s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-    .cell-ring.impact-ring.combo-5 {
-      border: 4.5px solid #FF2A85;
-      background: radial-gradient(circle, rgba(255,225,105,0.48) 0%, rgba(255,42,133,0.28) 65%, transparent 100%);
-      animation: cellImpactWaveCombo 0.36s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-    .cell-ring.impact-ring.combo-2::after,
-    .cell-ring.impact-ring.combo-3::after,
-    .cell-ring.impact-ring.combo-4::after,
-    .cell-ring.impact-ring.combo-5::after {
+    .cell-ring::after {
       content: '';
       position: absolute;
-      inset: 14%;
-      border-radius: 50%;
-      border: 2px solid #FFFDF7;
+      inset: 18%;
+      border: 2px dashed #FFFDF7;
+      transform: rotate(45deg);
+    }
+    .cell-ring.crush-ring {
+      background: radial-gradient(circle, #FFFDF7 0%, #FFE169 42%, #FF3B5C 85%);
+      animation: cellCrushWave 0.27s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .cell-ring.impact-ring {
+      background: radial-gradient(circle, rgba(255,253,247,0.85) 0%, rgba(255,183,3,0.75) 75%);
+      animation: cellImpactWave 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .cell-ring.impact-ring.combo-2 {
+      background: radial-gradient(circle, #FFFDF7 0%, #FFE169 38%, #F27D3A 85%);
+      animation: cellImpactWaveCombo 0.29s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .cell-ring.impact-ring.combo-3 {
+      background: radial-gradient(circle, #FFFDF7 0%, #FFE169 35%, #E63956 85%);
+      animation: cellImpactWaveCombo 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .cell-ring.impact-ring.combo-4 {
+      background: radial-gradient(circle, #FFFDF7 0%, #FFE169 35%, #8A56AC 85%);
+      animation: cellImpactWaveCombo 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .cell-ring.impact-ring.combo-5 {
+      background: radial-gradient(circle, #FFFDF7 0%, #FFE169 32%, #FF2A85 88%);
+      animation: cellImpactWaveCombo 0.38s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
     @keyframes cellCrushWave {
-      0% { transform: translate3d(-50%, -50%, 0) scale(0.35); opacity: 0.95; }
-      100% { transform: translate3d(-50%, -50%, 0) scale(1.62); opacity: 0; }
+      0% { transform: translate3d(-50%, -50%, 0) scale(0.32) rotate(-18deg); opacity: 0.96; }
+      100% { transform: translate3d(-50%, -50%, 0) scale(1.68) rotate(28deg); opacity: 0; }
     }
     @keyframes cellImpactWave {
-      0% { transform: translate3d(-50%, -50%, 0) scale(0.45); opacity: 0.72; }
-      100% { transform: translate3d(-50%, -50%, 0) scale(1.28); opacity: 0; }
+      0% { transform: translate3d(-50%, -50%, 0) scale(0.42) rotate(0deg); opacity: 0.80; }
+      100% { transform: translate3d(-50%, -50%, 0) scale(1.32) rotate(22deg); opacity: 0; }
     }
     @keyframes cellImpactWaveCombo {
-      0% { transform: translate3d(-50%, -50%, 0) scale(0.32); opacity: 0.96; }
-      100% { transform: translate3d(-50%, -50%, 0) scale(1.68); opacity: 0; }
+      0% { transform: translate3d(-50%, -50%, 0) scale(0.30) rotate(-15deg); opacity: 0.98; }
+      100% { transform: translate3d(-50%, -50%, 0) scale(1.74) rotate(35deg); opacity: 0; }
     }
 
-    /* Vertical Speed-Streak Wake Lines above fast-falling blocks */
+    /* Accordion-Folded Washi Paper Ribbon & Origami Diamond Wake above fast-falling blocks */
     .tile-speed-streak {
       position: absolute;
-      left: 16%;
-      right: 16%;
-      top: -42%;
-      height: 56%;
+      left: 22%;
+      right: 22%;
+      top: -46%;
+      height: 62%;
       pointer-events: none;
       z-index: 1;
       opacity: 0;
       transform-origin: bottom center;
       will-change: transform, opacity;
-      background:
-        linear-gradient(to top, var(--streak-color, #FFB703) 0%, transparent 100%) 15% 0 / 2.5px 85% no-repeat,
-        linear-gradient(to top, #FFFDF7 0%, var(--streak-color, #FFB703) 45%, transparent 100%) 50% 0 / 3.5px 100% no-repeat,
-        linear-gradient(to top, var(--streak-color, #FFB703) 0%, transparent 100%) 85% 0 / 2.5px 85% no-repeat;
+      background: repeating-linear-gradient(
+        180deg,
+        var(--streak-color, #FFB703) 0px,
+        var(--streak-color, #FFB703) 6px,
+        #FFFDF7 6px,
+        #FFFDF7 8px,
+        #FFE169 8px,
+        #FFE169 14px
+      );
+      clip-path: polygon(
+        18% 0%, 82% 0%,
+        100% 25%, 76% 50%,
+        100% 75%, 80% 100%,
+        50% 84%, 20% 100%,
+        0% 75%, 24% 50%,
+        0% 25%
+      );
     }
 
     /* GPU-Composited 60fps Tile Piece Container */
@@ -709,14 +719,15 @@
       overflow: visible;
     }
 
-    /* Floating Score Popup Badges */
+    /* Torn Washi-Ticket Floating Score Popup Badges */
     .floating-popup {
       position: absolute;
       transform: translate3d(-50%, -50%, 0);
       background: var(--sticky-yellow);
       border: 1.5px solid var(--cardboard-dark);
-      border-radius: 10px;
-      padding: 3px 9px;
+      border-radius: 4px;
+      clip-path: polygon(0% 12%, 6% 0%, 94% 0%, 100% 12%, 95% 50%, 100% 88%, 94% 100%, 6% 100%, 0% 88%, 5% 50%);
+      padding: 4px 12px;
       font-size: 13px;
       font-weight: 800;
       color: var(--ink-brown);
@@ -759,23 +770,23 @@
       box-shadow: 0 6px 16px rgba(255,42,133,0.45);
     }
     @keyframes floatScoreUp {
-      0% { transform: translate3d(-50%, -30%, 0) scale(0.5); opacity: 0; }
-      22% { transform: translate3d(-50%, -65%, 0) scale(1.26); opacity: 1; }
-      78% { transform: translate3d(-50%, -155%, 0) scale(1.04); opacity: 1; }
-      100% { transform: translate3d(-50%, -185%, 0) scale(0.88); opacity: 0; }
+      0% { transform: translate3d(-50%, -30%, 0) scale(0.5) rotate(-3deg); opacity: 0; }
+      22% { transform: translate3d(-50%, -65%, 0) scale(1.26) rotate(-3deg); opacity: 1; }
+      78% { transform: translate3d(-50%, -155%, 0) scale(1.04) rotate(-3deg); opacity: 1; }
+      100% { transform: translate3d(-50%, -185%, 0) scale(0.88) rotate(-3deg); opacity: 0; }
     }
 
-    /* Live Top-Right Cascade Multiplier Stamp (DROP x2!, x3!!, x4!!!) */
+    /* Live Top-Right Torn Washi-Tape Cascade Stamp (FOLD x2!, CREASE x3!!, ORIGAMI x4!!!) */
     #cascade-stamp {
       position: absolute;
       top: 10px;
       right: 12px;
-      transform: translate3d(0, 0, 0) scale(0) rotate(-5deg);
+      transform: translate3d(0, 0, 0) scale(0) rotate(-4deg);
       background: #F27D3A;
       color: #FFFDF7;
-      border: 2px solid #FFFDF7;
-      padding: 4px 11px;
-      border-radius: 10px;
+      border: 2px dashed #FFFDF7;
+      clip-path: polygon(0% 10%, 5% 0%, 95% 0%, 100% 10%, 96% 50%, 100% 90%, 95% 100%, 5% 100%, 0% 90%, 4% 50%);
+      padding: 5px 13px;
       font-size: 14px;
       font-weight: 900;
       letter-spacing: 0.4px;
@@ -786,38 +797,38 @@
       white-space: nowrap;
     }
     #cascade-stamp.visible {
-      transform: translate3d(0, 0, 0) scale(1) rotate(-5deg);
+      transform: translate3d(0, 0, 0) scale(1) rotate(-4deg);
     }
     #cascade-stamp.tier-3 {
       background: #E63956;
       border-color: #FFE169;
-      transform: translate3d(0, 0, 0) scale(1.08) rotate(-5deg);
+      transform: translate3d(0, 0, 0) scale(1.08) rotate(-4deg);
     }
     #cascade-stamp.tier-4 {
       background: #8A56AC;
       border-color: #FFE169;
-      transform: translate3d(0, 0, 0) scale(1.14) rotate(-5deg);
+      transform: translate3d(0, 0, 0) scale(1.14) rotate(-4deg);
     }
     #cascade-stamp.tier-5 {
       background: #FF2A85;
       border-color: #FFE169;
-      transform: translate3d(0, 0, 0) scale(1.20) rotate(-5deg);
+      transform: translate3d(0, 0, 0) scale(1.20) rotate(-4deg);
     }
 
-    /* Combo Tape Banner inside Board */
+    /* Torn Washi-Tape Combo Banner inside Board */
     #combo-banner {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate3d(-50%, -50%, 0) scale(0);
       background: var(--sticky-yellow);
-      border: 2.5px solid var(--thumbtack-red);
-      padding: 6px 16px;
-      border-radius: 12px;
+      border: 2.5px dashed var(--thumbtack-red);
+      clip-path: polygon(0% 10%, 3% 0%, 97% 0%, 100% 10%, 97% 50%, 100% 90%, 97% 100%, 3% 100%, 0% 90%, 3% 50%);
+      padding: 7px 18px;
       font-size: 18px;
       font-weight: 800;
       color: var(--ink-brown);
-      box-shadow: 0 6px 16px rgba(0,0,0,0.26);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.28);
       pointer-events: none;
       z-index: 35;
       transition: transform 0.2s cubic-bezier(0.22, 1.4, 0.36, 1);
@@ -1692,9 +1703,19 @@
       constructor() {
         this.ctx = null;
         this.master = null;
+        this.noiseBuf = null;
         this.enabled = true;
         this.tapIdx = 0;
-        this.pentatonic = [523.25, 587.33, 659.25, 783.99, 880.00, 1046.50, 1174.66, 1318.51, 1567.98];
+        this.stageNumber = 1;
+        this.isExcited = false;
+        this.bgmTimer = null;
+        this.bgmStep = 0;
+        // Japanese Yo Pentatonic Scale (D, E, G, A, B) across octaves for unmistakable Origami identity
+        this.yoScale = [
+          293.66, 329.63, 392.00, 440.00, 493.88,
+          587.33, 659.25, 783.99, 880.00, 987.77,
+          1174.66, 1318.51, 1567.98
+        ];
       }
       ensureCtx() {
         if (!this.enabled) return null;
@@ -1711,103 +1732,208 @@
               comp.release.setValueAtTime(0.15, this.ctx.currentTime);
               comp.connect(this.ctx.destination);
               this.master = comp;
+
+              // Pre-build 1.0s organic paper-fiber noise buffer for zero-alloc foley bursts
+              const sr = this.ctx.sampleRate;
+              this.noiseBuf = this.ctx.createBuffer(1, sr, sr);
+              const data = this.noiseBuf.getChannelData(0);
+              let last = 0;
+              for (let i = 0; i < sr; i++) {
+                const white = Math.random() * 2 - 1;
+                last = last * 0.62 + white * 0.38;
+                data[i] = last * 1.35;
+              }
             } catch (_) {}
           }
         }
         if (this.ctx && this.ctx.state === 'suspended') {
           this.ctx.resume().catch(() => {});
         }
+        if (this.enabled && !this.bgmTimer) {
+          this.startBgmLoop();
+        }
         return this.ctx;
       }
       dest() {
         return this.master || (this.ctx && this.ctx.destination);
       }
+      updateMood(stageNumber = 1, isExcited = false) {
+        this.stageNumber = Math.max(1, Math.min(10, stageNumber));
+        this.isExcited = Boolean(isExcited);
+      }
+      startBgmLoop() {
+        if (this.bgmTimer || !this.enabled) return;
+        const melodyPattern = [5, 7, 8, 7, 9, 8, 7, 5, 6, 7, 9, 10, 9, 7, 6, 5];
+        const bassPattern   = [0, -1, 2, -1, 3, -1, 2, -1, 1, -1, 3, -1, 4, -1, 0, -1];
+        const chimePattern  = [-1, 10, -1, 9, -1, 11, -1, 10, -1, 9, -1, 12, -1, 10, -1, 8];
+
+        const tick = () => {
+          if (!this.enabled) {
+            this.bgmTimer = null;
+            return;
+          }
+          if (this.ctx && this.ctx.state === 'running') {
+            const now = this.ctx.currentTime;
+            const stgMod = this.stageNumber % 5;
+            const semitones = stgMod === 1 ? 0 : stgMod === 2 ? 2 : stgMod === 3 ? -2 : stgMod === 4 ? 5 : 3;
+            const shift = Math.pow(2, semitones / 12);
+            const s = this.bgmStep % 16;
+            const melFreq = this.yoScale[melodyPattern[s]] * shift;
+            const bassIdx = bassPattern[s];
+            const chimeIdx = chimePattern[s];
+
+            // 1. Plucked Silk Koto + Music-Box Kalimba Melody Note
+            this.triggerKotoPluck(melFreq, now, 0.052, 0.24, s % 4 === 0);
+
+            // 2. Warm Hollow Bamboo Bass Pluck
+            if (bassIdx >= 0) {
+              this.triggerKotoPluck(this.yoScale[bassIdx] * shift * 0.5, now, 0.042, 0.28, false);
+            }
+
+            // 3. Sparkling Furin Wind-Chime Counter-Melody during Fever / Cascades
+            if (this.isExcited && chimeIdx >= 0) {
+              this.triggerKotoPluck(this.yoScale[chimeIdx] * shift, now + 0.12, 0.032, 0.18, false);
+            }
+
+            // 4. Soft Washi Paper-Brush Shaker on off-beats
+            if (s % 2 === 1) {
+              this.triggerFoleyBurst(now, 0.045, 2400, 3.2, 0.022);
+            }
+            this.bgmStep = (this.bgmStep + 1) % 16;
+          }
+          const intervalMs = this.isExcited ? 245 : 285;
+          this.bgmTimer = setTimeout(tick, intervalMs);
+        };
+        this.bgmTimer = setTimeout(tick, 180);
+      }
+      stopBgmLoop() {
+        if (this.bgmTimer) {
+          clearTimeout(this.bgmTimer);
+          this.bgmTimer = null;
+        }
+      }
+      triggerFoleyBurst(startTime, duration, filterFreq, Q, peakGain, endFreq = null) {
+        if (!this.ctx || !this.noiseBuf) return;
+        const src = this.ctx.createBufferSource();
+        src.buffer = this.noiseBuf;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(filterFreq, startTime);
+        if (endFreq) {
+          filter.frequency.exponentialRampToValueAtTime(endFreq, startTime + duration);
+        }
+        filter.Q.setValueAtTime(Q, startTime);
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.001, startTime);
+        gain.gain.linearRampToValueAtTime(peakGain, startTime + Math.min(0.005, duration * 0.2));
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+        src.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.dest());
+        const offset = Math.random() * Math.max(0.05, 0.9 - duration);
+        src.start(startTime, offset, duration + 0.01);
+      }
+      triggerKotoPluck(freq, startTime, peakGain = 0.16, duration = 0.22, graceBend = false) {
+        if (!this.ctx) return;
+        const osc1 = this.ctx.createOscillator();
+        const oscTine = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const tineGain = this.ctx.createGain();
+        osc1.type = 'triangle';
+        oscTine.type = 'sine';
+        if (graceBend) {
+          osc1.frequency.setValueAtTime(freq * 1.022, startTime);
+          osc1.frequency.exponentialRampToValueAtTime(freq, startTime + 0.028);
+        } else {
+          osc1.frequency.setValueAtTime(freq, startTime);
+        }
+        // Kalimba / Music-box metallic tine overtone at 2.96x
+        oscTine.frequency.setValueAtTime(freq * 2.96, startTime);
+        tineGain.gain.setValueAtTime(peakGain * 0.35, startTime);
+        tineGain.gain.exponentialRampToValueAtTime(0.001, startTime + duration * 0.45);
+
+        gain.gain.setValueAtTime(0.001, startTime);
+        gain.gain.linearRampToValueAtTime(peakGain, startTime + 0.003);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+        osc1.connect(gain);
+        oscTine.connect(tineGain);
+        tineGain.connect(this.dest());
+        gain.connect(this.dest());
+        osc1.start(startTime);
+        oscTine.start(startTime);
+        osc1.stop(startTime + duration + 0.01);
+        oscTine.stop(startTime + duration * 0.45 + 0.01);
+      }
       playCrinkle(intensity = 1) {
         const ctx = this.ensureCtx();
         if (!ctx) return;
         const now = ctx.currentTime;
-        const baseFreq = this.pentatonic[(this.tapIdx++ + Math.max(0, intensity - 1)) % this.pentatonic.length];
+        const idx = (this.tapIdx++ + Math.max(0, intensity - 1)) % 8;
+        const baseFreq = this.yoScale[3 + idx];
 
-        // Warm kalimba / marimba bubble-pop fundamental + 2nd harmonic
-        const osc1 = ctx.createOscillator();
-        const osc2 = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc1.type = 'sine';
-        osc2.type = 'triangle';
-        osc1.frequency.setValueAtTime(baseFreq * 1.16, now);
-        osc1.frequency.exponentialRampToValueAtTime(baseFreq, now + 0.026);
-        osc2.frequency.setValueAtTime(baseFreq * 2.0, now);
+        // 1. Tactile Origami Paper Fold Crease Foley (twin micro-crackle fiber impulses)
+        this.triggerFoleyBurst(now, 0.042, 1850, 2.2, 0.18, 2900);
+        this.triggerFoleyBurst(now + 0.018, 0.038, 2600, 2.5, 0.13);
 
-        const g2 = ctx.createGain();
-        g2.gain.setValueAtTime(0.22, now);
-        g2.gain.exponentialRampToValueAtTime(0.001, now + 0.065);
+        // 2. Hollow Corrugated Box Wood-Cavity Knock (290Hz -> 175Hz)
+        const knock = ctx.createOscillator();
+        const kGain = ctx.createGain();
+        knock.type = 'sine';
+        knock.frequency.setValueAtTime(290, now);
+        knock.frequency.exponentialRampToValueAtTime(175, now + 0.038);
+        kGain.gain.setValueAtTime(0.001, now);
+        kGain.gain.linearRampToValueAtTime(0.14, now + 0.002);
+        kGain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
+        knock.connect(kGain);
+        kGain.connect(this.dest());
+        knock.start(now);
+        knock.stop(now + 0.05);
 
-        gain.gain.setValueAtTime(0.001, now);
-        gain.gain.linearRampToValueAtTime(0.24, now + 0.004);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
-
-        osc1.connect(gain);
-        osc2.connect(g2);
-        g2.connect(gain);
-        gain.connect(this.dest());
-        osc1.start(now);
-        osc2.start(now);
-        osc1.stop(now + 0.145);
-        osc2.stop(now + 0.07);
+        // 3. Plucked Bamboo Kalimba Tine
+        this.triggerKotoPluck(baseFreq, now, 0.20, 0.16, true);
       }
       playWhoosh() {
         const ctx = this.ensureCtx();
         if (!ctx) return;
         const now = ctx.currentTime;
-        // Silky two-note marimba/flute glide (G4 -> D5)
-        const osc1 = ctx.createOscillator();
-        const osc2 = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc1.type = 'sine';
-        osc2.type = 'triangle';
-        osc1.frequency.setValueAtTime(392.00, now);
-        osc1.frequency.exponentialRampToValueAtTime(587.33, now + 0.13);
-        osc2.frequency.setValueAtTime(784.00, now);
-        osc2.frequency.exponentialRampToValueAtTime(1174.66, now + 0.13);
+        // 1. Textured construction-paper coaster sliding across corrugated cardboard + mid-swap fold snap
+        this.triggerFoleyBurst(now, 0.15, 920, 1.8, 0.22, 2450);
+        this.triggerFoleyBurst(now + 0.065, 0.035, 3100, 2.8, 0.16);
 
-        const g2 = ctx.createGain();
-        g2.gain.setValueAtTime(0.18, now);
-        g2.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
-
-        gain.gain.setValueAtTime(0.001, now);
-        gain.gain.linearRampToValueAtTime(0.22, now + 0.006);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.145);
-
-        osc1.connect(gain);
-        osc2.connect(g2);
-        g2.connect(gain);
-        gain.connect(this.dest());
-        osc1.start(now);
-        osc2.start(now);
-        osc1.stop(now + 0.15);
-        osc2.stop(now + 0.14);
+        // 2. Two-note Bamboo & Koto fifth interval (D5 587.33Hz -> A5 880.0Hz)
+        this.triggerKotoPluck(587.33, now, 0.16, 0.13, false);
+        this.triggerKotoPluck(880.00, now + 0.065, 0.18, 0.14, true);
       }
       playInvalidShake() {
         const ctx = this.ensureCtx();
         if (!ctx) return;
         const now = ctx.currentTime;
-        // Cute wooden marimba double-knock (E4 -> C4)
+        // Dry crumpled-paper crinkle + hollow bamboo woodblock double-tok (G4 -> D4)
+        this.triggerFoleyBurst(now, 0.06, 1600, 1.6, 0.16);
+        this.triggerFoleyBurst(now + 0.095, 0.06, 1400, 1.6, 0.14);
         [
-          { delay: 0, freq: 329.63 },
-          { delay: 0.09, freq: 261.63 }
+          { delay: 0, freq: 392.00 },
+          { delay: 0.095, freq: 293.66 }
         ].forEach(({ delay, freq }) => {
           const start = now + delay;
           const osc = ctx.createOscillator();
+          const osc2 = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = 'triangle';
+          osc2.type = 'sine';
           osc.frequency.setValueAtTime(freq, start);
+          osc2.frequency.setValueAtTime(freq * 2.42, start);
           gain.gain.setValueAtTime(0.001, start);
-          gain.gain.linearRampToValueAtTime(0.20, start + 0.004);
+          gain.gain.linearRampToValueAtTime(0.20, start + 0.003);
           gain.gain.exponentialRampToValueAtTime(0.001, start + 0.085);
           osc.connect(gain);
+          osc2.connect(gain);
           gain.connect(this.dest());
           osc.start(start);
+          osc2.start(start);
           osc.stop(start + 0.09);
+          osc2.stop(start + 0.09);
         });
       }
       playBounce(tileCount = 4, combo = 1) {
@@ -1815,199 +1941,148 @@
         if (!ctx) return;
         const now = ctx.currentTime;
         const hits = Math.max(2, Math.min(6, tileCount));
-        const comboPitchMult = Math.pow(2, Math.min(Math.max(1, combo) - 1, 8) * 1.5 / 12);
-        const stepDelay = Math.max(0.018, 0.030 - Math.min(4, Math.max(0, combo - 1)) * 0.003);
-        const dropNotes = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25];
+        const comboBoost = Math.min(5, Math.max(0, combo - 1));
+        const comboPitchMult = Math.pow(2, Math.min(Math.max(1, combo) - 1, 10) * 2 / 12);
+        const stepDelay = Math.max(0.016, 0.026 - comboBoost * 0.002);
+        // Yo Pentatonic Bamboo Marimba notes: D4, E4, G4, A4, B4, D5
+        const dropNotes = [293.66, 329.63, 392.00, 440.00, 493.88, 587.33];
+
         for (let i = 0; i < hits; i++) {
           const start = now + i * stepDelay;
           const f = dropNotes[i % dropNotes.length] * comboPitchMult;
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(f * 0.88, start);
-          osc.frequency.exponentialRampToValueAtTime(f, start + 0.025);
-          gain.gain.setValueAtTime(0.001, start);
-          gain.gain.linearRampToValueAtTime(0.22, start + 0.004);
-          gain.gain.exponentialRampToValueAtTime(0.001, start + 0.115);
-          osc.connect(gain);
-          gain.connect(this.dest());
-          osc.start(start);
-          osc.stop(start + 0.12);
 
-          if (combo >= 2) {
-            const bell = ctx.createOscillator();
-            const bellGain = ctx.createGain();
-            bell.type = 'triangle';
-            bell.frequency.setValueAtTime(f * 2.0, start);
-            const bellPeak = Math.min(0.14, 0.05 + combo * 0.02);
-            bellGain.gain.setValueAtTime(0.001, start);
-            bellGain.gain.linearRampToValueAtTime(bellPeak, start + 0.003);
-            bellGain.gain.exponentialRampToValueAtTime(0.001, start + 0.085);
-            bell.connect(bellGain);
-            bellGain.connect(this.dest());
-            bell.start(start);
-            bell.stop(start + 0.09);
-          }
+          // 1. Hollow Corrugated Cardboard Box-Lid Thump (138Hz -> 64Hz)
+          const thump = ctx.createOscillator();
+          const tGain = ctx.createGain();
+          thump.type = 'sine';
+          thump.frequency.setValueAtTime(138 + comboBoost * 12, start);
+          thump.frequency.exponentialRampToValueAtTime(64, start + 0.048);
+          tGain.gain.setValueAtTime(0.001, start);
+          tGain.gain.linearRampToValueAtTime(0.16 + comboBoost * 0.015, start + 0.003);
+          tGain.gain.exponentialRampToValueAtTime(0.001, start + 0.065);
+          thump.connect(tGain);
+          tGain.connect(this.dest());
+          thump.start(start);
+          thump.stop(start + 0.07);
+
+          // 2. Crisp Paper-Coaster Edge Slap Foley
+          this.triggerFoleyBurst(start, 0.028, 1950 + comboBoost * 220, 2.0, 0.11 + comboBoost * 0.015);
+
+          // 3. Resonant Bamboo Marimba + Koto Tine
+          this.triggerKotoPluck(f, start, 0.18 + comboBoost * 0.015, 0.13, combo >= 2);
         }
       }
       playSnip() {
         const ctx = this.ensureCtx();
         if (!ctx) return;
         const now = ctx.currentTime;
-        // Twin silver-bell shear notes: E6 -> A6
+        // Twin steel scissor-blade shear friction + inharmonic tuning-fork ring
         [
-          { delay: 0, freq: 1318.51 },
-          { delay: 0.075, freq: 1760.00 }
-        ].forEach(({ delay, freq }) => {
+          { delay: 0, f1: 1480.0, f2: 3890.0, noiseF: 3600 },
+          { delay: 0.082, f1: 1975.5, f2: 5120.0, noiseF: 4800 }
+        ].forEach(({ delay, f1, f2, noiseF }) => {
           const start = now + delay;
-          const osc = ctx.createOscillator();
+          this.triggerFoleyBurst(start, 0.065, noiseF, 3.0, 0.25, noiseF * 1.45);
+          const osc1 = ctx.createOscillator();
           const osc2 = ctx.createOscillator();
           const gain = ctx.createGain();
-          osc.type = 'sine';
+          osc1.type = 'sine';
           osc2.type = 'triangle';
-          osc.frequency.setValueAtTime(freq, start);
-          osc2.frequency.setValueAtTime(freq * 2, start);
-          const g2 = ctx.createGain();
-          g2.gain.setValueAtTime(0.22, start);
-          g2.gain.exponentialRampToValueAtTime(0.001, start + 0.09);
-
+          osc1.frequency.setValueAtTime(f1, start);
+          osc2.frequency.setValueAtTime(f2, start);
           gain.gain.setValueAtTime(0.001, start);
-          gain.gain.linearRampToValueAtTime(0.24, start + 0.003);
-          gain.gain.exponentialRampToValueAtTime(0.001, start + 0.14);
-          osc.connect(gain);
-          osc2.connect(g2);
-          g2.connect(gain);
+          gain.gain.linearRampToValueAtTime(0.18, start + 0.002);
+          gain.gain.exponentialRampToValueAtTime(0.001, start + 0.13);
+          osc1.connect(gain);
+          osc2.connect(gain);
           gain.connect(this.dest());
-          osc.start(start);
+          osc1.start(start);
           osc2.start(start);
-          osc.stop(start + 0.145);
-          osc2.stop(start + 0.095);
+          osc1.stop(start + 0.135);
+          osc2.stop(start + 0.135);
         });
       }
       playGlue() {
         const ctx = this.ensureCtx();
         if (!ctx) return;
         const now = ctx.currentTime;
-        // Juicy rising bubble glide (G4 -> G5) + C6 pop
+        // Wet craft-glue uncapping squish glide (280Hz -> 820Hz) + sticky paper peel + Koto pluck
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(392.00, now);
-        osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.16);
+        osc.frequency.setValueAtTime(280.0, now);
+        osc.frequency.exponentialRampToValueAtTime(820.0, now + 0.14);
         gain.gain.setValueAtTime(0.001, now);
-        gain.gain.linearRampToValueAtTime(0.25, now + 0.005);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+        gain.gain.linearRampToValueAtTime(0.24, now + 0.004);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
         osc.connect(gain);
         gain.connect(this.dest());
         osc.start(now);
-        osc.stop(now + 0.185);
+        osc.stop(now + 0.165);
 
-        const pop = ctx.createOscillator();
-        const popGain = ctx.createGain();
-        pop.type = 'triangle';
-        pop.frequency.setValueAtTime(1046.50, now + 0.09);
-        popGain.gain.setValueAtTime(0.001, now + 0.09);
-        popGain.gain.linearRampToValueAtTime(0.20, now + 0.094);
-        popGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
-        pop.connect(popGain);
-        popGain.connect(this.dest());
-        pop.start(now + 0.09);
-        pop.stop(now + 0.225);
+        this.triggerFoleyBurst(now + 0.09, 0.055, 2200, 2.2, 0.16);
+        this.triggerKotoPluck(1174.66, now + 0.095, 0.20, 0.16, true);
       }
       playSmash() {
         const ctx = this.ensureCtx();
         if (!ctx) return;
         const now = ctx.currentTime;
-        // Warm sub-bass drum thump (160Hz -> 52Hz) + wooden power chord
+        // 1. Deep Hollow Corrugated Box Lid Stomp (175Hz -> 48Hz) + Box Cavity (142Hz)
         const kick = ctx.createOscillator();
+        const cavity = ctx.createOscillator();
         const kickGain = ctx.createGain();
         kick.type = 'sine';
-        kick.frequency.setValueAtTime(160, now);
-        kick.frequency.exponentialRampToValueAtTime(52, now + 0.22);
+        cavity.type = 'triangle';
+        kick.frequency.setValueAtTime(175, now);
+        kick.frequency.exponentialRampToValueAtTime(48, now + 0.22);
+        cavity.frequency.setValueAtTime(142, now);
         kickGain.gain.setValueAtTime(0.001, now);
-        kickGain.gain.linearRampToValueAtTime(0.38, now + 0.004);
+        kickGain.gain.linearRampToValueAtTime(0.36, now + 0.003);
         kickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.30);
         kick.connect(kickGain);
+        cavity.connect(kickGain);
         kickGain.connect(this.dest());
         kick.start(now);
+        cavity.start(now);
         kick.stop(now + 0.31);
+        cavity.stop(now + 0.16);
 
-        [523.25, 783.99, 1046.50].forEach(freq => {
-          const osc = ctx.createOscillator();
-          const g = ctx.createGain();
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(freq, now);
-          g.gain.setValueAtTime(0.001, now);
-          g.gain.linearRampToValueAtTime(0.12, now + 0.005);
-          g.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
-          osc.connect(g);
-          g.connect(this.dest());
-          osc.start(now);
-          osc.stop(now + 0.265);
+        // 2. Bursting Kraft-Paper Rip Foley
+        this.triggerFoleyBurst(now, 0.14, 1450, 1.5, 0.28, 2800);
+
+        // 3. Resonant Japanese Yo Fifth + Octave Koto Chord (D5 + A5 + D6)
+        [587.33, 880.00, 1174.66].forEach(freq => {
+          this.triggerKotoPluck(freq, now + 0.01, 0.14, 0.26, true);
         });
       }
       playChord(step = 1) {
         const ctx = this.ensureCtx();
         if (!ctx) return;
+        if (step >= 2) this.isExcited = true;
         const now = ctx.currentTime;
         const mult = Math.pow(2, Math.min(step - 1, 10) * 2 / 12);
-        // 5-note Major 9th Celesta & Harp arpeggio (C5, E5, G5, C6, D6)
-        [523.25, 659.25, 783.99, 1046.50, 1174.66].forEach((freq, idx) => {
-          const start = now + idx * 0.036;
-          const f = freq * mult;
-          const osc1 = ctx.createOscillator();
-          const osc2 = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc1.type = 'sine';
-          osc2.type = 'triangle';
-          osc1.frequency.setValueAtTime(f, start);
-          osc2.frequency.setValueAtTime(f * 2.0, start);
 
-          const g2 = ctx.createGain();
-          g2.gain.setValueAtTime(0.20, start);
-          g2.gain.exponentialRampToValueAtTime(0.001, start + 0.16);
+        // 1. Tactile Torn Washi Paper Rip Foley (staggered fiber tear impulses)
+        this.triggerFoleyBurst(now, 0.055, 1650, 2.0, 0.22, 2600);
+        this.triggerFoleyBurst(now + 0.038, 0.065, 2250, 2.2, 0.20, 3200);
 
-          gain.gain.setValueAtTime(0.001, start);
-          gain.gain.linearRampToValueAtTime(0.20, start + 0.004);
-          gain.gain.exponentialRampToValueAtTime(0.001, start + 0.34);
-
-          osc1.connect(gain);
-          osc2.connect(g2);
-          g2.connect(gain);
-          gain.connect(this.dest());
-          osc1.start(start);
-          osc2.start(start);
-          osc1.stop(start + 0.35);
-          osc2.stop(start + 0.17);
+        // 2. Strumming 6-String Silk Koto & Music-Box Yo-Pentatonic Arpeggio (D5, E5, G5, A5, B5, D6)
+        [587.33, 659.25, 783.99, 880.00, 987.77, 1174.66].forEach((freq, idx) => {
+          const start = now + idx * 0.032;
+          this.triggerKotoPluck(freq * mult, start, 0.18, 0.32, idx === 0 || idx === 5);
         });
       }
       playFanfare() {
         const ctx = this.ensureCtx();
         if (!ctx) return;
+        this.isExcited = true;
         const now = ctx.currentTime;
-        // 6-note celebratory royal celesta fanfare (C5 - E5 - G5 - B5 - D6 - G6)
-        [523.25, 659.25, 783.99, 987.77, 1174.66, 1567.98].forEach((freq, idx) => {
-          const start = now + idx * 0.052;
-          const osc1 = ctx.createOscillator();
-          const osc2 = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc1.type = 'sine';
-          osc2.type = 'triangle';
-          osc1.frequency.setValueAtTime(freq, start);
-          osc2.frequency.setValueAtTime(freq * 1.003, start);
-
-          const sustain = idx === 5 ? 0.52 : 0.34;
-          gain.gain.setValueAtTime(0.001, start);
-          gain.gain.linearRampToValueAtTime(0.18, start + 0.004);
-          gain.gain.exponentialRampToValueAtTime(0.001, start + sustain);
-
-          osc1.connect(gain);
-          osc2.connect(gain);
-          gain.connect(this.dest());
-          osc1.start(start);
-          osc2.start(start);
-          osc1.stop(start + sustain + 0.01);
-          osc2.stop(start + sustain + 0.01);
+        // Celebratory paper-popper burst + 7-note Yo Pentatonic Royal Koto Glissando
+        this.triggerFoleyBurst(now, 0.08, 2100, 1.8, 0.24, 3600);
+        [587.33, 659.25, 783.99, 880.00, 987.77, 1174.66, 1567.98].forEach((freq, idx) => {
+          const start = now + idx * 0.046;
+          const sustain = idx === 6 ? 0.50 : 0.34;
+          this.triggerKotoPluck(freq, start, 0.19, sustain, true);
         });
       }
     }
@@ -2187,10 +2262,11 @@
       const sc = s.depthScale;
       const sw = s.w * sc;
       const sh = s.h * sc;
-      const flutterScaleY = s.isLanded ? 0.76 : (0.34 + 0.66 * Math.abs(Math.cos(s.flutterPhase)));
+      const flutterScaleY = s.isLanded ? 0.78 : (0.34 + 0.66 * Math.abs(Math.cos(s.flutterPhase)));
       const shadowMult = s.isLanded ? 0.35 : 0.85;
       const shX = (-currentTiltX * 6 + 3) * sc * shadowMult;
       const shY = (-currentTiltY * 6 + 4) * sc * shadowMult;
+      const shape = s.shape || 0;
 
       ctx.save();
       ctx.globalAlpha = Math.max(0, Math.min(1, s.alpha));
@@ -2198,34 +2274,130 @@
       ctx.rotate((s.rot * Math.PI) / 180);
       ctx.scale(1, flutterScaleY);
 
-      // Soft paper contact / drop shadow
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
-      ctx.beginPath();
-      ctx.moveTo(-sw * 0.5 + shX, -sh * 0.4 + shY);
-      ctx.lineTo(sw * 0.45 + shX, -sh * 0.5 + shY);
-      ctx.lineTo(sw * 0.55 + shX, sh * 0.35 + shY);
-      ctx.lineTo(-sw * 0.35 + shX, sh * 0.5 + shY);
-      ctx.closePath();
-      ctx.fill();
+      if (shape === 0) {
+        // 0: Folded Origami Paper Dart / Crane Wing (two-tone wings + center valley fold)
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.24)';
+        ctx.beginPath();
+        ctx.moveTo(sw * 0.68 + shX, shY);
+        ctx.lineTo(-sw * 0.56 + shX, -sh * 0.64 + shY);
+        ctx.lineTo(-sw * 0.32 + shX, shY);
+        ctx.lineTo(-sw * 0.56 + shX, sh * 0.64 + shY);
+        ctx.closePath();
+        ctx.fill();
 
-      // Primary paper scrap body
-      ctx.fillStyle = s.color;
-      ctx.beginPath();
-      ctx.moveTo(-sw * 0.5, -sh * 0.4);
-      ctx.lineTo(sw * 0.45, -sh * 0.5);
-      ctx.lineTo(sw * 0.55, sh * 0.35);
-      ctx.lineTo(-sw * 0.35, sh * 0.5);
-      ctx.closePath();
-      ctx.fill();
+        ctx.fillStyle = s.color;
+        ctx.beginPath();
+        ctx.moveTo(sw * 0.68, 0);
+        ctx.lineTo(-sw * 0.56, -sh * 0.64);
+        ctx.lineTo(-sw * 0.32, 0);
+        ctx.closePath();
+        ctx.fill();
 
-      // Origami fold facet
-      ctx.fillStyle = s.foldColor;
-      ctx.beginPath();
-      ctx.moveTo(-sw * 0.5, -sh * 0.4);
-      ctx.lineTo(sw * 0.45, -sh * 0.5);
-      ctx.lineTo(0, 0);
-      ctx.closePath();
-      ctx.fill();
+        ctx.fillStyle = s.foldColor;
+        ctx.beginPath();
+        ctx.moveTo(sw * 0.68, 0);
+        ctx.lineTo(-sw * 0.32, 0);
+        ctx.lineTo(-sw * 0.56, sh * 0.64);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(255, 253, 247, 0.85)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(-sw * 0.32, 0);
+        ctx.lineTo(sw * 0.68, 0);
+        ctx.stroke();
+      } else if (shape === 1) {
+        // 1: V-Notched Washi Masking-Tape Strip with center stitch line
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+        ctx.beginPath();
+        ctx.moveTo(-sw * 0.64 + shX, -sh * 0.44 + shY);
+        ctx.lineTo(sw * 0.64 + shX, -sh * 0.44 + shY);
+        ctx.lineTo(sw * 0.42 + shX, shY);
+        ctx.lineTo(sw * 0.64 + shX, sh * 0.44 + shY);
+        ctx.lineTo(-sw * 0.64 + shX, sh * 0.44 + shY);
+        ctx.lineTo(-sw * 0.42 + shX, shY);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = s.color;
+        ctx.beginPath();
+        ctx.moveTo(-sw * 0.64, -sh * 0.44);
+        ctx.lineTo(sw * 0.64, -sh * 0.44);
+        ctx.lineTo(sw * 0.42, 0);
+        ctx.lineTo(sw * 0.64, sh * 0.44);
+        ctx.lineTo(-sw * 0.64, sh * 0.44);
+        ctx.lineTo(-sw * 0.42, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = s.foldColor;
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(-sw * 0.36, 0);
+        ctx.lineTo(sw * 0.36, 0);
+        ctx.stroke();
+      } else if (shape === 2) {
+        // 2: 4-Point Origami Paper Pinwheel Star
+        const rOut = Math.max(sw, sh) * 0.62;
+        const rIn = rOut * 0.38;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+        ctx.beginPath();
+        ctx.moveTo(shX, -rOut + shY);
+        ctx.lineTo(rIn + shX, -rIn + shY);
+        ctx.lineTo(rOut + shX, shY);
+        ctx.lineTo(rIn + shX, rIn + shY);
+        ctx.lineTo(shX, rOut + shY);
+        ctx.lineTo(-rIn + shX, rIn + shY);
+        ctx.lineTo(-rOut + shX, shY);
+        ctx.lineTo(-rIn + shX, -rIn + shY);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = s.color;
+        ctx.beginPath();
+        ctx.moveTo(0, -rOut);
+        ctx.lineTo(rIn, -rIn);
+        ctx.lineTo(rOut, 0);
+        ctx.lineTo(rIn, rIn);
+        ctx.lineTo(0, rOut);
+        ctx.lineTo(-rIn, rIn);
+        ctx.lineTo(-rOut, 0);
+        ctx.lineTo(-rIn, -rIn);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = s.foldColor;
+        ctx.beginPath();
+        ctx.arc(0, 0, rIn * 0.55, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // 3: Two-Tone Creased Origami Diamond Square
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+        ctx.beginPath();
+        ctx.moveTo(shX, -sh * 0.60 + shY);
+        ctx.lineTo(sw * 0.60 + shX, shY);
+        ctx.lineTo(shX, sh * 0.60 + shY);
+        ctx.lineTo(-sw * 0.60 + shX, shY);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = s.color;
+        ctx.beginPath();
+        ctx.moveTo(0, -sh * 0.60);
+        ctx.lineTo(0, sh * 0.60);
+        ctx.lineTo(-sw * 0.60, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = s.foldColor;
+        ctx.beginPath();
+        ctx.moveTo(0, -sh * 0.60);
+        ctx.lineTo(sw * 0.60, 0);
+        ctx.lineTo(0, sh * 0.60);
+        ctx.closePath();
+        ctx.fill();
+      }
 
       ctx.restore();
     }
@@ -2245,8 +2417,9 @@
           vy: Math.sin(angle) * speed - 4.4,
           rot: Math.random() * 360,
           vRot: (Math.random() - 0.5) * 19,
-          w: 7.5 + Math.random() * 7.5,
-          h: 5.5 + Math.random() * 6.5,
+          w: 8.0 + Math.random() * 7.5,
+          h: 6.0 + Math.random() * 6.5,
+          shape: i % 4,
           color: i % 2 === 0 ? piece.c1 : piece.c2,
           foldColor: piece.c2,
           alpha: 1,
@@ -3269,7 +3442,8 @@
       const clamped = Math.min(5, combo);
       cardboardLidEl.classList.add(`combo-heat-${clamped}`);
       const bangs = '!'.repeat(Math.min(4, combo - 1));
-      stampEl.textContent = `DROP x${combo}${bangs}`;
+      const verb = combo >= 5 ? 'MASTERWORK' : combo === 4 ? 'ORIGAMI' : combo === 3 ? 'CREASE' : 'FOLD';
+      stampEl.textContent = `✦ ${verb} x${combo}${bangs}`;
       stampEl.className = `visible tier-${clamped}`;
       cascadeStampTimer = setTimeout(() => {
         stampEl.className = '';
@@ -3331,13 +3505,13 @@
               : freedLocks > 0
                 ? (combo >= 2 ? `TAPE SEAL RIPPED x${combo}!` : 'TAPE SEAL RIPPED!')
                 : combo >= 5
-                  ? `SUPERNOVA DROP x${combo}!!!!`
+                  ? `MASTERWORK ORIGAMI FOLD x${combo}!!!!`
                   : combo === 4
-                    ? 'ULTRA CASCADE DROP x4!!!'
+                    ? 'ULTRA CREASE CASCADE x4!!!'
                     : combo === 3
-                      ? 'MEGA CASCADE DROP x3!!'
+                      ? 'MEGA ORIGAMI CASCADE x3!!'
                       : combo === 2
-                        ? 'SUPER CASCADE DROP x2!'
+                        ? 'SUPER PAPER FOLD x2!'
                         : state.streak >= 3
                           ? `HOT STREAK x${state.streak}!`
                           : null;
@@ -3358,6 +3532,8 @@
         generateBoard();
       }
 
+      const curStg = getStageInfo(state.level);
+      audio.updateMood(curStg.stageNumber, state.feverMoves > 0);
       checkGameEnd();
       state.busy = false;
       saveProgress();
@@ -4010,9 +4186,20 @@
 
     document.getElementById('btn-sound').addEventListener('click', () => {
       audio.enabled = !audio.enabled;
+      if (audio.enabled) {
+        audio.ensureCtx();
+        audio.startBgmLoop();
+      } else {
+        audio.stopBgmLoop();
+      }
       saveProgress();
       renderAll();
     });
+
+    // Unlock WebAudio & start Origami Workshop BGM on first user gesture
+    window.addEventListener('pointerdown', () => {
+      if (audio.enabled) audio.ensureCtx();
+    }, { once: true, passive: true });
 
     document.getElementById('btn-open-map').addEventListener('click', openWorldMap);
     document.getElementById('header-tapes-group').addEventListener('click', openWorldMap);
@@ -4025,6 +4212,7 @@
     loadSaved();
     syncResponsiveLayout();
     startLevel(state.level);
+    audio.updateMood(getStageInfo(state.level).stageNumber, false);
     requestAnimationFrame(masterFrameLoop);
   </script>
 </body>

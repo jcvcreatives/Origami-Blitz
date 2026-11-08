@@ -114,6 +114,8 @@ class PaperCrushViewModel(
             status = GameStatus.PLAYING
         )
         persistProgress()
+        val stageNum = ((clampedLevel - 1) / 5) + 1
+        soundSynth.updateMusicalMood(stageNumber = stageNum, isFeverOrHighCombo = false)
         if (!showMap) {
             scheduleIdleHint()
         }
@@ -971,10 +973,10 @@ class PaperCrushViewModel(
                 analysis.triggeredColorStorm -> "${comboPrefix}5-FOLD RAINBOW PINWHEEL! +1 BOOSTER"
                 analysis.triggeredPaperBomb -> "${comboPrefix}L/T FOLD • ORIGAMI BOMB CRAFTED!"
                 analysis.triggeredLineRip -> "${comboPrefix}4-FOLD • LINE CUTTER CRAFTED!"
-                combo >= 5 -> "SUPERNOVA DROP x$combo!!!!"
-                combo == 4 -> "ULTRA CASCADE DROP x4!!!"
-                combo == 3 -> "MEGA CASCADE DROP x3!!"
-                combo == 2 -> "SUPER CASCADE DROP x2!"
+                combo >= 5 -> "MASTERWORK ORIGAMI FOLD x$combo!!!!"
+                combo == 4 -> "ULTRA CREASE CASCADE x4!!!"
+                combo == 3 -> "MEGA ORIGAMI CASCADE x3!!"
+                combo == 2 -> "SUPER PAPER FOLD x2!"
                 goldCollectedCount > 0 -> "GOLD WASHI STAMP COLLECTED! +${goldCollectedCount * 80}"
                 tapeDamagedCount > 0 -> "TAPE / WAX SEAL RIPPED!"
                 _uiState.value.streakCount >= 3 -> "HOT STREAK x${_uiState.value.streakCount}!"
@@ -1082,6 +1084,11 @@ class PaperCrushViewModel(
                 highestUnlockedLevel = updatedHighestLevel
             )
         }
+        val finalState = _uiState.value
+        soundSynth.updateMusicalMood(
+            stageNumber = finalState.currentStage.stageNumber,
+            isFeverOrHighCombo = finalState.feverMovesLeft > 0
+        )
         persistProgress()
         if (nextStatus == GameStatus.PLAYING) {
             scheduleIdleHint()
@@ -1593,6 +1600,11 @@ class PaperCrushViewModel(
             putBoolean(KEY_SOUND, state.soundEnabled)
             apply()
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        soundSynth.stopWorkshopMusicLoop()
     }
 
     companion object {

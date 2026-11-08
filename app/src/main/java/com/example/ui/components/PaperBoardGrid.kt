@@ -55,6 +55,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -91,6 +93,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.sin
 
 // Realistic gravity acceleration curve (starts crisp, accelerates hard toward landing impact)
@@ -298,7 +301,7 @@ fun PaperCardboardBoard(
                 }
             }
 
-            // Corner Live Cascade Multiplier Badge (x2, x3, x4, x5+!)
+            // Corner Live Washi-Tape Cascade Stamp (FOLD x2!, CREASE x3!!, ORIGAMI x4!!!)
             AnimatedVisibility(
                 visible = activeCombo >= 2,
                 enter = scaleIn(spring(dampingRatio = 0.42f, stiffness = Spring.StiffnessMediumLow)) + fadeIn(),
@@ -308,25 +311,32 @@ fun PaperCardboardBoard(
                     .padding(6.dp)
                     .zIndex(28f)
             ) {
+                val stampShape = TornPaperShape(teethCount = 6, toothDepthPx = 7f)
+                val stampVerb = when {
+                    activeCombo >= 5 -> "MASTERWORK"
+                    activeCombo == 4 -> "ORIGAMI"
+                    activeCombo == 3 -> "CREASE"
+                    else -> "FOLD"
+                }
                 Surface(
-                    shape = RoundedCornerShape(99.dp),
+                    shape = stampShape,
                     color = comboAccent,
                     shadowElevation = 8.dp,
-                    modifier = Modifier.border(2.dp, StickyNoteYellow, RoundedCornerShape(99.dp))
+                    modifier = Modifier.border(2.dp, StickyNoteYellow, stampShape)
                 ) {
                     Text(
-                        text = "DROP x$activeCombo${"!".repeat((activeCombo - 1).coerceIn(1, 4))}",
+                        text = "✦ $stampVerb x$activeCombo${"!".repeat((activeCombo - 1).coerceIn(1, 4))}",
                         style = MaterialTheme.typography.titleMedium.copy(
-                            fontSize = (14 + activeCombo.coerceAtMost(5)).sp,
+                            fontSize = (13 + activeCombo.coerceAtMost(5)).sp,
                             fontWeight = FontWeight.ExtraBold
                         ),
                         color = PeppermintWhite,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
                     )
                 }
             }
 
-            // Juicy floating combo pill with escalating x2, x3, x4+ styling
+            // Torn Washi-Tape Combo Banner with Hanko Stamp Badge
             AnimatedVisibility(
                 visible = state.comboBannerText != null,
                 enter = scaleIn(spring(dampingRatio = 0.44f, stiffness = Spring.StiffnessMedium)) + fadeIn(),
@@ -335,12 +345,17 @@ fun PaperCardboardBoard(
                     .align(Alignment.Center)
                     .zIndex(25f)
             ) {
+                val bannerShape = TornPaperShape(teethCount = 7, toothDepthPx = 8f)
                 val bannerBorderColor = if (activeCombo >= 2) comboAccent else PeppermintRed
                 Surface(
-                    shape = RoundedCornerShape(16.dp),
+                    shape = bannerShape,
                     color = if (activeCombo >= 3) comboAccent else StickyNoteYellow,
                     shadowElevation = 10.dp,
-                    modifier = Modifier.border(2.5.dp, if (activeCombo >= 3) StickyNoteYellow else bannerBorderColor, RoundedCornerShape(16.dp))
+                    modifier = Modifier.border(
+                        2.5.dp,
+                        if (activeCombo >= 3) StickyNoteYellow else bannerBorderColor,
+                        bannerShape
+                    )
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 7.dp),
@@ -352,14 +367,19 @@ fun PaperCardboardBoard(
                                 modifier = Modifier
                                     .background(
                                         if (activeCombo >= 3) StickyNoteYellow else comboAccent,
-                                        RoundedCornerShape(8.dp)
+                                        RoundedCornerShape(6.dp)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        InkBrown,
+                                        RoundedCornerShape(6.dp)
                                     )
                                     .padding(horizontal = 7.dp, vertical = 2.dp)
                             ) {
                                 Text(
-                                    text = "x$activeCombo",
+                                    text = "✹ x$activeCombo",
                                     style = MaterialTheme.typography.titleMedium.copy(
-                                        fontSize = 18.sp,
+                                        fontSize = 17.sp,
                                         fontWeight = FontWeight.Black
                                     ),
                                     color = if (activeCombo >= 3) InkBrown else PeppermintWhite
@@ -369,7 +389,7 @@ fun PaperCardboardBoard(
                         Text(
                             text = state.comboBannerText.orEmpty(),
                             style = MaterialTheme.typography.titleMedium.copy(
-                                fontSize = if (activeCombo >= 3) 20.sp else 18.sp,
+                                fontSize = if (activeCombo >= 3) 19.sp else 17.sp,
                                 fontWeight = FontWeight.ExtraBold
                             ),
                             color = if (activeCombo >= 3) PeppermintWhite else InkBrown
@@ -391,6 +411,7 @@ private fun FloatingScoreBadge(
     val progress = remember { Animatable(0f) }
     val mult = popup.comboMultiplier.coerceAtLeast(1)
     val multBoost = (mult - 1).coerceIn(0, 5) * 0.10f
+    val ticketShape = TornPaperShape(teethCount = 5, toothDepthPx = 6f)
 
     LaunchedEffect(popup.id) {
         progress.animateTo(
@@ -416,19 +437,20 @@ private fun FloatingScoreBadge(
                 translationY = (popup.row + 0.12f) * cellPx + risePx
                 scaleX = scale
                 scaleY = scale
+                rotationZ = if (mult >= 2) -3.5f else 0f
                 alpha = alphaVal
             }
-            .shadow(if (mult >= 2) 6.dp else 4.dp, RoundedCornerShape(10.dp))
+            .shadow(if (mult >= 2) 6.dp else 4.dp, ticketShape)
             .background(
                 if (mult >= 3) comboTierAccentColor(mult) else MaskingTapeCream,
-                RoundedCornerShape(10.dp)
+                ticketShape
             )
             .border(
                 width = if (mult >= 2) 2.dp else 1.5.dp,
                 color = if (mult >= 3) StickyNoteYellow else popup.color,
-                shape = RoundedCornerShape(10.dp)
+                shape = ticketShape
             )
-            .padding(horizontal = 9.dp, vertical = 3.dp)
+            .padding(horizontal = 10.dp, vertical = 4.dp)
     ) {
         Text(
             text = popup.text,
@@ -669,85 +691,190 @@ private fun PaperBoardCell(
                 )
         )
 
-        // 2. Speed-Streak Wake Lines, Dual Concentric Landing Shockwaves & Starburst Crush Rings
+        // 2. Bespoke Origami Accordion-Ribbon Wake, Fold-Crease Starburst & Scissor-Cut Perforation FX
         Canvas(modifier = Modifier.fillMaxSize()) {
             val rowOff = offsetRowAnim.value
-            // Draw vertical paper speed-streak wake lines above fast-dropping blocks
-            if (tile.spawnDistance > 0.001f && rowOff < -0.08f) {
+            val dashEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 5f), 0f)
+
+            // A) Accordion-Folded Washi Paper Ribbon & Fluttering Origami Diamond Wake above falling blocks
+            if (tile.spawnDistance > 0.001f && rowOff < -0.06f) {
                 val streakAlpha = ((-rowOff / tile.spawnDistance.coerceAtLeast(1f)).coerceIn(0f, 1f)) *
-                    (0.45f + tierBoost * 0.11f).coerceAtMost(0.92f)
-                val topY = (rowOff * size.height) - size.height * (0.28f + tierBoost * 0.08f)
-                val midY = (rowOff * size.height) + size.height * 0.15f
-                val strokeW = size.width * (0.045f + tierBoost * 0.01f)
-                val streakColor = if (comboTier >= 2) tierColor.copy(alpha = streakAlpha)
-                else tile.type.primaryColor.copy(alpha = streakAlpha * 0.75f)
+                    (0.55f + tierBoost * 0.10f).coerceAtMost(0.95f)
+                val topY = (rowOff * size.height) - size.height * (0.34f + tierBoost * 0.10f)
+                val botY = (rowOff * size.height) + size.height * 0.18f
+                val ribbonColor = if (comboTier >= 2) tierColor.copy(alpha = streakAlpha)
+                else tile.type.primaryColor.copy(alpha = streakAlpha * 0.85f)
+                val foldLight = PeppermintWhite.copy(alpha = streakAlpha * 0.88f)
 
-                drawLine(
-                    color = streakColor,
-                    start = Offset(size.width * 0.26f, topY),
-                    end = Offset(size.width * 0.26f, midY),
-                    strokeWidth = strokeW
-                )
-                drawLine(
-                    color = PeppermintWhite.copy(alpha = streakAlpha * 0.85f),
-                    start = Offset(size.width * 0.50f, topY - size.height * 0.14f),
-                    end = Offset(size.width * 0.50f, midY),
-                    strokeWidth = strokeW * 1.15f
-                )
-                drawLine(
-                    color = streakColor,
-                    start = Offset(size.width * 0.74f, topY),
-                    end = Offset(size.width * 0.74f, midY),
-                    strokeWidth = strokeW
-                )
-            }
+                // Zig-zag accordion-folded Washi ribbon in center
+                val folds = 4 + tierBoost.coerceAtMost(3)
+                val segH = (botY - topY) / folds
+                val halfRibbonW = size.width * (0.14f + tierBoost * 0.02f)
+                for (f in 0 until folds) {
+                    val y0 = topY + f * segH
+                    val y1 = y0 + segH
+                    val xShift0 = if (f % 2 == 0) -halfRibbonW * 0.35f else halfRibbonW * 0.35f
+                    val xShift1 = -xShift0
+                    val quad = Path().apply {
+                        moveTo(center.x - halfRibbonW + xShift0, y0)
+                        lineTo(center.x + halfRibbonW + xShift0, y0)
+                        lineTo(center.x + halfRibbonW + xShift1, y1)
+                        lineTo(center.x - halfRibbonW + xShift1, y1)
+                        close()
+                    }
+                    drawPath(
+                        path = quad,
+                        color = if (f % 2 == 0) ribbonColor else tile.type.secondaryColor.copy(alpha = streakAlpha * 0.85f)
+                    )
+                    // Crisp horizontal origami fold-crease line
+                    drawLine(
+                        color = foldLight,
+                        start = Offset(center.x - halfRibbonW + xShift0, y0),
+                        end = Offset(center.x + halfRibbonW + xShift0, y0),
+                        strokeWidth = 1.5f
+                    )
+                }
 
-            val crushP = crushRingAnim.value
-            if (crushP > 0.01f) {
-                val maxR = size.minDimension * (0.64f + tierBoost * 0.06f)
-                drawCircle(
-                    color = tile.type.primaryColor.copy(alpha = (1f - crushP) * 0.78f),
-                    radius = maxR * (0.32f + crushP * 0.74f),
-                    style = Stroke(width = size.minDimension * 0.10f * (1f - crushP * 0.5f))
-                )
-                if (comboTier >= 2) {
-                    drawCircle(
-                        color = tierColor.copy(alpha = (1f - crushP) * 0.85f),
-                        radius = maxR * (0.18f + crushP * 0.92f),
-                        style = Stroke(width = size.minDimension * 0.06f * (1f - crushP))
+                // Flanking fluttering folded paper diamonds in the wake
+                val diamondSize = size.width * (0.09f + tierBoost * 0.015f)
+                for (side in intArrayOf(-1, 1)) {
+                    val dx = center.x + side * size.width * 0.30f
+                    val dy = (topY + botY) * 0.5f + (side * segH * 0.3f)
+                    val diamond = Path().apply {
+                        moveTo(dx, dy - diamondSize)
+                        lineTo(dx + diamondSize * 0.75f, dy)
+                        lineTo(dx, dy + diamondSize)
+                        lineTo(dx - diamondSize * 0.75f, dy)
+                        close()
+                    }
+                    drawPath(diamond, ribbonColor)
+                    drawLine(
+                        color = foldLight,
+                        start = Offset(dx, dy - diamondSize),
+                        end = Offset(dx, dy + diamondSize),
+                        strokeWidth = 1.3f
                     )
                 }
             }
 
+            // B) Origami 8-Point Star-Crease & Scissor-Cut Perforation Burst on Match Crush
+            val crushP = crushRingAnim.value
+            if (crushP > 0.01f) {
+                val fade = (1f - crushP).coerceIn(0f, 1f)
+                val outerR = size.minDimension * (0.28f + crushP * (0.58f + tierBoost * 0.06f))
+                val innerR = outerR * 0.54f
+                val starColor = if (comboTier >= 2) tierColor.copy(alpha = fade * 0.88f)
+                else tile.type.primaryColor.copy(alpha = fade * 0.84f)
+
+                val starPath = Path()
+                val points = 16
+                for (i in 0 until points) {
+                    val r = if (i % 2 == 0) outerR else innerR
+                    val angle = (i * PI / 8.0 + crushP * 0.45).toFloat()
+                    val px = center.x + cos(angle) * r
+                    val py = center.y + sin(angle) * r
+                    if (i == 0) starPath.moveTo(px, py) else starPath.lineTo(px, py)
+                }
+                starPath.close()
+
+                drawPath(
+                    path = starPath,
+                    color = StickyNoteYellow.copy(alpha = fade * 0.38f)
+                )
+                drawPath(
+                    path = starPath,
+                    color = starColor,
+                    style = Stroke(width = size.minDimension * 0.065f * fade)
+                )
+
+                // Dashed scissor-cut diagonal crease guidelines across the crushed cell
+                val diagR = outerR * 0.92f
+                for (d in 0 until 4) {
+                    val a = (d * PI / 4.0).toFloat()
+                    val cA = cos(a)
+                    val sA = sin(a)
+                    drawLine(
+                        color = InkBrown.copy(alpha = fade * 0.70f),
+                        start = Offset(center.x - cA * diagR, center.y - sA * diagR),
+                        end = Offset(center.x + cA * diagR, center.y + sA * diagR),
+                        strokeWidth = 2f,
+                        pathEffect = dashEffect
+                    )
+                }
+            }
+
+            // C) Unfolding Origami Diamond-Crease & Flying Paper-Dart Landing Burst
             val impactP = impactRingAnim.value
             if (impactP > 0.01f) {
-                val ringScale = 0.26f + impactP * (0.34f + tierBoost * 0.07f)
-                drawCircle(
-                    color = tierColor.copy(alpha = (1f - impactP) * (0.48f + tierBoost * 0.09f).coerceAtMost(0.9f)),
-                    radius = size.minDimension * ringScale,
-                    style = Stroke(width = size.minDimension * (0.055f + tierBoost * 0.012f) * (1f - impactP))
+                val fade = (1f - impactP).coerceIn(0f, 1f)
+                val reach = size.minDimension * (0.26f + impactP * (0.40f + tierBoost * 0.07f))
+                val notch = reach * 0.62f
+                val creaseColor = tierColor.copy(alpha = fade * (0.62f + tierBoost * 0.08f).coerceAtMost(0.95f))
+
+                // 8-point folded origami diamond-star outline
+                val diamondStar = Path().apply {
+                    moveTo(center.x, center.y - reach)
+                    lineTo(center.x + notch * 0.55f, center.y - notch * 0.55f)
+                    lineTo(center.x + reach, center.y)
+                    lineTo(center.x + notch * 0.55f, center.y + notch * 0.55f)
+                    lineTo(center.x, center.y + reach)
+                    lineTo(center.x - notch * 0.55f, center.y + notch * 0.55f)
+                    lineTo(center.x - reach, center.y)
+                    lineTo(center.x - notch * 0.55f, center.y - notch * 0.55f)
+                    close()
+                }
+                drawPath(
+                    path = diamondStar,
+                    color = creaseColor,
+                    style = Stroke(width = size.minDimension * (0.052f + tierBoost * 0.01f) * fade)
                 )
-                // Second concentric shockwave ring + 8 radial burst rays for x2, x3, x4+ drops!
-                if (comboTier >= 2 && impactP > 0.12f) {
-                    val innerP = ((impactP - 0.12f) / 0.88f).coerceIn(0f, 1f)
-                    drawCircle(
-                        color = StickyNoteYellow.copy(alpha = (1f - innerP) * 0.75f),
-                        radius = size.minDimension * (0.18f + innerP * (0.44f + tierBoost * 0.06f)),
-                        style = Stroke(width = size.minDimension * 0.04f * (1f - innerP))
-                    )
-                    val rayCount = 8
-                    val rStart = size.minDimension * (0.24f + impactP * 0.22f)
-                    val rEnd = size.minDimension * (0.36f + impactP * (0.34f + tierBoost * 0.05f))
-                    for (i in 0 until rayCount) {
-                        val angle = (i * (PI / 4.0)).toFloat()
-                        val cosA = kotlin.math.cos(angle)
-                        val sinA = sin(angle)
-                        drawLine(
-                            color = tierColor.copy(alpha = (1f - impactP) * 0.75f),
-                            start = Offset(center.x + cosA * rStart, center.y + sinA * rStart),
-                            end = Offset(center.x + cosA * rEnd, center.y + sinA * rEnd),
-                            strokeWidth = size.minDimension * 0.035f * (1f - impactP)
-                        )
+
+                // Inner stitched/perforated square fold-crease frame
+                val innerReach = reach * 0.72f
+                val innerSquare = Path().apply {
+                    moveTo(center.x - innerReach, center.y - innerReach)
+                    lineTo(center.x + innerReach, center.y - innerReach)
+                    lineTo(center.x + innerReach, center.y + innerReach)
+                    lineTo(center.x - innerReach, center.y + innerReach)
+                    close()
+                }
+                drawPath(
+                    path = innerSquare,
+                    color = StickyNoteYellow.copy(alpha = fade * 0.82f),
+                    style = Stroke(width = 2f, pathEffect = dashEffect)
+                )
+
+                // Outward-flying folded paper triangle darts on x2, x3, x4+ cascade drops!
+                if (comboTier >= 2) {
+                    val dartCount = (4 + tierBoost * 2).coerceAtMost(8)
+                    val dartDist = size.minDimension * (0.24f + impactP * (0.44f + tierBoost * 0.06f))
+                    val dartLen = size.minDimension * (0.12f + tierBoost * 0.015f) * fade
+                    for (i in 0 until dartCount) {
+                        val angle = (i * (2.0 * PI / dartCount) + impactP * 0.35).toFloat()
+                        val cA = cos(angle)
+                        val sA = sin(angle)
+                        val pA = -sA
+                        val pB = cA
+                        val tipX = center.x + cA * (dartDist + dartLen)
+                        val tipY = center.y + sA * (dartDist + dartLen)
+                        val baseX = center.x + cA * dartDist
+                        val baseY = center.y + sA * dartDist
+                        val wingW = dartLen * 0.58f
+
+                        val leftWing = Path().apply {
+                            moveTo(tipX, tipY)
+                            lineTo(baseX + pA * wingW, baseY + pB * wingW)
+                            lineTo(baseX, baseY)
+                            close()
+                        }
+                        val rightWing = Path().apply {
+                            moveTo(tipX, tipY)
+                            lineTo(baseX - pA * wingW, baseY - pB * wingW)
+                            lineTo(baseX, baseY)
+                            close()
+                        }
+                        drawPath(leftWing, tierColor.copy(alpha = fade * 0.90f))
+                        drawPath(rightWing, StickyNoteYellow.copy(alpha = fade * 0.90f))
                     }
                 }
             }
