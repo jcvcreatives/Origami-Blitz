@@ -96,8 +96,8 @@ fun PaperCraftCrushApp(
                         val change = event.changes.firstOrNull()
                         if (change != null && containerSize.width > 0 && containerSize.height > 0) {
                             if (change.pressed) {
-                                val nx = ((change.position.x / containerSize.width) - 0.5f) * 0.65f
-                                val ny = ((change.position.y / containerSize.height) - 0.5f) * 0.65f
+                                val nx = ((change.position.x / containerSize.width) - 0.5f) * 0.22f
+                                val ny = ((change.position.y / containerSize.height) - 0.5f) * 0.22f
                                 pointerTilt = Offset(nx, ny)
                             } else {
                                 pointerTilt = Offset.Zero
@@ -107,7 +107,7 @@ fun PaperCraftCrushApp(
                 }
             }
     ) {
-        // 1. Multi-layer Paper & Origami Diorama Backdrop with tilt parallax & landed depth confetti
+        // 1. Multi-layer Paper & Origami Diorama Backdrop with gentle tilt parallax & landed depth confetti
         PaperDioramaBackdrop(
             tilt = deviceTilt,
             scraps = confettiScraps
@@ -121,12 +121,7 @@ fun PaperCraftCrushApp(
                 .padding(horizontal = 10.dp, vertical = 6.dp)
         ) {
             val isLandscape = maxWidth > maxHeight * 1.12f
-            val hudTiltXPx = with(density) { (deviceTilt.x * 5f).dp.toPx() }
-            val hudTiltYPx = with(density) { (deviceTilt.y * 4f).dp.toPx() }
-            val hudParallaxModifier = Modifier.graphicsLayer {
-                translationX = hudTiltXPx
-                translationY = hudTiltYPx
-            }
+            val hudParallaxModifier = Modifier
 
             if (isLandscape) {
                 Row(

@@ -43,12 +43,12 @@ fun PaperDioramaBackdrop(
     Canvas(modifier = modifier.fillMaxSize()) {
         val w = size.width
         val h = size.height
-        val maxShiftX = w * 0.032f
-        val maxShiftY = h * 0.022f
+        val maxShiftX = w * 0.010f
+        val maxShiftY = h * 0.007f
 
-        // Shadow vector moves opposite to the light source tilt
-        val shadowShiftX = -tilt.x * 8f + 4f
-        val shadowShiftY = -tilt.y * 8f + 5f
+        // Shadow vector moves subtly opposite to the light source tilt
+        val shadowShiftX = -tilt.x * 3f + 3f
+        val shadowShiftY = -tilt.y * 3f + 4f
 
         // 1. Bright sky-blue paper base
         drawRect(color = SkyBluePaper)
@@ -210,10 +210,10 @@ fun ConfettiShredOverlay(
     Canvas(modifier = modifier.fillMaxSize()) {
         val w = size.width
         val h = size.height
-        val maxShiftX = w * 0.032f
-        val maxShiftY = h * 0.022f
-        val shadowShiftX = -tilt.x * 6f + 3f
-        val shadowShiftY = -tilt.y * 6f + 4f
+        val maxShiftX = w * 0.010f
+        val maxShiftY = h * 0.007f
+        val shadowShiftX = -tilt.x * 3f + 2.5f
+        val shadowShiftY = -tilt.y * 3f + 3.5f
 
         // Render airborne particles ordered back-to-front by depth layer
         for (layer in ConfettiDepthLayer.entries) {
@@ -319,22 +319,22 @@ fun GlobalPaperLightingOverlay(
         val h = size.height
         val maxDim = size.maxDimension.coerceAtLeast(1f)
 
-        // Focal point of the overhead craft-lamp shifts smoothly with device tilt
+        // Focal point of the overhead craft-lamp shifts gently with device tilt
         val lightCenter = Offset(
-            x = w * (0.50f + tilt.x * 0.34f),
-            y = h * (0.38f + tilt.y * 0.30f)
+            x = w * (0.50f + tilt.x * 0.12f),
+            y = h * (0.38f + tilt.y * 0.10f)
         )
 
-        // 1. Warm directional paper-sheen highlight
+        // 1. Soft, steady warm directional paper-sheen highlight
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    Color(0x36FFFDF5),
-                    Color(0x16FFF8E1),
+                    Color(0x1EFFFDF5),
+                    Color(0x0CFFF8E1),
                     Color.Transparent
                 ),
                 center = lightCenter,
-                radius = maxDim * 0.72f
+                radius = maxDim * 0.78f
             )
         )
 

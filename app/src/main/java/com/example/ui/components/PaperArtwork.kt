@@ -21,8 +21,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import com.example.model.BoosterType
 import com.example.model.PieceType
 import com.example.ui.theme.CardboardDark
-import com.example.ui.theme.CardboardLight
-import com.example.ui.theme.CardboardMedium
 import com.example.ui.theme.CupcakeFrostingPink
 import com.example.ui.theme.CupcakeLinerBlue
 import com.example.ui.theme.InkBrown
@@ -44,7 +42,7 @@ import kotlin.math.sin
  */
 class TornPaperShape(
     private val teethCount: Int = 7,
-    private val toothDepthPx: Float = 7f,
+    private val toothDepthPx: Float = 5f,
     private val tearTopBottom: Boolean = false
 ) : Shape {
     override fun createOutline(
@@ -55,7 +53,7 @@ class TornPaperShape(
         val path = Path()
         val w = size.width
         val h = size.height
-        val depth = toothDepthPx.coerceAtMost(9f)
+        val depth = toothDepthPx.coerceAtMost(7f)
         val stepY = h / teethCount.coerceAtLeast(2)
         val stepX = w / (teethCount * 2).coerceAtLeast(4)
 
@@ -64,7 +62,7 @@ class TornPaperShape(
             val topSteps = (w / stepX).toInt().coerceAtLeast(2)
             for (i in 1..topSteps) {
                 val x = (i * w / topSteps).coerceAtMost(w - depth)
-                val y = if (i % 2 == 1) depth * 0.45f else 0f
+                val y = if (i % 2 == 1) depth * 0.40f else 0f
                 path.lineTo(x, y)
             }
         } else {
@@ -82,7 +80,7 @@ class TornPaperShape(
             val botSteps = (w / stepX).toInt().coerceAtLeast(2)
             for (i in botSteps - 1 downTo 1) {
                 val x = (i * w / botSteps).coerceAtLeast(depth)
-                val y = if (i % 2 == 1) h - depth * 0.45f else h
+                val y = if (i % 2 == 1) h - depth * 0.40f else h
                 path.lineTo(x, y)
             }
         } else {
@@ -101,8 +99,9 @@ class TornPaperShape(
 }
 
 /**
- * Vibrant, high-contrast die-cut cardstock and origami pieces with white sticker rims,
- * drop shadows, and crisp ink outlines that pop off the board.
+ * Tactile 3D pressed-paper block tiles with a thick cardstock coaster base,
+ * color-tinted matte face, top paper bevel highlight, and clean single-hue origami emblems
+ * for effortless visual recognition and zero eye strain during long sessions.
  */
 @Composable
 fun PaperPieceVector(
@@ -121,159 +120,239 @@ fun PaperPieceVector(
     }
 }
 
-private fun DrawScope.drawPeppermintPiece() {
-    val cx = size.width / 2f
-    val cy = size.height / 2f
-    val r = size.minDimension * 0.40f
-    val shadowOffset = size.minDimension * 0.04f
-    val strokeW = size.minDimension * 0.025f
+/**
+ * Draws a physical 3D pressed-cardstock square tile coaster with a bottom thickness lip,
+ * warm matte face, inner crease frame, and top-edge highlight.
+ */
+private fun DrawScope.drawPaperTileCardBase(
+    faceColor: Color,
+    lipColor: Color,
+    creaseColor: Color
+) {
+    val w = size.width
+    val h = size.height
+    val pad = w * 0.03f
+    val cardW = w - pad * 2f
+    val cardH = h - pad * 2f
+    val lipH = h * 0.085f
+    val corner = CornerRadius(w * 0.19f, w * 0.19f)
+    val strokeW = w * 0.024f
 
-    // Drop shadow
-    drawCircle(
-        color = Color(0x33000000),
-        radius = r * 1.05f,
-        center = Offset(cx + shadowOffset, cy + shadowOffset)
+    // 1. Soft ambient contact shadow inside the board slot
+    drawRoundRect(
+        color = Color(0x28000000),
+        topLeft = Offset(pad, pad + lipH * 0.45f),
+        size = Size(cardW, cardH),
+        cornerRadius = corner
     )
-    // Crisp white die-cut sticker rim
+
+    // 2. 3D Bottom cardstock thickness lip
+    drawRoundRect(
+        color = lipColor,
+        topLeft = Offset(pad, pad + lipH * 0.15f),
+        size = Size(cardW, cardH - lipH * 0.15f),
+        cornerRadius = corner
+    )
+
+    // 3. Matte top cardstock face
+    val faceH = cardH - lipH
+    drawRoundRect(
+        color = faceColor,
+        topLeft = Offset(pad, pad),
+        size = Size(cardW, faceH),
+        cornerRadius = corner
+    )
+
+    // 4. Top-edge warm paper highlight bevel
+    drawRoundRect(
+        color = Color.White.copy(alpha = 0.65f),
+        topLeft = Offset(pad + strokeW, pad + strokeW * 0.8f),
+        size = Size(cardW - strokeW * 2f, faceH * 0.35f),
+        cornerRadius = CornerRadius(w * 0.16f, w * 0.16f)
+    )
+    drawRoundRect(
+        color = faceColor,
+        topLeft = Offset(pad + strokeW, pad + strokeW * 2.1f),
+        size = Size(cardW - strokeW * 2f, faceH * 0.35f),
+        cornerRadius = CornerRadius(w * 0.15f, w * 0.15f)
+    )
+
+    // 5. Subtle debossed inner paper frame
+    val inset = w * 0.10f
+    drawRoundRect(
+        color = creaseColor.copy(alpha = 0.38f),
+        topLeft = Offset(inset, inset * 0.92f),
+        size = Size(w - inset * 2f, faceH - inset * 1.35f),
+        cornerRadius = CornerRadius(w * 0.13f, w * 0.13f),
+        style = Stroke(width = w * 0.015f)
+    )
+
+    // 6. Outer crisp ink border around the 3D tile
+    drawRoundRect(
+        color = InkBrown.copy(alpha = 0.82f),
+        topLeft = Offset(pad, pad),
+        size = Size(cardW, cardH),
+        cornerRadius = corner,
+        style = Stroke(width = strokeW)
+    )
+}
+
+private fun DrawScope.drawPeppermintPiece() {
+    drawPaperTileCardBase(
+        faceColor = Color(0xFFFFF1F3),
+        lipColor = Color(0xFFFECDD3),
+        creaseColor = PeppermintRed
+    )
+
+    val cx = size.width * 0.5f
+    val cy = size.height * 0.465f
+    val r = size.minDimension * 0.30f
+    val strokeW = size.minDimension * 0.024f
+
+    // Crisp white sticker halo
     drawCircle(
         color = PeppermintWhite,
-        radius = r * 1.05f,
+        radius = r * 1.08f,
         center = Offset(cx, cy)
     )
-    // Vibrant candy red base
+    // Ruby candy base
     drawCircle(
         color = PeppermintRed,
-        radius = r * 0.92f,
+        radius = r * 0.95f,
         center = Offset(cx, cy)
     )
-    // 6 Swirled white & blush pinwheel fins
+    // 6 clean pinwheel folds
     for (i in 0 until 6) {
         rotate(degrees = i * 60f, pivot = Offset(cx, cy)) {
             val fin = Path().apply {
                 moveTo(cx, cy)
-                quadraticTo(cx + r * 0.44f, cy - r * 0.24f, cx + r * 0.88f, cy - r * 0.14f)
+                quadraticTo(cx + r * 0.44f, cy - r * 0.24f, cx + r * 0.90f, cy - r * 0.14f)
                 lineTo(cx + r * 0.72f, cy + r * 0.26f)
                 close()
             }
             drawPath(
                 path = fin,
-                color = if (i % 2 == 0) PeppermintWhite else Color(0xFFFFCCD5)
+                color = if (i % 2 == 0) PeppermintWhite else Color(0xFFFFD4DC)
             )
         }
     }
     drawCircle(
         color = InkBrown,
-        radius = r * 0.94f,
+        radius = r * 0.95f,
         center = Offset(cx, cy),
         style = Stroke(width = strokeW)
     )
-    // Center candy button
     drawCircle(
         color = PeppermintRed,
-        radius = r * 0.22f,
+        radius = r * 0.24f,
         center = Offset(cx, cy)
     )
     drawCircle(
         color = PeppermintWhite,
         radius = r * 0.09f,
-        center = Offset(cx - r * 0.04f, cy - r * 0.04f)
+        center = Offset(cx - r * 0.05f, cy - r * 0.05f)
     )
 }
 
 private fun DrawScope.drawCupcakePiece() {
+    drawPaperTileCardBase(
+        faceColor = Color(0xFFFDF2F8),
+        lipColor = Color(0xFFFBCFE8),
+        creaseColor = CupcakeFrostingPink
+    )
+
     val w = size.width
-    val h = size.height
-    val s = size.minDimension * 0.04f
+    val h = size.height * 0.93f
     val strokeW = size.minDimension * 0.024f
 
-    // Drop shadow
-    drawCircle(Color(0x33000000), radius = w * 0.32f, center = Offset(w * 0.5f + s, h * 0.46f + s))
-
-    // White die-cut halo
-    drawCircle(PeppermintWhite, radius = w * 0.34f, center = Offset(w * 0.5f, h * 0.45f))
-
-    // Bright sky-blue pleated liner
+    // Warm golden waffle-paper pleated liner (no blue to clash with the Crane!)
     val liner = Path().apply {
-        moveTo(w * 0.23f, h * 0.52f)
-        lineTo(w * 0.77f, h * 0.52f)
-        lineTo(w * 0.67f, h * 0.85f)
-        lineTo(w * 0.33f, h * 0.85f)
+        moveTo(w * 0.27f, h * 0.53f)
+        lineTo(w * 0.73f, h * 0.53f)
+        lineTo(w * 0.64f, h * 0.82f)
+        lineTo(w * 0.36f, h * 0.82f)
         close()
     }
     drawPath(liner, CupcakeLinerBlue)
-    for (i in 1..4) {
-        val topX = w * (0.23f + i * 0.108f)
-        val botX = w * (0.33f + i * 0.068f)
+    for (i in 1..3) {
+        val topX = w * (0.29f + i * 0.105f)
+        val botX = w * (0.37f + i * 0.065f)
         drawLine(
-            color = Color(0xFF0288D1),
-            start = Offset(topX, h * 0.54f),
-            end = Offset(botX, h * 0.83f),
-            strokeWidth = w * 0.025f,
+            color = Color(0xFFB47642),
+            start = Offset(topX, h * 0.56f),
+            end = Offset(botX, h * 0.79f),
+            strokeWidth = w * 0.024f,
             cap = StrokeCap.Round
         )
     }
     drawPath(liner, InkBrown, style = Stroke(width = strokeW, join = StrokeJoin.Round))
 
-    // Bubblegum pink layered paper frosting
+    // Sakura berry pink layered paper frosting
     drawRoundRect(
         color = CupcakeFrostingPink,
-        topLeft = Offset(w * 0.19f, h * 0.39f),
-        size = Size(w * 0.62f, h * 0.18f),
-        cornerRadius = CornerRadius(w * 0.09f, w * 0.09f)
-    )
-    drawRoundRect(
-        color = InkBrown,
-        topLeft = Offset(w * 0.19f, h * 0.39f),
-        size = Size(w * 0.62f, h * 0.18f),
-        cornerRadius = CornerRadius(w * 0.09f, w * 0.09f),
-        style = Stroke(width = strokeW)
-    )
-    drawRoundRect(
-        color = Color(0xFFFF85B3),
-        topLeft = Offset(w * 0.26f, h * 0.27f),
-        size = Size(w * 0.48f, h * 0.16f),
+        topLeft = Offset(w * 0.22f, h * 0.40f),
+        size = Size(w * 0.56f, h * 0.16f),
         cornerRadius = CornerRadius(w * 0.08f, w * 0.08f)
     )
     drawRoundRect(
         color = InkBrown,
-        topLeft = Offset(w * 0.26f, h * 0.27f),
-        size = Size(w * 0.48f, h * 0.16f),
+        topLeft = Offset(w * 0.22f, h * 0.40f),
+        size = Size(w * 0.56f, h * 0.16f),
         cornerRadius = CornerRadius(w * 0.08f, w * 0.08f),
         style = Stroke(width = strokeW)
     )
-    // Bright red cherry on top
+    drawRoundRect(
+        color = Color(0xFFF472B6),
+        topLeft = Offset(w * 0.29f, h * 0.28f),
+        size = Size(w * 0.42f, h * 0.15f),
+        cornerRadius = CornerRadius(w * 0.075f, w * 0.075f)
+    )
+    drawRoundRect(
+        color = InkBrown,
+        topLeft = Offset(w * 0.29f, h * 0.28f),
+        size = Size(w * 0.42f, h * 0.15f),
+        cornerRadius = CornerRadius(w * 0.075f, w * 0.075f),
+        style = Stroke(width = strokeW)
+    )
+    // Glossy berry pearl on top
     drawCircle(
-        color = PeppermintRed,
-        radius = w * 0.085f,
-        center = Offset(w * 0.50f, h * 0.19f)
+        color = Color(0xFFBE185D),
+        radius = w * 0.072f,
+        center = Offset(w * 0.50f, h * 0.21f)
     )
     drawCircle(
         color = PeppermintWhite,
-        radius = w * 0.03f,
-        center = Offset(w * 0.48f, h * 0.17f)
+        radius = w * 0.025f,
+        center = Offset(w * 0.48f, h * 0.19f)
     )
 }
 
 private fun DrawScope.drawWrappedCandyPiece() {
+    drawPaperTileCardBase(
+        faceColor = Color(0xFFF5F3FF),
+        lipColor = Color(0xFFDDD6FE),
+        creaseColor = WrappedCandyPurple
+    )
+
     val w = size.width
-    val h = size.height
+    val h = size.height * 0.93f
     val cx = w * 0.5f
     val cy = h * 0.5f
-    val strokeW = size.minDimension * 0.025f
+    val strokeW = size.minDimension * 0.024f
 
-    rotate(degrees = -24f, pivot = Offset(cx, cy)) {
+    rotate(degrees = -20f, pivot = Offset(cx, cy)) {
         val leftTail = Path().apply {
-            moveTo(w * 0.28f, cy)
-            lineTo(w * 0.08f, h * 0.29f)
-            lineTo(w * 0.14f, cy)
-            lineTo(w * 0.08f, h * 0.71f)
+            moveTo(w * 0.30f, cy)
+            lineTo(w * 0.13f, h * 0.32f)
+            lineTo(w * 0.18f, cy)
+            lineTo(w * 0.13f, h * 0.68f)
             close()
         }
         val rightTail = Path().apply {
-            moveTo(w * 0.72f, cy)
-            lineTo(w * 0.92f, h * 0.29f)
-            lineTo(w * 0.86f, cy)
-            lineTo(w * 0.92f, h * 0.71f)
+            moveTo(w * 0.70f, cy)
+            lineTo(w * 0.87f, h * 0.32f)
+            lineTo(w * 0.82f, cy)
+            lineTo(w * 0.87f, h * 0.68f)
             close()
         }
         drawPath(leftTail, WrappedCandyOrange)
@@ -282,152 +361,144 @@ private fun DrawScope.drawWrappedCandyPiece() {
         drawPath(rightTail, InkBrown, style = Stroke(width = strokeW, join = StrokeJoin.Round))
 
         drawRoundRect(
-            color = Color(0x33000000),
-            topLeft = Offset(w * 0.26f, h * 0.34f + w * 0.035f),
-            size = Size(w * 0.48f, h * 0.35f),
-            cornerRadius = CornerRadius(w * 0.14f, w * 0.14f)
-        )
-        drawRoundRect(
             color = WrappedCandyPurple,
-            topLeft = Offset(w * 0.25f, h * 0.32f),
-            size = Size(w * 0.50f, h * 0.36f),
-            cornerRadius = CornerRadius(w * 0.14f, w * 0.14f)
+            topLeft = Offset(w * 0.28f, h * 0.34f),
+            size = Size(w * 0.44f, h * 0.32f),
+            cornerRadius = CornerRadius(w * 0.12f, w * 0.12f)
         )
         drawLine(
             color = WrappedCandyOrange,
-            start = Offset(w * 0.37f, h * 0.35f),
-            end = Offset(w * 0.45f, h * 0.65f),
-            strokeWidth = w * 0.055f,
+            start = Offset(w * 0.39f, h * 0.37f),
+            end = Offset(w * 0.46f, h * 0.63f),
+            strokeWidth = w * 0.048f,
             cap = StrokeCap.Round
         )
         drawLine(
             color = PeppermintWhite,
-            start = Offset(w * 0.51f, h * 0.35f),
-            end = Offset(w * 0.59f, h * 0.65f),
-            strokeWidth = w * 0.045f,
+            start = Offset(w * 0.52f, h * 0.37f),
+            end = Offset(w * 0.59f, h * 0.63f),
+            strokeWidth = w * 0.040f,
             cap = StrokeCap.Round
         )
         drawRoundRect(
             color = InkBrown,
-            topLeft = Offset(w * 0.25f, h * 0.32f),
-            size = Size(w * 0.50f, h * 0.36f),
-            cornerRadius = CornerRadius(w * 0.14f, w * 0.14f),
+            topLeft = Offset(w * 0.28f, h * 0.34f),
+            size = Size(w * 0.44f, h * 0.32f),
+            cornerRadius = CornerRadius(w * 0.12f, w * 0.12f),
             style = Stroke(width = strokeW)
         )
     }
 }
 
 private fun DrawScope.drawCardboardStarPiece() {
-    val cx = size.width * 0.5f
-    val cy = size.height * 0.5f
-    val outerR = size.minDimension * 0.43f
-    val innerR = outerR * 0.45f
-    val shadowShift = size.minDimension * 0.04f
-    val strokeW = size.minDimension * 0.025f
+    drawPaperTileCardBase(
+        faceColor = Color(0xFFFFFBEB),
+        lipColor = Color(0xFFFDE68A),
+        creaseColor = StarCardboardGold
+    )
 
-    fun buildStarPath(offsetX: Float, offsetY: Float, scale: Float = 1f): Path {
+    val cx = size.width * 0.5f
+    val cy = size.height * 0.47f
+    val outerR = size.minDimension * 0.33f
+    val innerR = outerR * 0.46f
+    val strokeW = size.minDimension * 0.024f
+
+    fun buildStarPath(scale: Float = 1f): Path {
         val p = Path()
         for (i in 0 until 10) {
             val angle = -PI / 2.0 + i * (PI / 5.0)
             val rad = (if (i % 2 == 0) outerR else innerR) * scale
-            val x = cx + offsetX + (rad * cos(angle)).toFloat()
-            val y = cy + offsetY + (rad * sin(angle)).toFloat()
+            val x = cx + (rad * cos(angle)).toFloat()
+            val y = cy + (rad * sin(angle)).toFloat()
             if (i == 0) p.moveTo(x, y) else p.lineTo(x, y)
         }
         p.close()
         return p
     }
 
-    drawPath(buildStarPath(shadowShift, shadowShift, 1.0f), Color(0x33000000))
-    val mainStar = buildStarPath(0f, 0f, 0.96f)
+    val mainStar = buildStarPath(1.0f)
     drawPath(mainStar, StarCardboardGold)
     drawPath(mainStar, InkBrown, style = Stroke(width = strokeW, join = StrokeJoin.Round))
 
     for (i in 0 until 5) {
         val angle = -PI / 2.0 + i * (2.0 * PI / 5.0)
-        val x = cx + (outerR * 0.90f * cos(angle)).toFloat()
-        val y = cy + (outerR * 0.90f * sin(angle)).toFloat()
+        val x = cx + (outerR * 0.88f * cos(angle)).toFloat()
+        val y = cy + (outerR * 0.88f * sin(angle)).toFloat()
         drawLine(
-            color = Color(0xFFD97706).copy(alpha = 0.65f),
+            color = Color(0xFFD97706).copy(alpha = 0.55f),
             start = Offset(cx, cy),
             end = Offset(x, y),
-            strokeWidth = size.minDimension * 0.02f
+            strokeWidth = size.minDimension * 0.018f
         )
     }
 
-    val stitchStar = buildStarPath(0f, 0f, 0.68f)
+    val stitchStar = buildStarPath(0.64f)
     drawPath(
         path = stitchStar,
         color = PeppermintWhite,
         style = Stroke(
-            width = size.minDimension * 0.024f,
-            pathEffect = PathEffect.dashPathEffect(floatArrayOf(7f, 5f), 0f),
+            width = size.minDimension * 0.022f,
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f),
             join = StrokeJoin.Round
         )
     )
 }
 
 private fun DrawScope.drawOrigamiFoxPiece() {
+    drawPaperTileCardBase(
+        faceColor = Color(0xFFFFF7ED),
+        lipColor = Color(0xFFFED7AA),
+        creaseColor = OrigamiFoxOrange
+    )
+
     val w = size.width
-    val h = size.height
+    val h = size.height * 0.92f
     val strokeW = size.minDimension * 0.024f
 
-    // Lush emerald origami leaf collar
-    val greenLeaf = Path().apply {
-        moveTo(w * 0.15f, h * 0.64f)
-        lineTo(w * 0.50f, h * 0.89f)
-        lineTo(w * 0.85f, h * 0.64f)
-        lineTo(w * 0.70f, h * 0.48f)
-        lineTo(w * 0.30f, h * 0.48f)
-        close()
-    }
-    drawPath(greenLeaf, OrigamiFoxGreen)
-    drawPath(greenLeaf, InkBrown, style = Stroke(width = strokeW, join = StrokeJoin.Round))
-
     val leftEar = Path().apply {
-        moveTo(w * 0.20f, h * 0.15f)
-        lineTo(w * 0.42f, h * 0.35f)
-        lineTo(w * 0.17f, h * 0.48f)
+        moveTo(w * 0.24f, h * 0.20f)
+        lineTo(w * 0.43f, h * 0.36f)
+        lineTo(w * 0.21f, h * 0.48f)
         close()
     }
     val rightEar = Path().apply {
-        moveTo(w * 0.80f, h * 0.15f)
-        lineTo(w * 0.58f, h * 0.35f)
-        lineTo(w * 0.83f, h * 0.48f)
+        moveTo(w * 0.76f, h * 0.20f)
+        lineTo(w * 0.57f, h * 0.36f)
+        lineTo(w * 0.79f, h * 0.48f)
         close()
     }
-    drawPath(leftEar, Color(0xFFE04F16))
+    drawPath(leftEar, Color(0xFFD9460F))
     drawPath(leftEar, InkBrown, style = Stroke(width = strokeW, join = StrokeJoin.Round))
-    drawPath(rightEar, Color(0xFFE04F16))
+    drawPath(rightEar, Color(0xFFD9460F))
     drawPath(rightEar, InkBrown, style = Stroke(width = strokeW, join = StrokeJoin.Round))
 
     val leftFace = Path().apply {
-        moveTo(w * 0.50f, h * 0.32f)
-        lineTo(w * 0.17f, h * 0.48f)
-        lineTo(w * 0.50f, h * 0.84f)
+        moveTo(w * 0.50f, h * 0.33f)
+        lineTo(w * 0.21f, h * 0.48f)
+        lineTo(w * 0.50f, h * 0.81f)
         close()
     }
     val rightFace = Path().apply {
-        moveTo(w * 0.50f, h * 0.32f)
-        lineTo(w * 0.83f, h * 0.48f)
-        lineTo(w * 0.50f, h * 0.84f)
+        moveTo(w * 0.50f, h * 0.33f)
+        lineTo(w * 0.79f, h * 0.48f)
+        lineTo(w * 0.50f, h * 0.81f)
         close()
     }
-    drawPath(leftFace, Color(0xFFFF8552))
+    drawPath(leftFace, Color(0xFFFB923C))
     drawPath(rightFace, OrigamiFoxOrange)
     drawPath(leftFace, InkBrown, style = Stroke(width = strokeW, join = StrokeJoin.Round))
     drawPath(rightFace, InkBrown, style = Stroke(width = strokeW, join = StrokeJoin.Round))
 
     val leftCheek = Path().apply {
-        moveTo(w * 0.17f, h * 0.48f)
-        lineTo(w * 0.36f, h * 0.58f)
-        lineTo(w * 0.50f, h * 0.84f)
+        moveTo(w * 0.21f, h * 0.48f)
+        lineTo(w * 0.38f, h * 0.58f)
+        lineTo(w * 0.50f, h * 0.81f)
         close()
     }
     val rightCheek = Path().apply {
-        moveTo(w * 0.83f, h * 0.48f)
-        lineTo(w * 0.64f, h * 0.58f)
-        lineTo(w * 0.50f, h * 0.84f)
+        moveTo(w * 0.79f, h * 0.48f)
+        lineTo(w * 0.62f, h * 0.58f)
+        lineTo(w * 0.50f, h * 0.81f)
         close()
     }
     drawPath(leftCheek, PeppermintWhite)
@@ -435,29 +506,35 @@ private fun DrawScope.drawOrigamiFoxPiece() {
     drawPath(leftCheek, InkBrown, style = Stroke(width = strokeW, join = StrokeJoin.Round))
     drawPath(rightCheek, InkBrown, style = Stroke(width = strokeW, join = StrokeJoin.Round))
 
-    drawCircle(InkBrown, radius = w * 0.045f, center = Offset(w * 0.50f, h * 0.81f))
-    drawCircle(InkBrown, radius = w * 0.03f, center = Offset(w * 0.38f, h * 0.49f))
-    drawCircle(InkBrown, radius = w * 0.03f, center = Offset(w * 0.62f, h * 0.49f))
+    drawCircle(InkBrown, radius = w * 0.040f, center = Offset(w * 0.50f, h * 0.78f))
+    drawCircle(InkBrown, radius = w * 0.026f, center = Offset(w * 0.39f, h * 0.49f))
+    drawCircle(InkBrown, radius = w * 0.026f, center = Offset(w * 0.61f, h * 0.49f))
 }
 
 private fun DrawScope.drawOrigamiCranePiece() {
+    drawPaperTileCardBase(
+        faceColor = Color(0xFFF0F9FF),
+        lipColor = Color(0xFFBAE6FD),
+        creaseColor = OrigamiCraneBlue
+    )
+
     val w = size.width
-    val h = size.height
+    val h = size.height * 0.92f
     val strokeW = size.minDimension * 0.024f
 
     val backWing = Path().apply {
-        moveTo(w * 0.48f, h * 0.52f)
-        lineTo(w * 0.78f, h * 0.16f)
-        lineTo(w * 0.64f, h * 0.56f)
+        moveTo(w * 0.48f, h * 0.51f)
+        lineTo(w * 0.74f, h * 0.20f)
+        lineTo(w * 0.62f, h * 0.55f)
         close()
     }
     drawPath(backWing, OrigamiCraneBlue)
     drawPath(backWing, InkBrown, style = Stroke(width = strokeW, join = StrokeJoin.Round))
 
     val tail = Path().apply {
-        moveTo(w * 0.34f, h * 0.62f)
-        lineTo(w * 0.14f, h * 0.26f)
-        lineTo(w * 0.24f, h * 0.68f)
+        moveTo(w * 0.36f, h * 0.60f)
+        lineTo(w * 0.19f, h * 0.28f)
+        lineTo(w * 0.27f, h * 0.65f)
         close()
     }
     drawPath(tail, OrigamiCraneBlue)
@@ -465,29 +542,29 @@ private fun DrawScope.drawOrigamiCranePiece() {
 
     val body = Path().apply {
         moveTo(w * 0.50f, h * 0.44f)
-        lineTo(w * 0.70f, h * 0.62f)
-        lineTo(w * 0.48f, h * 0.76f)
-        lineTo(w * 0.24f, h * 0.68f)
+        lineTo(w * 0.68f, h * 0.60f)
+        lineTo(w * 0.48f, h * 0.72f)
+        lineTo(w * 0.27f, h * 0.65f)
         close()
     }
     drawPath(body, OrigamiCraneBlue)
     drawPath(body, InkBrown, style = Stroke(width = strokeW, join = StrokeJoin.Round))
 
     val neck = Path().apply {
-        moveTo(w * 0.62f, h * 0.64f)
-        lineTo(w * 0.80f, h * 0.26f)
-        lineTo(w * 0.91f, h * 0.32f)
-        lineTo(w * 0.79f, h * 0.36f)
-        lineTo(w * 0.70f, h * 0.68f)
+        moveTo(w * 0.60f, h * 0.62f)
+        lineTo(w * 0.76f, h * 0.29f)
+        lineTo(w * 0.86f, h * 0.34f)
+        lineTo(w * 0.75f, h * 0.38f)
+        lineTo(w * 0.68f, h * 0.65f)
         close()
     }
     drawPath(neck, OrigamiCraneCyan)
     drawPath(neck, InkBrown, style = Stroke(width = strokeW, join = StrokeJoin.Round))
 
     val frontWing = Path().apply {
-        moveTo(w * 0.32f, h * 0.56f)
-        lineTo(w * 0.66f, h * 0.56f)
-        lineTo(w * 0.44f, h * 0.88f)
+        moveTo(w * 0.34f, h * 0.55f)
+        lineTo(w * 0.64f, h * 0.55f)
+        lineTo(w * 0.45f, h * 0.82f)
         close()
     }
     drawPath(frontWing, OrigamiCraneCyan)
@@ -559,7 +636,7 @@ fun BoosterVectorIcon(
                     lineTo(w * 0.46f, h * 0.12f)
                     close()
                 }
-                drawPath(nozzle, WrappedCandyOrange)
+                drawPath(nozzle, StarCardboardGold)
             }
 
             BoosterType.HAMMER -> {

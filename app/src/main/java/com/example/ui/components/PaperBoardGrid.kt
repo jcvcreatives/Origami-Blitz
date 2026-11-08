@@ -112,45 +112,36 @@ fun PaperCardboardBoard(
     val isFever = state.feverMovesLeft > 0
     val density = LocalDensity.current
 
-    // Single shared infinite transition for idle hints & selection bob (avoids 49 separate clocks)
+    // Single shared infinite transition for calm, non-dizzying idle hints & selection breathing
     val infiniteTransition = rememberInfiniteTransition(label = "board_shared_pulse")
     val sharedWaveState = infiniteTransition.animateFloat(
         initialValue = -1f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(440, easing = FastOutSlowInEasing),
+            animation = tween(1500, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "shared_wave"
     )
 
-    // Board impact recoil/shake on big matches, cascades, and smashes
+    // Subtle, non-dizzying board pulse on big matches (no vertical shaking or tilt drift)
     val boardPunchAnim = remember { Animatable(0f) }
     LaunchedEffect(state.boardPunchSeq) {
         if (state.boardPunchSeq > 0L && state.boardPunchStrength > 0f) {
-            val s = state.boardPunchStrength
+            val s = state.boardPunchStrength.coerceAtMost(1f)
             boardPunchAnim.snapTo(1f * s)
             boardPunchAnim.animateTo(
                 targetValue = 0f,
-                animationSpec = spring(
-                    dampingRatio = 0.35f,
-                    stiffness = Spring.StiffnessMedium
-                )
+                animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing)
             )
         }
     }
-
-    val tiltXPx = with(density) { (tilt.x * 10f).dp.toPx() }
-    val tiltYPx = with(density) { (tilt.y * 8f).dp.toPx() }
 
     Box(
         modifier = modifier
             .graphicsLayer {
                 val punchVal = boardPunchAnim.value
-                val punchScale = 1f + (punchVal * 0.028f)
-                val punchOffsetY = (sin(punchVal * PI * 3.0) * 7.0 * state.boardPunchStrength).toFloat() * this.density
-                translationX = tiltXPx
-                translationY = tiltYPx + punchOffsetY
+                val punchScale = 1f + (punchVal * 0.009f)
                 scaleX = punchScale
                 scaleY = punchScale
             }
@@ -494,8 +485,8 @@ private fun PaperBoardCell(
     }
 
     val baseScale by animateFloatAsState(
-        targetValue = if (isSelected) 1.15f else 1f,
-        animationSpec = spring(dampingRatio = 0.52f, stiffness = Spring.StiffnessMedium),
+        targetValue = if (isSelected) 1.07f else 1f,
+        animationSpec = spring(dampingRatio = 0.68f, stiffness = Spring.StiffnessMedium),
         label = "tile_base_scale"
     )
 
@@ -550,7 +541,7 @@ private fun PaperBoardCell(
             .testTag("board_tile_${pos.row}_${pos.col}"),
         contentAlignment = Alignment.Center
     ) {
-        // Stationary paper cell card background
+        // Recessed warm kraft slot well
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -558,18 +549,18 @@ private fun PaperBoardCell(
                 .background(
                     when {
                         isSelected -> StickyNoteYellow
-                        isHinted -> StickyNoteYellow.copy(alpha = 0.68f)
+                        isHinted -> StickyNoteYellow.copy(alpha = 0.55f)
                         isInvalidShake -> PeppermintRed.copy(alpha = 0.22f)
                         else -> cellPaperColor
                     },
                     cellShape
                 )
                 .border(
-                    width = if (isSelected || isHinted) 1.8.dp else 0.5.dp,
+                    width = if (isSelected || isHinted) 2.dp else 0.8.dp,
                     color = when {
                         isSelected -> PeppermintRed
                         isHinted -> OrigamiFoxOrange
-                        else -> MaskingTapeBorder.copy(alpha = 0.6f)
+                        else -> CardboardDark.copy(alpha = 0.45f)
                     },
                     shape = cellShape
                 )
@@ -579,32 +570,28 @@ private fun PaperBoardCell(
         Canvas(modifier = Modifier.fillMaxSize()) {
             val crushP = crushRingAnim.value
             if (crushP > 0.01f) {
-                val maxR = size.minDimension * 0.65f
+                val maxR = size.minDimension * 0.62f
                 drawCircle(
-                    color = tile.type.primaryColor.copy(alpha = (1f - crushP) * 0.75f),
-                    radius = maxR * (0.35f + crushP * 0.75f),
-                    style = Stroke(width = size.minDimension * 0.10f * (1f - crushP * 0.5f))
-                )
-                drawCircle(
-                    color = PeppermintWhite.copy(alpha = (1f - crushP) * 0.65f),
-                    radius = maxR * (0.25f + crushP * 0.45f)
+                    color = tile.type.primaryColor.copy(alpha = (1f - crushP) * 0.65f),
+                    radius = maxR * (0.35f + crushP * 0.70f),
+                    style = Stroke(width = size.minDimension * 0.09f * (1f - crushP * 0.5f))
                 )
             }
             val impactP = impactRingAnim.value
             if (impactP > 0.01f) {
                 drawCircle(
-                    color = StarCardboardGold.copy(alpha = (1f - impactP) * 0.48f),
-                    radius = size.minDimension * (0.25f + impactP * 0.35f),
-                    style = Stroke(width = size.minDimension * 0.055f * (1f - impactP))
+                    color = StarCardboardGold.copy(alpha = (1f - impactP) * 0.35f),
+                    radius = size.minDimension * (0.25f + impactP * 0.30f),
+                    style = Stroke(width = size.minDimension * 0.045f * (1f - impactP))
                 )
             }
         }
 
-        // Die-cut paper game piece with GPU RenderNode 60fps transforms
+        // Tactile 3D pressed-paper block tile with smooth, planar 60fps transforms (zero dizzying 3D pitch/yaw)
         PaperPieceVector(
             pieceType = tile.type,
             modifier = Modifier
-                .fillMaxSize(0.84f)
+                .fillMaxSize(0.95f)
                 .graphicsLayer {
                     val colOff = offsetColAnim.value
                     val rowOff = offsetRowAnim.value
@@ -616,76 +603,60 @@ private fun PaperBoardCell(
                     val fallRatio = if (tile.spawnDistance > 0.001f) {
                         (abs(rowOff) / tile.spawnDistance.coerceAtLeast(1f)).coerceIn(0f, 1f)
                     } else 0f
-                    // Velocity peaks right before impact (when fallRatio approaches 0)
                     val fallSpeedFactor = if (isFallingMidAir) (1f - fallRatio * 0.65f) else 0f
 
                     val arcSin = sin(swapP * PI).toFloat()
                     val arcOffsetX = if (!isHorizontalSwap && swapP > 0.01f) {
-                        arcSin * arcSign * 0.38f * cellPx
+                        arcSin * arcSign * 0.24f * cellPx
                     } else 0f
                     val arcOffsetY = if (isHorizontalSwap && swapP > 0.01f) {
-                        -arcSin * arcSign * 0.38f * cellPx
+                        -arcSin * arcSign * 0.24f * cellPx
                     } else 0f
 
-                    // Directional hint nudge toward partner tile
+                    // Calm directional hint nudge toward partner tile
                     val hintNudgeFactor = ((wave + 1f) * 0.5f)
                     val hintNudgeX = if (hintPartnerDelta != null) {
-                        hintPartnerDelta.x * hintNudgeFactor * cellPx * 0.13f
+                        hintPartnerDelta.x * hintNudgeFactor * cellPx * 0.08f
                     } else 0f
                     val hintNudgeY = if (hintPartnerDelta != null) {
-                        hintPartnerDelta.y * hintNudgeFactor * cellPx * 0.13f
+                        hintPartnerDelta.y * hintNudgeFactor * cellPx * 0.08f
                     } else 0f
 
                     // Live tactile finger drag follow before swipe threshold triggers
-                    val dragFollowX = (dragAccum.x * 0.42f).coerceIn(-cellPx * 0.28f, cellPx * 0.28f)
-                    val dragFollowY = (dragAccum.y * 0.42f).coerceIn(-cellPx * 0.28f, cellPx * 0.28f)
+                    val dragFollowX = (dragAccum.x * 0.38f).coerceIn(-cellPx * 0.24f, cellPx * 0.24f)
+                    val dragFollowY = (dragAccum.y * 0.38f).coerceIn(-cellPx * 0.24f, cellPx * 0.24f)
                     val isDraggingNow = abs(dragFollowX) > 1f || abs(dragFollowY) > 1f
 
                     translationX = colOff * cellPx + arcOffsetX + shakeAnim.value + hintNudgeX + dragFollowX
                     translationY = rowOff * cellPx + arcOffsetY + hintNudgeY + dragFollowY
 
                     val swapBoost = if (swapP > 0.01f) {
-                        if (arcSign > 0f) 0.38f * arcSin else 0.16f * arcSin
+                        if (arcSign > 0f) 0.18f * arcSin else 0.06f * arcSin
                     } else 0f
-                    val dragBoost = if (isDraggingNow) 0.12f else 0f
-                    val hintScaleBoost = if (isHinted) 0.06f + wave * 0.04f else 0f
-                    val selectedBobBoost = if (isSelected) wave * 0.04f else 0f
+                    val dragBoost = if (isDraggingNow) 0.07f else 0f
+                    val hintScaleBoost = if (isHinted) 0.03f + wave * 0.02f else 0f
+                    val selectedBobBoost = if (isSelected) wave * 0.018f else 0f
 
-                    // Oscillating damped squash-and-stretch on landing
+                    // Cushioned squash-and-stretch on landing
                     val squashWave = sin(squash * PI * 1.5).toFloat() * squash
                     scaleX = when {
                         tile.isCrushing -> crushScaleAnim.value
-                        isFallingMidAir -> 1f - (fallSpeedFactor * 0.15f)
-                        squash > 0.01f -> 1f + (squashWave * 0.26f)
+                        isFallingMidAir -> 1f - (fallSpeedFactor * 0.07f)
+                        squash > 0.01f -> 1f + (squashWave * 0.12f)
                         else -> baseScale + swapBoost + dragBoost + hintScaleBoost + selectedBobBoost
                     }
                     scaleY = when {
                         tile.isCrushing -> crushScaleAnim.value
-                        isFallingMidAir -> 1f + (fallSpeedFactor * 0.20f)
-                        squash > 0.01f -> 1f - (squashWave * 0.22f)
+                        isFallingMidAir -> 1f + (fallSpeedFactor * 0.09f)
+                        squash > 0.01f -> 1f - (squashWave * 0.10f)
                         else -> baseScale + swapBoost + dragBoost + hintScaleBoost + selectedBobBoost
                     }
 
-                    // 3D Origami tilt & rotation
-                    cameraDistance = 14f * this.density
+                    // Gentle planar rotation only during active swap or crush (zero idle wobble)
                     rotationZ = when {
-                        tile.isCrushing -> crushRotAnim.value
-                        swapP > 0.01f -> arcSin * arcSign * 18f
-                        isDraggingNow -> (dragFollowX / cellPx) * 22f
-                        isHinted -> wave * 6f
-                        isSelected -> wave * 5f
-                        else -> 0f
-                    }
-                    rotationY = when {
-                        swapP > 0.01f && isHorizontalSwap -> arcSin * arcSign * 26f
-                        isDraggingNow -> (dragFollowX / cellPx) * 18f
-                        else -> 0f
-                    }
-                    rotationX = when {
-                        swapP > 0.01f && !isHorizontalSwap -> -arcSin * arcSign * 26f
-                        isFallingMidAir -> fallSpeedFactor * 12f
-                        squash > 0.01f -> -squashWave * 14f
-                        isDraggingNow -> -(dragFollowY / cellPx) * 18f
+                        tile.isCrushing -> crushRotAnim.value * 0.35f
+                        swapP > 0.01f -> arcSin * arcSign * 6f
+                        isDraggingNow -> (dragFollowX / cellPx) * 6f
                         else -> 0f
                     }
                 }
