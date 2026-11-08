@@ -458,6 +458,23 @@
     .board-cell.cell-odd {
       background: var(--cell-subtle);
     }
+    .board-cell.gold-stamp {
+      background: linear-gradient(135deg, #FFF3B0 0%, #FFE169 50%, #F3B700 100%);
+      border: 1.5px solid #D97706;
+      box-shadow: inset 0 2px 5px rgba(180, 83, 9, 0.28);
+    }
+    .board-cell.gold-stamp::before {
+      content: '★';
+      position: absolute;
+      top: 1px;
+      left: 3px;
+      font-size: 9px;
+      font-weight: 900;
+      color: #B45309;
+      line-height: 1;
+      pointer-events: none;
+      z-index: 3;
+    }
     .board-cell.selected {
       background: var(--sticky-yellow);
       border: 2px solid var(--thumbtack-red);
@@ -477,6 +494,97 @@
     }
     .board-cell.moving-top {
       z-index: 26;
+    }
+
+    /* Masking Tape Straps & Red Wax Seal Overlay */
+    .cell-lock-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    .cell-lock-overlay.tape-1,
+    .cell-lock-overlay.tape-2 {
+      display: flex;
+    }
+    .cell-lock-overlay.tape-1::before,
+    .cell-lock-overlay.tape-2::before,
+    .cell-lock-overlay.tape-1::after,
+    .cell-lock-overlay.tape-2::after {
+      content: '';
+      position: absolute;
+      width: 112%;
+      height: 22%;
+      background: rgba(247, 236, 206, 0.92);
+      border-top: 1px dashed rgba(138, 101, 68, 0.65);
+      border-bottom: 1px dashed rgba(138, 101, 68, 0.65);
+      box-shadow: 0 1px 2px rgba(45, 24, 10, 0.25);
+    }
+    .cell-lock-overlay.tape-1::before,
+    .cell-lock-overlay.tape-2::before {
+      transform: rotate(-36deg);
+    }
+    .cell-lock-overlay.tape-1::after,
+    .cell-lock-overlay.tape-2::after {
+      transform: rotate(36deg);
+    }
+    .wax-seal-stamp {
+      position: relative;
+      z-index: 6;
+      width: 44%;
+      height: 44%;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #EF4444 0%, #B91C1C 75%, #7F1D1D 100%);
+      border: 1.5px solid #FCA5A5;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+      color: #FFFDF9;
+      font-size: 9px;
+      font-weight: 900;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+    .cell-lock-overlay.tape-2 .wax-seal-stamp {
+      display: flex;
+    }
+
+    /* Craftable On-Board Special Power-Up Badge */
+    .tile-special-badge {
+      position: absolute;
+      right: 1px;
+      bottom: 1px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 1.5px solid #FFFDF9;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+      color: #FFFDF9;
+      font-size: 10px;
+      font-weight: 900;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      z-index: 4;
+      pointer-events: none;
+    }
+    .tile-special-badge.visible {
+      display: flex;
+    }
+    .mech-goal-badge {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 900;
+      line-height: 1;
     }
 
     /* Shockwave Ring inside each cell for landing impact & match crush */
@@ -1797,15 +1905,37 @@
           const pieceDiv = document.createElement('div');
           pieceDiv.className = 'tile-piece';
 
+          const pieceArtDiv = document.createElement('div');
+          pieceArtDiv.style.width = '100%';
+          pieceArtDiv.style.height = '100%';
+
+          const specialBadgeDiv = document.createElement('div');
+          specialBadgeDiv.className = 'tile-special-badge';
+
+          pieceDiv.appendChild(pieceArtDiv);
+          pieceDiv.appendChild(specialBadgeDiv);
+
+          const lockOverlayDiv = document.createElement('div');
+          lockOverlayDiv.className = 'cell-lock-overlay';
+          const waxSealDiv = document.createElement('div');
+          waxSealDiv.className = 'wax-seal-stamp';
+          waxSealDiv.textContent = '★';
+          lockOverlayDiv.appendChild(waxSealDiv);
+
           cell.appendChild(ringDiv);
           cell.appendChild(pieceDiv);
+          cell.appendChild(lockOverlayDiv);
           boardGridEl.appendChild(cell);
 
           cellPool[r][c] = {
             cell,
             ringDiv,
             pieceDiv,
-            renderedPieceId: null
+            pieceArtDiv,
+            specialBadgeDiv,
+            lockOverlayDiv,
+            renderedPieceId: null,
+            renderedSpecial: 'NONE'
           };
         }
       }
@@ -2246,16 +2376,33 @@
       setTimeout(() => el.remove(), 760);
     }
 
+    const TOTAL_LEVELS = 50;
     const LEVELS_PER_STAGE = 5;
+    const TOTAL_STAGES = 10;
     const STAGE_THEMES = [
-      { title: 'Whispering Pine Woods', subtitle: 'Woodland Origami Trail', color: '#52B788', pieceIdx: 4 },
-      { title: 'Peppermint Boardwalk', subtitle: 'Sweet Paper Pinwheel Pier', color: '#FF3355', pieceIdx: 0 },
-      { title: 'Golden Cardboard Canyon', subtitle: 'Corrugated Mesa Ridge', color: '#FFB703', pieceIdx: 3 },
-      { title: 'Starlight Origami Summit', subtitle: 'Cloud-Folded Sky Peaks', color: '#8B5CF6', pieceIdx: 5 }
+      { title: 'Whispering Pine Woods', subtitle: 'Classic Paper Fold & Washi Stamps', color: '#40916C', pieceIdx: 4 },
+      { title: 'Peppermint Boardwalk', subtitle: 'Masking Tape Pier Challenges', color: '#E05368', pieceIdx: 0 },
+      { title: 'Golden Cardboard Canyon', subtitle: 'Wax-Sealed Mesa Cartons', color: '#E09F26', pieceIdx: 3 },
+      { title: 'Starlight Origami Summit', subtitle: 'Foil Stamps & Tape Peaks', color: '#7C5CE6', pieceIdx: 5 },
+      { title: 'Sakura Washi Garden', subtitle: 'Folded Petal Pavilion', color: '#D95D76', pieceIdx: 0 },
+      { title: 'Origami Lantern Harbor', subtitle: 'Paper Boat & Crane Quay', color: '#2E8BC0', pieceIdx: 2 },
+      { title: 'Berry Confectionery Box', subtitle: 'Wax-Sealed Sweet Studio', color: '#8A56AC', pieceIdx: 5 },
+      { title: 'Lavender Ribbon Atelier', subtitle: 'Bookbinder’s Press Hall', color: '#5A7D9A', pieceIdx: 1 },
+      { title: 'Amber Sunburst Glasshouse', subtitle: 'Stained-Paper Conservatory', color: '#D97724', pieceIdx: 3 },
+      { title: 'Grand Origami Citadel', subtitle: 'Royal Paper Crown Finale', color: '#C84B31', pieceIdx: 4 }
     ];
 
+    const SPECIAL_META = {
+      NONE: { symbol: '', bg: 'transparent' },
+      ROW_CUTTER: { symbol: '↔', bg: '#2563EB' },
+      COL_CUTTER: { symbol: '↕', bg: '#059669' },
+      PAPER_BOMB: { symbol: '✦', bg: '#DC2626' },
+      PINWHEEL_RAINBOW: { symbol: '✹', bg: '#9333EA' }
+    };
+
     function getStageInfo(lvl) {
-      const stageNumber = Math.floor((lvl - 1) / LEVELS_PER_STAGE) + 1;
+      const clamped = Math.max(1, Math.min(TOTAL_LEVELS, lvl));
+      const stageNumber = Math.floor((clamped - 1) / LEVELS_PER_STAGE) + 1;
       const theme = STAGE_THEMES[(stageNumber - 1) % STAGE_THEMES.length];
       return {
         stageNumber,
@@ -2266,15 +2413,99 @@
       };
     }
 
-    function getGoalsConfigForLevel(lvl) {
+    function getLevelBlueprint(rawLvl) {
+      const lvl = Math.max(1, Math.min(TOTAL_LEVELS, rawLvl));
+      const stage = Math.floor((lvl - 1) / LEVELS_PER_STAGE) + 1;
+      const posInStage = (lvl - 1) % LEVELS_PER_STAGE; // 0..4
+      const isBoss = posInStage === 4;
+
       const p1 = PIECES[(lvl - 1) % PIECES.length];
       const p2 = PIECES[(lvl + 2) % PIECES.length];
+      const p3 = PIECES[(lvl + 4) % PIECES.length];
+
+      const moves = Math.max(17, Math.min(28, 22 + Math.floor(stage / 2) + (isBoss ? 2 : 0) - Math.floor(posInStage / 2)));
+
+      const baseTarget1 = 10 + Math.floor(lvl * 0.45);
+      const baseTarget2 = 9 + Math.floor(lvl * 0.4);
+      const goals = [
+        { piece: p1, target: baseTarget1, count: 0 },
+        { piece: p2, target: baseTarget2, count: 0 }
+      ];
+      if (lvl >= 18 && (isBoss || lvl % 3 === 0)) {
+        goals.push({ piece: p3, target: 8 + Math.floor(lvl * 0.25), count: 0 });
+      }
+
+      const goldCells = new Set();
+      if (lvl >= 2) {
+        if (stage === 1 || stage === 4 || stage === 5 || stage === 6 || stage === 9 || stage === 10 || lvl % 2 === 0) {
+          const pattern = lvl % 5;
+          if (pattern === 0) {
+            for (let r = 2; r <= 4; r++) {
+              for (let c = 2; c <= 4; c++) goldCells.add(`${r},${c}`);
+            }
+          } else if (pattern === 1) {
+            for (let i = 1; i <= 5; i++) {
+              goldCells.add(`3,${i}`);
+              goldCells.add(`${i},3`);
+            }
+          } else if (pattern === 2) {
+            for (let r = 1; r <= 5; r++) {
+              for (let c = 1; c <= 5; c++) {
+                if (Math.abs(r - 3) + Math.abs(c - 3) <= 2) goldCells.add(`${r},${c}`);
+              }
+            }
+          } else if (pattern === 3) {
+            [1, 2, 4, 5].forEach(r => {
+              [1, 2, 4, 5].forEach(c => goldCells.add(`${r},${c}`));
+            });
+          } else {
+            for (let c = 1; c <= 5; c++) {
+              goldCells.add(`2,${c}`);
+              goldCells.add(`4,${c}`);
+            }
+          }
+        }
+      }
+
+      const tapeLocks = new Map();
+      if (lvl >= 6) {
+        const useWaxSeals = lvl >= 11;
+        const lockCoords = [];
+        const pat = (lvl + stage) % 5;
+        if (pat === 0) {
+          lockCoords.push([1, 1], [1, 5], [5, 1], [5, 5], [3, 2], [3, 4], [2, 3], [4, 3]);
+        } else if (pat === 1) {
+          lockCoords.push([2, 1], [2, 3], [2, 5], [4, 1], [4, 3], [4, 5]);
+        } else if (pat === 2) {
+          lockCoords.push([1, 3], [2, 2], [2, 4], [3, 1], [3, 5], [4, 2], [4, 4], [5, 3]);
+        } else if (pat === 3) {
+          lockCoords.push([1, 2], [1, 4], [3, 1], [3, 3], [3, 5], [5, 2], [5, 4]);
+        } else {
+          lockCoords.push([2, 2], [2, 3], [2, 4], [4, 2], [4, 3], [4, 4]);
+        }
+        const maxLocks = Math.min(lockCoords.length, 4 + Math.floor(lvl / 7) + (isBoss ? 2 : 0));
+        lockCoords.slice(0, maxLocks).forEach(([r, c], idx) => {
+          const hp = (useWaxSeals && (isBoss || idx % 2 === 0)) ? 2 : 1;
+          tapeLocks.set(`${r},${c}`, hp);
+        });
+      }
+
+      const hasWax = Array.from(tapeLocks.values()).some(v => v >= 2);
+      const mechanicLabel = (goldCells.size > 0 && tapeLocks.size > 0)
+        ? (hasWax ? 'Gold Stamps & Wax Seals' : 'Gold Stamps & Masking Tape')
+        : tapeLocks.size > 0
+          ? (hasWax ? 'Break Red Wax Seals (2 Hits)' : 'Rip Masking Tape Straps')
+          : goldCells.size > 0
+            ? 'Collect Gold Washi Stamps'
+            : 'Match 4+ to Craft Paper Cutters';
+
       return {
-        moves: Math.min(30, 24 + (lvl % 3)),
-        goals: [
-          { piece: p1, target: 10 + Math.min(lvl * 2, 24), count: 0 },
-          { piece: p2, target: 8 + Math.min(lvl * 2, 20), count: 0 }
-        ]
+        level: lvl,
+        moves,
+        goals,
+        goldCells,
+        tapeLocks,
+        mechanicLabel
       };
     }
 
@@ -2288,7 +2519,15 @@
       highScore: 0,
       moves: 25,
       goals: [],
+      goldCells: new Set(),
+      goldTarget: 0,
+      goldCollected: 0,
+      tapeLocks: new Map(),
+      tapeTarget: 0,
+      tapeCleared: 0,
+      mechanicLabel: '',
       board: [],
+      specials: {},
       boosters: { SCISSORS: 3, GLUE: 3, HAMMER: 2 },
       activeBooster: null,
       glueFirst: null,
@@ -2301,6 +2540,23 @@
     };
 
     let hintTimer = null;
+
+    function isCellLocked(r, c) {
+      return (state.tapeLocks.get(`${r},${c}`) || 0) > 0;
+    }
+
+    function getSpecial(r, c) {
+      return state.specials[`${r},${c}`] || 'NONE';
+    }
+
+    function setSpecial(r, c, spec) {
+      const key = `${r},${c}`;
+      if (!spec || spec === 'NONE') {
+        delete state.specials[key];
+      } else {
+        state.specials[key] = spec;
+      }
+    }
 
     function scheduleIdleHint() {
       clearTimeout(hintTimer);
@@ -2318,10 +2574,17 @@
     function findFirstValidMove() {
       for (let r = 0; r < BOARD_SIZE; r++) {
         for (let c = 0; c < BOARD_SIZE; c++) {
+          if (isCellLocked(r, c)) continue;
           const neighbors = [];
-          if (c + 1 < BOARD_SIZE) neighbors.push({ r, c: c + 1 });
-          if (r + 1 < BOARD_SIZE) neighbors.push({ r: r + 1, c });
+          if (c + 1 < BOARD_SIZE && !isCellLocked(r, c + 1)) neighbors.push({ r, c: c + 1 });
+          if (r + 1 < BOARD_SIZE && !isCellLocked(r + 1, c)) neighbors.push({ r: r + 1, c });
           for (const n of neighbors) {
+            if (getSpecial(r, c) === 'PINWHEEL_RAINBOW' || getSpecial(n.r, n.c) === 'PINWHEEL_RAINBOW') {
+              return [{ r, c }, n];
+            }
+            if (getSpecial(r, c) !== 'NONE' && getSpecial(n.r, n.c) !== 'NONE') {
+              return [{ r, c }, n];
+            }
             const tmp = state.board[r][c];
             state.board[r][c] = state.board[n.r][n.c];
             state.board[n.r][n.c] = tmp;
@@ -2340,8 +2603,8 @@
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
-          state.level = parsed.level || 1;
-          state.highestLevel = Math.max(state.level, parsed.highestLevel || state.level);
+          state.level = Math.max(1, Math.min(TOTAL_LEVELS, parsed.level || 1));
+          state.highestLevel = Math.max(state.level, Math.min(TOTAL_LEVELS, parsed.highestLevel || state.level));
           state.levelStars = parsed.levelStars || {};
           state.highScore = parsed.highScore || 0;
           if (parsed.boosters) state.boosters = parsed.boosters;
@@ -2368,7 +2631,9 @@
     }
 
     function generateBoard() {
+      let attempts = 0;
       while (true) {
+        attempts++;
         const b = [];
         for (let r = 0; r < BOARD_SIZE; r++) {
           b[r] = [];
@@ -2384,20 +2649,29 @@
           }
         }
         state.board = b;
-        if (findFirstValidMove()) return b;
+        if (findFirstValidMove() || attempts > 40) return b;
       }
     }
 
-    function startLevel(lvl) {
+    function startLevel(rawLvl) {
+      const lvl = Math.max(1, Math.min(TOTAL_LEVELS, rawLvl));
       clearTimeout(hintTimer);
       activeTileAnims.clear();
       state.level = lvl;
       state.highestLevel = Math.max(state.highestLevel, lvl);
       state.mapSelectedLevel = lvl;
       state.score = 0;
-      const cfg = getGoalsConfigForLevel(lvl);
-      state.moves = cfg.moves;
-      state.goals = cfg.goals;
+      const bp = getLevelBlueprint(lvl);
+      state.moves = bp.moves;
+      state.goals = bp.goals;
+      state.goldCells = new Set(bp.goldCells);
+      state.goldTarget = bp.goldCells.size;
+      state.goldCollected = 0;
+      state.tapeLocks = new Map(bp.tapeLocks);
+      state.tapeTarget = bp.tapeLocks.size;
+      state.tapeCleared = 0;
+      state.mechanicLabel = bp.mechanicLabel;
+      state.specials = {};
       state.activeBooster = null;
       state.glueFirst = null;
       state.selected = null;
@@ -2411,7 +2685,6 @@
       document.getElementById('world-map-modal').classList.remove('visible');
       saveProgress();
       syncResponsiveLayout();
-      // Cascade entrance animation for the new level board
       const introMotion = new Map();
       for (let r = 0; r < BOARD_SIZE; r++) {
         for (let c = 0; c < BOARD_SIZE; c++) {
@@ -2448,13 +2721,22 @@
         ? `★ ORIGAMI FEVER 2x SCORE! (${state.feverMoves} MOVES) ★`
         : state.streak >= 2
           ? `FEVER METER • HOT STREAK x${state.streak}!`
-          : 'FEVER METER • MATCH 4+ FOR LINE RIP!';
+          : (state.mechanicLabel ? state.mechanicLabel.toUpperCase() : 'MATCH 4+ TO CRAFT PAPER CUTTERS!');
 
       const goalsContainer = document.getElementById('goal-chips');
-      goalsContainer.innerHTML = state.goals.map(g => {
+      let goalsHtml = state.goals.map(g => {
         const rem = Math.max(0, g.target - g.count);
         return `<div class="goal-chip">${g.piece.svg}<span>${rem === 0 ? '✓' : rem}</span></div>`;
       }).join('');
+      if (state.goldTarget > 0) {
+        const remGold = state.goldCells.size;
+        goalsHtml += `<div class="goal-chip" title="Gold Washi Stamps"><span class="mech-goal-badge" style="background:#FFE169;border:1.5px solid #D97706;color:#92400E;">★</span><span>${remGold === 0 ? '✓' : remGold}</span></div>`;
+      }
+      if (state.tapeTarget > 0) {
+        const remTape = state.tapeLocks.size;
+        goalsHtml += `<div class="goal-chip" title="Masking Tape & Wax Seals"><span class="mech-goal-badge" style="background:#F5E8C7;border:1.5px solid #B91C1C;color:#991B1B;">✕</span><span>${remTape === 0 ? '✓' : remTape}</span></div>`;
+      }
+      goalsContainer.innerHTML = goalsHtml;
 
       ['SCISSORS', 'GLUE', 'HAMMER'].forEach(key => {
         const btn = document.getElementById(`booster-${key.toLowerCase()}`);
@@ -2490,11 +2772,33 @@
           const slot = cellPool[r][c];
           const piece = state.board[r][c];
           const key = `${r},${c}`;
+          const spec = getSpecial(r, c);
+          const lockHp = state.tapeLocks.get(key) || 0;
+          const hasGold = state.goldCells.has(key);
 
           if (slot.renderedPieceId !== piece.id) {
-            slot.pieceDiv.innerHTML = piece.svg;
+            slot.pieceArtDiv.innerHTML = piece.svg;
             slot.renderedPieceId = piece.id;
           }
+
+          if (slot.renderedSpecial !== spec) {
+            slot.renderedSpecial = spec;
+            if (spec !== 'NONE' && SPECIAL_META[spec]) {
+              slot.specialBadgeDiv.textContent = SPECIAL_META[spec].symbol;
+              slot.specialBadgeDiv.style.background = SPECIAL_META[spec].bg;
+              slot.specialBadgeDiv.classList.add('visible');
+            } else {
+              slot.specialBadgeDiv.textContent = '';
+              slot.specialBadgeDiv.classList.remove('visible');
+            }
+          }
+
+          slot.cell.classList.toggle('gold-stamp', hasGold);
+          slot.lockOverlayDiv.className = lockHp >= 2
+            ? 'cell-lock-overlay tape-2'
+            : lockHp === 1
+              ? 'cell-lock-overlay tape-1'
+              : 'cell-lock-overlay';
 
           const isSel = (state.selected && state.selected.r === r && state.selected.c === c) ||
                         (state.glueFirst && state.glueFirst.r === r && state.glueFirst.c === c);
@@ -2542,11 +2846,10 @@
       }
     }
 
-    function analyzeMatches(board) {
+    function analyzeMatches(board, preferredPivot = null) {
       const matched = new Set();
-      const ripRows = new Set();
-      const ripCols = new Set();
-      const stormIds = new Set();
+      const horizRuns = [];
+      const vertRuns = [];
 
       for (let r = 0; r < BOARD_SIZE; r++) {
         let c = 0;
@@ -2556,9 +2859,13 @@
           while (end < BOARD_SIZE && board[r][end].id === id) end++;
           const len = end - c;
           if (len >= 3) {
-            for (let k = c; k < end; k++) matched.add(`${r},${k}`);
-            if (len === 4) ripRows.add(r);
-            if (len >= 5) stormIds.add(id);
+            const cells = [];
+            for (let k = c; k < end; k++) {
+              const key = `${r},${k}`;
+              matched.add(key);
+              cells.push({ r, c: k, key });
+            }
+            horizRuns.push({ piece: board[r][c], cells });
           }
           c = end;
         }
@@ -2571,33 +2878,152 @@
           while (end < BOARD_SIZE && board[end][c].id === id) end++;
           const len = end - r;
           if (len >= 3) {
-            for (let k = r; k < end; k++) matched.add(`${k},${c}`);
-            if (len === 4) ripCols.add(c);
-            if (len >= 5) stormIds.add(id);
+            const cells = [];
+            for (let k = r; k < end; k++) {
+              const key = `${k},${c}`;
+              matched.add(key);
+              cells.push({ r: k, c, key });
+            }
+            vertRuns.push({ piece: board[r][c], cells });
           }
           r = end;
         }
       }
 
-      ripRows.forEach(r => {
-        for (let c = 0; c < BOARD_SIZE; c++) matched.add(`${r},${c}`);
+      const spawns = new Map();
+      const usedHoriz = new Set();
+      const usedVert = new Set();
+
+      // 1. L or T intersections -> PAPER_BOMB (✦)
+      horizRuns.forEach((hRun, hi) => {
+        vertRuns.forEach((vRun, vi) => {
+          if (usedHoriz.has(hi) || usedVert.has(vi)) return;
+          if (hRun.piece.id !== vRun.piece.id) return;
+          const inter = hRun.cells.find(hc => vRun.cells.some(vc => vc.key === hc.key));
+          if (inter) {
+            usedHoriz.add(hi);
+            usedVert.add(vi);
+            spawns.set(inter.key, { piece: hRun.piece, special: 'PAPER_BOMB' });
+          }
+        });
       });
-      ripCols.forEach(c => {
-        for (let r = 0; r < BOARD_SIZE; r++) matched.add(`${r},${c}`);
+
+      // 2. Straight runs of 5+ -> PINWHEEL_RAINBOW (✹), 4 -> ROW_CUTTER (↔) / COL_CUTTER (↕)
+      horizRuns.forEach((hRun, hi) => {
+        if (usedHoriz.has(hi)) return;
+        if (hRun.cells.length >= 4) {
+          const pivot = (preferredPivot && hRun.cells.find(x => x.r === preferredPivot.r && x.c === preferredPivot.c))
+            || hRun.cells[Math.floor(hRun.cells.length / 2)];
+          const spec = hRun.cells.length >= 5 ? 'PINWHEEL_RAINBOW' : 'COL_CUTTER';
+          spawns.set(pivot.key, { piece: hRun.piece, special: spec });
+        }
       });
-      if (stormIds.size > 0) {
-        for (let r = 0; r < BOARD_SIZE; r++) {
-          for (let c = 0; c < BOARD_SIZE; c++) {
-            if (stormIds.has(board[r][c].id)) matched.add(`${r},${c}`);
+
+      vertRuns.forEach((vRun, vi) => {
+        if (usedVert.has(vi)) return;
+        if (vRun.cells.length >= 4) {
+          const pivot = (preferredPivot && vRun.cells.find(x => x.r === preferredPivot.r && x.c === preferredPivot.c))
+            || vRun.cells[Math.floor(vRun.cells.length / 2)];
+          const spec = vRun.cells.length >= 5 ? 'PINWHEEL_RAINBOW' : 'ROW_CUTTER';
+          if (!spawns.has(pivot.key)) {
+            spawns.set(pivot.key, { piece: vRun.piece, special: spec });
           }
         }
-      }
+      });
+
+      const lineRip = Array.from(spawns.values()).some(s => s.special === 'ROW_CUTTER' || s.special === 'COL_CUTTER' || s.special === 'PAPER_BOMB');
+      const colorStorm = Array.from(spawns.values()).some(s => s.special === 'PINWHEEL_RAINBOW');
 
       return {
         matched,
-        lineRip: ripRows.size > 0 || ripCols.size > 0,
-        colorStorm: stormIds.size > 0
+        spawns,
+        lineRip,
+        colorStorm
       };
+    }
+
+    function expandSpecialChain(initialSet) {
+      const expanded = new Set(initialSet);
+      const processed = new Set();
+      let triggeredAny = false;
+      let changed = true;
+
+      while (changed) {
+        changed = false;
+        Array.from(expanded).forEach(key => {
+          if (processed.has(key)) return;
+          processed.add(key);
+          const [r, c] = key.split(',').map(Number);
+          const spec = getSpecial(r, c);
+          if (spec === 'ROW_CUTTER') {
+            triggeredAny = true;
+            for (let col = 0; col < BOARD_SIZE; col++) {
+              const k = `${r},${col}`;
+              if (!expanded.has(k)) { expanded.add(k); changed = true; }
+            }
+          } else if (spec === 'COL_CUTTER') {
+            triggeredAny = true;
+            for (let row = 0; row < BOARD_SIZE; row++) {
+              const k = `${row},${c}`;
+              if (!expanded.has(k)) { expanded.add(k); changed = true; }
+            }
+          } else if (spec === 'PAPER_BOMB') {
+            triggeredAny = true;
+            for (let dr = -1; dr <= 1; dr++) {
+              for (let dc = -1; dc <= 1; dc++) {
+                const nr = r + dr, nc = c + dc;
+                if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
+                  const k = `${nr},${nc}`;
+                  if (!expanded.has(k)) { expanded.add(k); changed = true; }
+                }
+              }
+            }
+          } else if (spec === 'PINWHEEL_RAINBOW') {
+            triggeredAny = true;
+            const targetId = state.board[r][c].id;
+            for (let row = 0; row < BOARD_SIZE; row++) {
+              for (let col = 0; col < BOARD_SIZE; col++) {
+                if (state.board[row][col].id === targetId) {
+                  const k = `${row},${col}`;
+                  if (!expanded.has(k)) { expanded.add(k); changed = true; }
+                }
+              }
+            }
+          }
+        });
+      }
+
+      return { expanded, triggeredAny };
+    }
+
+    function applyTapeDamage(clearedSet) {
+      if (state.tapeLocks.size === 0) return 0;
+      const damaged = new Set();
+      clearedSet.forEach(key => {
+        if (state.tapeLocks.has(key)) damaged.add(key);
+        const [r, c] = key.split(',').map(Number);
+        [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]].forEach(([nr, nc]) => {
+          const nk = `${nr},${nc}`;
+          if (state.tapeLocks.has(nk)) damaged.add(nk);
+        });
+      });
+      if (damaged.size === 0) return 0;
+      let newlyFreed = 0;
+      damaged.forEach(key => {
+        const hp = state.tapeLocks.get(key) || 0;
+        if (hp > 1) {
+          state.tapeLocks.set(key, hp - 1);
+        } else if (hp === 1) {
+          state.tapeLocks.delete(key);
+          newlyFreed++;
+        }
+        const [r, c] = key.split(',').map(Number);
+        spawnConfettiAtCell(r, c, state.board[r][c], 10);
+      });
+      state.tapeCleared = state.tapeTarget - state.tapeLocks.size;
+      state.score += damaged.size * 60;
+      if (state.score > state.highScore) state.highScore = state.score;
+      return newlyFreed;
     }
 
     function showComboBanner(text) {
@@ -2613,26 +3039,34 @@
 
     const sleep = ms => new Promise(res => setTimeout(res, ms));
 
-    async function crushAndCascade(initialSet, bonusPts = 55) {
+    async function crushAndCascade(initialSet, bonusPts = 55, preferredPivot = null) {
       state.busy = true;
       state.hintPair = null;
       if (initialSet && initialSet.size > 0) {
-        punchBoard(0.85);
-        applyClearedSet(initialSet, 1, bonusPts);
-        renderBoard(initialSet);
+        const { expanded, triggeredAny } = expandSpecialChain(initialSet);
+        if (triggeredAny) audio.playSmash();
+        punchBoard(triggeredAny ? 1.1 : 0.85);
+        applyTapeDamage(expanded);
+        applyClearedSet(expanded, 1, bonusPts);
+        renderBoard(expanded);
         await sleep(220);
-        const dropMotion = dropAndRefill(initialSet);
+        const dropMotion = dropAndRefill(expanded, new Map());
         audio.playBounce();
         renderAll(dropMotion);
         await sleep(340);
       }
 
       let combo = 0;
+      let pivotToUse = preferredPivot;
       while (true) {
-        const { matched, lineRip, colorStorm } = analyzeMatches(state.board);
+        const { matched, spawns, lineRip, colorStorm } = analyzeMatches(state.board, pivotToUse);
+        pivotToUse = null;
         if (matched.size === 0) break;
         combo++;
         audio.playChord(combo);
+
+        const { expanded, triggeredAny } = expandSpecialChain(matched);
+        if (triggeredAny) audio.playSmash();
 
         if (colorStorm) {
           audio.playFanfare();
@@ -2641,25 +3075,31 @@
           state.boosters[rk] = (state.boosters[rk] || 0) + 1;
         }
 
+        const freedLocks = applyTapeDamage(expanded);
+
         const banner = colorStorm
-          ? '5-FOLD COLOR STORM! +1 BOOSTER'
-          : lineRip
-            ? '4-FOLD LINE RIP!'
-            : combo >= 3
-              ? `ORIGAMI FEVER COMBO x${combo}!`
-              : combo === 2
-                ? 'DOUBLE FOLD x2!'
-                : state.streak >= 3
-                  ? `HOT STREAK x${state.streak}!`
-                  : null;
+          ? '5-FOLD PINWHEEL CRAFTED! +1 BOOSTER'
+          : triggeredAny
+            ? 'SPECIAL PAPER CUTTER BLAST!'
+            : lineRip
+              ? 'PAPER CUTTER CRAFTED!'
+              : freedLocks > 0
+                ? 'TAPE SEAL RIPPED!'
+                : combo >= 3
+                  ? `ORIGAMI FEVER COMBO x${combo}!`
+                  : combo === 2
+                    ? 'DOUBLE FOLD x2!'
+                    : state.streak >= 3
+                      ? `HOT STREAK x${state.streak}!`
+                      : null;
         if (banner) showComboBanner(banner);
 
-        punchBoard(colorStorm ? 1.25 : lineRip || combo >= 2 ? 0.85 : 0.4);
-        applyClearedSet(matched, combo, colorStorm ? 65 : lineRip ? 48 : 32);
-        renderBoard(matched);
+        punchBoard(colorStorm || triggeredAny ? 1.25 : lineRip || combo >= 2 ? 0.85 : 0.4);
+        applyClearedSet(expanded, combo, colorStorm ? 65 : (lineRip || triggeredAny) ? 48 : 32);
+        renderBoard(expanded);
         await sleep(225);
-        const dropMotion = dropAndRefill(matched);
-        audio.playBounce(matched.size);
+        const dropMotion = dropAndRefill(expanded, spawns);
+        audio.playBounce(expanded.size);
         renderAll(dropMotion);
         await sleep(340);
       }
@@ -2677,6 +3117,7 @@
 
     function applyClearedSet(set, combo, ptsPerTile) {
       let sumR = 0, sumC = 0;
+      let goldBonus = 0;
       set.forEach(key => {
         const [r, c] = key.split(',').map(Number);
         sumR += r;
@@ -2686,11 +3127,16 @@
         state.goals.forEach(g => {
           if (g.piece.id === piece.id) g.count++;
         });
+        if (state.goldCells.has(key)) {
+          state.goldCells.delete(key);
+          state.goldCollected = state.goldTarget - state.goldCells.size;
+          goldBonus += 80;
+        }
       });
 
       const isFever = state.feverMoves > 0;
       const mult = isFever ? 2 : 1;
-      const gained = set.size * ptsPerTile * combo * mult;
+      const gained = set.size * ptsPerTile * combo * mult + goldBonus;
       state.score += gained;
       if (state.score > state.highScore) state.highScore = state.score;
 
@@ -2717,13 +3163,19 @@
       }
     }
 
-    function dropAndRefill(removedSet) {
+    function dropAndRefill(removedSet, spawnsMap = new Map()) {
       const motionMap = new Map();
+      const nextSpecials = {};
+
       for (let c = 0; c < BOARD_SIZE; c++) {
         const survivors = [];
         for (let r = BOARD_SIZE - 1; r >= 0; r--) {
-          if (!removedSet.has(`${r},${c}`)) {
-            survivors.unshift({ piece: state.board[r][c], oldRow: r });
+          const key = `${r},${c}`;
+          if (spawnsMap && spawnsMap.has(key)) {
+            const sp = spawnsMap.get(key);
+            survivors.unshift({ piece: sp.piece, special: sp.special, oldRow: r });
+          } else if (!removedSet.has(key)) {
+            survivors.unshift({ piece: state.board[r][c], special: getSpecial(r, c), oldRow: r });
           }
         }
         const missingCount = BOARD_SIZE - survivors.length;
@@ -2738,8 +3190,11 @@
         }
         for (let i = 0; i < survivors.length; i++) {
           const targetRow = missingCount + i;
-          const { piece, oldRow } = survivors[i];
+          const { piece, special, oldRow } = survivors[i];
           state.board[targetRow][c] = piece;
+          if (special && special !== 'NONE') {
+            nextSpecials[`${targetRow},${c}`] = special;
+          }
           const dropRows = targetRow - oldRow;
           if (dropRows > 0) {
             motionMap.set(`${targetRow},${c}`, {
@@ -2750,11 +3205,15 @@
           }
         }
       }
+      state.specials = nextSpecials;
       return motionMap;
     }
 
     function checkGameEnd() {
-      const won = state.goals.every(g => g.count >= g.target);
+      const piecesDone = state.goals.every(g => g.count >= g.target);
+      const goldDone = state.goldCells.size === 0;
+      const tapeDone = state.tapeLocks.size === 0;
+      const won = piecesDone && goldDone && tapeDone;
       if (won || state.moves <= 0) {
         clearTimeout(hintTimer);
         if (won) {
@@ -2764,13 +3223,15 @@
             : (state.moves >= 4 || state.score >= 1300) ? 2 : 1;
           state.lastEarnedStars = stars;
           state.levelStars[state.level] = Math.max(state.levelStars[state.level] || 0, stars);
-          state.highestLevel = Math.max(state.highestLevel, state.level + 1);
+          state.highestLevel = Math.min(TOTAL_LEVELS, Math.max(state.highestLevel, state.level + 1));
           saveProgress();
         }
         const stg = getStageInfo(state.level);
         const modal = document.getElementById('status-modal');
-        document.getElementById('modal-stage-tag').textContent = `STAGE ${stg.stageNumber} • LEVEL ${state.level}`;
-        document.getElementById('modal-title').textContent = won ? 'Level Complete!' : 'Out of Moves!';
+        document.getElementById('modal-stage-tag').textContent = `STAGE ${stg.stageNumber} • LEVEL ${state.level} OF ${TOTAL_LEVELS}`;
+        document.getElementById('modal-title').textContent = won
+          ? (state.level >= TOTAL_LEVELS ? 'Grand Citadel Complete!' : 'Level Complete!')
+          : 'Out of Moves!';
         const starsEl = document.getElementById('modal-stars');
         if (won) {
           const earned = state.lastEarnedStars || 1;
@@ -2783,16 +3244,18 @@
         }
         document.getElementById('modal-icon').innerHTML = state.goals[0].piece.svg;
         document.getElementById('modal-subtitle').textContent = won
-          ? 'You crafted all goal pieces and earned +1 booster bonus!'
+          ? 'You cleared every paper goal and earned +1 booster bonus!'
           : 'The paper diorama still needs a few more matches.';
         document.getElementById('modal-score').textContent = `SCORE: ${state.score}`;
         const btn = document.getElementById('modal-action-btn');
-        btn.textContent = won ? 'Next Torn Level' : 'Try Level Again';
+        btn.textContent = won
+          ? (state.level < TOTAL_LEVELS ? `Next Level (${state.level + 1})` : 'Replay Level 50')
+          : 'Try Level Again';
         btn.onclick = () => {
           if (won) {
             state.boosters.SCISSORS = (state.boosters.SCISSORS || 0) + 1;
             state.boosters.GLUE = (state.boosters.GLUE || 0) + 1;
-            startLevel(state.level + 1);
+            startLevel(Math.min(TOTAL_LEVELS, state.level + 1));
           } else {
             startLevel(state.level);
           }
@@ -2825,16 +3288,15 @@
 
     function renderWorldMap() {
       const totalStars = Object.values(state.levelStars).reduce((a, b) => a + b, 0);
-      document.getElementById('map-total-stars').textContent = totalStars;
+      document.getElementById('map-total-stars').textContent = `${totalStars}/${TOTAL_LEVELS * 3}`;
       const curStg = getStageInfo(state.level);
       document.getElementById('map-current-stage-label').textContent =
-        `Stage ${curStg.stageNumber}: ${curStg.title}`;
+        `Stage ${curStg.stageNumber}/${TOTAL_STAGES}: ${curStg.title}`;
 
-      const totalStages = Math.max(4, Math.floor((state.highestLevel + 4) / LEVELS_PER_STAGE) + 1);
       const scrollArea = document.getElementById('map-scroll-area');
       scrollArea.innerHTML = '';
 
-      for (let s = 1; s <= totalStages; s++) {
+      for (let s = 1; s <= TOTAL_STAGES; s++) {
         const firstLvl = (s - 1) * LEVELS_PER_STAGE + 1;
         const stg = getStageInfo(firstLvl);
         const levels = Array.from({ length: LEVELS_PER_STAGE }, (_, i) => firstLvl + i);
@@ -2944,14 +3406,22 @@
     function updateMapInspector() {
       const sel = state.mapSelectedLevel;
       const stg = getStageInfo(sel);
-      const cfg = getGoalsConfigForLevel(sel);
+      const bp = getLevelBlueprint(sel);
       const stars = state.levelStars[sel] || 0;
       const starStr = [1, 2, 3].map(s => `<span style="color:${s <= stars ? '#FF6B35' : '#D4C29A'}">★</span>`).join('');
       document.getElementById('map-insp-title').innerHTML =
         `Stage ${stg.stageNumber} • Level ${sel} &nbsp;${starStr}`;
+      let extraHtml = '';
+      if (bp.goldCells.size > 0) {
+        extraHtml += `<span style="color:#B45309;font-weight:800;">★${bp.goldCells.size}</span>`;
+      }
+      if (bp.tapeLocks.size > 0) {
+        extraHtml += `<span style="color:#991B1B;font-weight:800;">✕${bp.tapeLocks.size}</span>`;
+      }
       document.getElementById('map-insp-goals').innerHTML =
-        cfg.goals.map(g => `<div class="g-chip">${g.piece.svg}<span>${g.target}</span></div>`).join('') +
-        `<span style="color:var(--thumbtack-red);">• ${cfg.moves} Moves</span>`;
+        bp.goals.map(g => `<div class="g-chip">${g.piece.svg}<span>${g.target}</span></div>`).join('') +
+        extraHtml +
+        `<span style="color:var(--thumbtack-red);">• ${bp.moves} Moves</span>`;
       const playBtn = document.getElementById('map-play-btn');
       const isResuming = sel === state.level && state.score > 0;
       playBtn.textContent = isResuming ? `▶ Resume Level ${sel}` : `▶ Play Level ${sel}`;
@@ -3013,6 +3483,10 @@
           const tmp = state.board[a.r][a.c];
           state.board[a.r][a.c] = state.board[r][c];
           state.board[r][c] = tmp;
+          const specA = getSpecial(a.r, a.c);
+          const specB = getSpecial(r, c);
+          setSpecial(a.r, a.c, specB);
+          setSpecial(r, c, specA);
           const glueMotion = new Map([
             [`${a.r},${a.c}`, { dx: c - a.c, dy: r - a.r, arcSign: -1, type: 'swap' }],
             [`${r},${c}`, { dx: a.c - c, dy: a.r - r, arcSign: 1, type: 'swap' }]
@@ -3022,8 +3496,15 @@
           showComboBanner('GLUE SWAP!');
           renderAll(glueMotion);
           await sleep(265);
-          await crushAndCascade(new Set());
+          await crushAndCascade(new Set(), 55, { r, c });
         }
+        return;
+      }
+
+      if (isCellLocked(r, c)) {
+        audio.playInvalidShake();
+        showComboBanner('LOCKED BY TAPE! MATCH BESIDE IT');
+        renderBoard(new Set(), [{ r, c }, { r, c }]);
         return;
       }
 
@@ -3033,6 +3514,18 @@
         renderAll();
         scheduleIdleHint();
       } else if (state.selected.r === r && state.selected.c === c) {
+        // Double-tap a special power-up tile to detonate it in place
+        const spec = getSpecial(r, c);
+        if (spec !== 'NONE') {
+          state.selected = null;
+          state.moves = Math.max(0, state.moves - 1);
+          state.streak++;
+          if (state.feverMoves > 0) state.feverMoves--;
+          audio.playSmash();
+          showComboBanner('PAPER CUTTER ACTIVATED!');
+          await crushAndCascade(new Set([`${r},${c}`]), 60);
+          return;
+        }
         state.selected = null;
         renderAll();
         scheduleIdleHint();
@@ -3050,6 +3543,12 @@
 
     async function trySwap(a, b) {
       if (state.busy) return;
+      if (isCellLocked(a.r, a.c) || isCellLocked(b.r, b.c)) {
+        audio.playInvalidShake();
+        showComboBanner('LOCKED BY TAPE! MATCH BESIDE IT');
+        renderBoard(new Set(), [a, b]);
+        return;
+      }
       clearTimeout(hintTimer);
       state.hintPair = null;
       state.busy = true;
@@ -3058,6 +3557,10 @@
       const tmp = state.board[a.r][a.c];
       state.board[a.r][a.c] = state.board[b.r][b.c];
       state.board[b.r][b.c] = tmp;
+      const specA = getSpecial(a.r, a.c);
+      const specB = getSpecial(b.r, b.c);
+      setSpecial(a.r, a.c, specB);
+      setSpecial(b.r, b.c, specA);
 
       const swapMotion = new Map([
         [`${a.r},${a.c}`, { dx: b.c - a.c, dy: b.r - a.r, arcSign: -1, type: 'swap' }],
@@ -3066,7 +3569,48 @@
       renderBoard(new Set(), null, swapMotion);
       await sleep(250);
 
-      const { matched } = analyzeMatches(state.board);
+      const nowSpecA = getSpecial(a.r, a.c);
+      const nowSpecB = getSpecial(b.r, b.c);
+
+      // 1. Rainbow Pinwheel swapped with any tile -> Full-Board Color Storm
+      if (nowSpecA === 'PINWHEEL_RAINBOW' || nowSpecB === 'PINWHEEL_RAINBOW') {
+        const targetId = nowSpecA === 'PINWHEEL_RAINBOW'
+          ? state.board[b.r][b.c].id
+          : state.board[a.r][a.c].id;
+        const stormSet = new Set([`${a.r},${a.c}`, `${b.r},${b.c}`]);
+        for (let rr = 0; rr < BOARD_SIZE; rr++) {
+          for (let cc = 0; cc < BOARD_SIZE; cc++) {
+            if (state.board[rr][cc].id === targetId) stormSet.add(`${rr},${cc}`);
+          }
+        }
+        state.moves = Math.max(0, state.moves - 1);
+        state.streak++;
+        if (state.feverMoves > 0) state.feverMoves--;
+        audio.playFanfare();
+        showComboBanner('PINWHEEL COLOR STORM!');
+        await crushAndCascade(stormSet, 70);
+        return;
+      }
+
+      // 2. Two Special Tiles swapped together -> Mega Origami Cross Slice
+      if (nowSpecA !== 'NONE' && nowSpecB !== 'NONE') {
+        const comboSet = new Set([`${a.r},${a.c}`, `${b.r},${b.c}`]);
+        for (let i = 0; i < BOARD_SIZE; i++) {
+          comboSet.add(`${a.r},${i}`);
+          comboSet.add(`${b.r},${i}`);
+          comboSet.add(`${i},${a.c}`);
+          comboSet.add(`${i},${b.c}`);
+        }
+        state.moves = Math.max(0, state.moves - 1);
+        state.streak++;
+        if (state.feverMoves > 0) state.feverMoves--;
+        audio.playSmash();
+        showComboBanner('MEGA ORIGAMI CROSS SLICE!');
+        await crushAndCascade(comboSet, 65);
+        return;
+      }
+
+      const { matched } = analyzeMatches(state.board, b);
       if (matched.size === 0) {
         state.streak = 0;
         audio.playInvalidShake();
@@ -3076,6 +3620,8 @@
         const rev = state.board[a.r][a.c];
         state.board[a.r][a.c] = state.board[b.r][b.c];
         state.board[b.r][b.c] = rev;
+        setSpecial(a.r, a.c, specA);
+        setSpecial(b.r, b.c, specB);
         const reverseMotion = new Map([
           [`${a.r},${a.c}`, { dx: b.c - a.c, dy: b.r - a.r, arcSign: -1, type: 'swap' }],
           [`${b.r},${b.c}`, { dx: a.c - b.c, dy: a.r - b.r, arcSign: 1, type: 'swap' }]
@@ -3089,7 +3635,7 @@
         state.moves = Math.max(0, state.moves - 1);
         state.streak++;
         if (state.feverMoves > 0) state.feverMoves--;
-        await crushAndCascade(new Set());
+        await crushAndCascade(new Set(), 55, b);
       }
     }
 

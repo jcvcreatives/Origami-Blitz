@@ -225,19 +225,24 @@ fun PaperTopHud(
             TornGoalNote(
                 primaryGoal = state.goal,
                 secondaryGoal = state.secondaryGoal,
-                modifier = Modifier.weight(1.1f)
+                initialGoldCount = state.initialGoldCount,
+                goldRemaining = state.goldRemaining,
+                initialTapeCount = state.initialTapeCount,
+                tapeRemaining = state.tapeRemaining,
+                modifier = Modifier.weight(1.18f)
             )
 
             MovesStickyNote(
                 movesRemaining = state.movesRemaining,
-                modifier = Modifier.weight(0.95f)
+                modifier = Modifier.weight(0.92f)
             )
         }
 
         OrigamiFeverStrip(
             feverCharge = state.feverCharge,
             feverMovesLeft = state.feverMovesLeft,
-            streakCount = state.streakCount
+            streakCount = state.streakCount,
+            mechanicLabel = state.mechanicLabel
         )
     }
 }
@@ -246,7 +251,8 @@ fun PaperTopHud(
 private fun OrigamiFeverStrip(
     feverCharge: Float,
     feverMovesLeft: Int,
-    streakCount: Int
+    streakCount: Int,
+    mechanicLabel: String = ""
 ) {
     val isFever = feverMovesLeft > 0
     val animatedFill by animateFloatAsState(
@@ -288,14 +294,16 @@ private fun OrigamiFeverStrip(
         Text(
             text = when {
                 isFever -> "★ ORIGAMI FEVER 2x SCORE! ($feverMovesLeft MOVES) ★"
-                streakCount >= 2 -> "FEVER METER • HOT STREAK x$streakCount!"
-                else -> "FEVER METER • MATCH 4+ FOR LINE RIP!"
+                streakCount >= 2 -> "HOT STREAK x$streakCount • ${mechanicLabel.uppercase()}"
+                mechanicLabel.isNotBlank() -> mechanicLabel.uppercase()
+                else -> "FEVER METER • MATCH 4+ FOR LINE CUTTER!"
             },
             style = MaterialTheme.typography.labelLarge.copy(
-                fontSize = 11.sp,
+                fontSize = 10.5.sp,
                 fontWeight = FontWeight.Bold
             ),
-            color = if (isFever) PeppermintWhite else InkBrown
+            color = if (isFever) PeppermintWhite else InkBrown,
+            maxLines = 1
         )
     }
 }
@@ -357,6 +365,10 @@ fun CardboardScoreBanner(
 fun TornGoalNote(
     primaryGoal: LevelGoal,
     secondaryGoal: LevelGoal?,
+    initialGoldCount: Int = 0,
+    goldRemaining: Int = 0,
+    initialTapeCount: Int = 0,
+    tapeRemaining: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val noteShape = TornPaperShape(teethCount = 6, toothDepthPx = 6f, tearTopBottom = true)
@@ -365,23 +377,38 @@ fun TornGoalNote(
             .shadow(4.dp, noteShape)
             .background(MaskingTapeCream, noteShape)
             .border(1.5.dp, MaskingTapeBorder, noteShape)
-            .padding(horizontal = 8.dp, vertical = 6.dp)
+            .padding(horizontal = 6.dp, vertical = 6.dp)
             .testTag("next_goal_box"),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = stringResource(R.string.label_next_goal),
-            style = MaterialTheme.typography.labelLarge.copy(fontSize = 11.sp),
+            style = MaterialTheme.typography.labelLarge.copy(fontSize = 10.sp),
             color = InkSoftBrown
         )
         Spacer(modifier = Modifier.height(3.dp))
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
         ) {
             GoalItemChip(goal = primaryGoal)
             if (secondaryGoal != null) {
                 GoalItemChip(goal = secondaryGoal)
+            }
+            if (initialGoldCount > 0) {
+                MechanicGoalChip(
+                    badgeText = "★",
+                    badgeBg = StarCardboardGold,
+                    remaining = goldRemaining
+                )
+            }
+            if (initialTapeCount > 0) {
+                MechanicGoalChip(
+                    badgeText = "✕",
+                    badgeBg = PeppermintRed,
+                    badgeFg = PeppermintWhite,
+                    remaining = tapeRemaining
+                )
             }
         }
     }
@@ -391,16 +418,51 @@ fun TornGoalNote(
 private fun GoalItemChip(goal: LevelGoal) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(3.dp)
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         PaperPieceVector(
             pieceType = goal.targetPiece,
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier.size(21.dp)
         )
         Text(
             text = if (goal.isCompleted) "✓" else "${goal.remaining}",
-            style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp),
+            style = MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp),
             color = if (goal.isCompleted) OrigamiFoxGreen else InkBrown
+        )
+    }
+}
+
+@Composable
+private fun MechanicGoalChip(
+    badgeText: String,
+    badgeBg: Color,
+    badgeFg: Color = InkBrown,
+    remaining: Int
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(19.dp)
+                .background(badgeBg, CircleShape)
+                .border(1.2.dp, InkBrown, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = badgeText,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.ExtraBold
+                ),
+                color = badgeFg
+            )
+        }
+        Text(
+            text = if (remaining <= 0) "✓" else "$remaining",
+            style = MaterialTheme.typography.titleMedium.copy(fontSize = 14.sp),
+            color = if (remaining <= 0) OrigamiFoxGreen else InkBrown
         )
     }
 }

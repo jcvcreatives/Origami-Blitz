@@ -81,8 +81,8 @@ import com.example.model.LEVELS_PER_STAGE
 import com.example.model.PaperGameState
 import com.example.model.PaperStageInfo
 import com.example.model.PieceType
-import com.example.model.buildGoalsForLevel
-import com.example.model.getMovesForLevel
+import com.example.model.TOTAL_STAGES
+import com.example.model.getLevelBlueprint
 import com.example.model.getStageInfoForLevel
 import com.example.ui.theme.CardboardDark
 import com.example.ui.theme.CardboardLight
@@ -104,9 +104,9 @@ import com.example.ui.theme.ThumbtackRed
 import kotlin.math.sin
 
 /**
- * Candy Crush-inspired winding Paper Craft Saga World Map showing stages,
- * Winding stitched-paper paths, 1-3 star badges per level, a bouncing Origami Fox
- * avatar on the player's current level, and an interactive level goal inspector.
+ * Candy Crush-inspired winding Paper Craft Saga World Map showing all 10 Stages (50 Levels),
+ * winding stitched-paper paths, 1-3 star badges per level, a bouncing Origami Fox
+ * avatar on the player's current level, and an interactive level goal & mechanic inspector.
  */
 @Composable
 fun PaperWorldMapOverlay(
@@ -129,9 +129,8 @@ fun PaperWorldMapOverlay(
         exit = fadeOut(tween(180)) + slideOutVertically(targetOffsetY = { it / 6 }),
         modifier = modifier
     ) {
-        val totalStages = maxOf(4, ((state.highestUnlockedLevel + 4) / LEVELS_PER_STAGE) + 1)
-        val stages = remember(totalStages) {
-            (1..totalStages).map { stageIdx ->
+        val stages = remember {
+            (1..TOTAL_STAGES).map { stageIdx ->
                 val firstLevel = (stageIdx - 1) * LEVELS_PER_STAGE + 1
                 getStageInfoForLevel(firstLevel)
             }
@@ -670,8 +669,7 @@ private fun SelectedLevelInspectorCard(
 ) {
     val selectedLvl = state.mapSelectedLevel.coerceAtLeast(1)
     val stageInfo = getStageInfoForLevel(selectedLvl)
-    val (primaryGoal, secondaryGoal) = remember(selectedLvl) { buildGoalsForLevel(selectedLvl) }
-    val moves = remember(selectedLvl) { getMovesForLevel(selectedLvl) }
+    val bp = remember(selectedLvl) { getLevelBlueprint(selectedLvl) }
     val earnedStars = state.levelStars[selectedLvl] ?: 0
     val isCurrentActive = selectedLvl == state.level && state.score > 0
 
@@ -690,7 +688,7 @@ private fun SelectedLevelInspectorCard(
     ) {
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -716,43 +714,73 @@ private fun SelectedLevelInspectorCard(
                 }
             }
 
-            // Goal Preview Chips + Moves
+            Text(
+                text = bp.mechanicLabel,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                ),
+                color = InkSoftBrown,
+                maxLines = 1
+            )
+
+            // Goal Preview Chips + Mechanic Chips + Moves
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     PaperPieceVector(
-                        pieceType = primaryGoal.targetPiece,
-                        modifier = Modifier.size(20.dp)
+                        pieceType = bp.primaryGoal.targetPiece,
+                        modifier = Modifier.size(19.dp)
                     )
                     Text(
-                        text = "${primaryGoal.targetCount}",
-                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 14.sp),
+                        text = "${bp.primaryGoal.targetCount}",
+                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 13.5.sp),
                         color = InkBrown
                     )
                 }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     PaperPieceVector(
-                        pieceType = secondaryGoal.targetPiece,
-                        modifier = Modifier.size(20.dp)
+                        pieceType = bp.secondaryGoal.targetPiece,
+                        modifier = Modifier.size(19.dp)
                     )
                     Text(
-                        text = "${secondaryGoal.targetCount}",
-                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 14.sp),
+                        text = "${bp.secondaryGoal.targetCount}",
+                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 13.5.sp),
                         color = InkBrown
                     )
                 }
+                if (bp.goldCells.isNotEmpty()) {
+                    Text(
+                        text = "★${bp.goldCells.size}",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        ),
+                        color = Color(0xFFB45309)
+                    )
+                }
+                if (bp.tapeLocks.isNotEmpty()) {
+                    Text(
+                        text = "✕${bp.tapeLocks.size}",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        ),
+                        color = PeppermintRed
+                    )
+                }
                 Text(
-                    text = "• $moves Moves",
+                    text = "• ${bp.moves} Moves",
                     style = MaterialTheme.typography.bodyLarge.copy(
-                        fontSize = 14.sp,
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.Bold
                     ),
                     color = PeppermintRed

@@ -12,12 +12,12 @@ import com.example.model.ConfettiScrap
 import com.example.model.FloatingScorePopup
 import com.example.model.GameStatus
 import com.example.model.GridPos
-import com.example.model.LevelGoal
 import com.example.model.PaperGameState
 import com.example.model.PieceType
-import com.example.model.buildGoalsForLevel
+import com.example.model.TOTAL_LEVELS
+import com.example.model.TileSpecial
 import com.example.model.computeDioramaLandingY
-import com.example.model.getMovesForLevel
+import com.example.model.getLevelBlueprint
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.random.Random
 
 class PaperCrushViewModel(
@@ -51,8 +52,8 @@ class PaperCrushViewModel(
     }
 
     private fun loadSavedStateAndStart() {
-        val savedLevel = prefs?.getInt(KEY_LEVEL, 1)?.coerceAtLeast(1) ?: 1
-        val savedHighest = prefs?.getInt(KEY_HIGHEST_LEVEL, savedLevel)?.coerceAtLeast(savedLevel) ?: savedLevel
+        val savedLevel = prefs?.getInt(KEY_LEVEL, 1)?.coerceIn(1, TOTAL_LEVELS) ?: 1
+        val savedHighest = prefs?.getInt(KEY_HIGHEST_LEVEL, savedLevel)?.coerceIn(savedLevel, TOTAL_LEVELS) ?: savedLevel
         val savedHighScore = prefs?.getInt(KEY_HIGH_SCORE, 0) ?: 0
         val savedScissors = prefs?.getInt(KEY_SCISSORS, 3) ?: 3
         val savedGlue = prefs?.getInt(KEY_GLUE, 3) ?: 3
@@ -78,7 +79,7 @@ class PaperCrushViewModel(
 
     fun startLevel(
         level: Int,
-        highestUnlockedLevel: Int = maxOf(_uiState.value.highestUnlockedLevel, level),
+        highestUnlockedLevel: Int = maxOf(_uiState.value.highestUnlockedLevel, level).coerceAtMost(TOTAL_LEVELS),
         levelStars: Map<Int, Int> = _uiState.value.levelStars,
         carryHighScore: Int = _uiState.value.highScore,
         boosters: Map<BoosterType, Int> = _uiState.value.boosters,
@@ -86,22 +87,27 @@ class PaperCrushViewModel(
         showMap: Boolean = false
     ) {
         idleHintJob?.cancel()
-        val (primaryGoal, secondaryGoal) = buildGoalsForLevel(level)
-        val moves = getMovesForLevel(level)
+        val clampedLevel = level.coerceIn(1, TOTAL_LEVELS)
+        val bp = getLevelBlueprint(clampedLevel)
 
-        val initialBoard = generatePlayableBoard()
+        val initialBoard = generatePlayableBoard(bp.tapeLocks.keys)
         _uiState.value = PaperGameState(
-            level = level,
-            highestUnlockedLevel = highestUnlockedLevel,
+            level = clampedLevel,
+            highestUnlockedLevel = maxOf(highestUnlockedLevel, clampedLevel).coerceAtMost(TOTAL_LEVELS),
             levelStars = levelStars,
             lastEarnedStars = 0,
             showWorldMap = showMap,
-            mapSelectedLevel = level,
+            mapSelectedLevel = clampedLevel,
             score = 0,
             highScore = carryHighScore,
-            movesRemaining = moves,
-            goal = primaryGoal,
-            secondaryGoal = secondaryGoal,
+            movesRemaining = bp.moves,
+            goal = bp.primaryGoal,
+            secondaryGoal = bp.secondaryGoal,
+            goldCells = bp.goldCells,
+            initialGoldCount = bp.goldCells.size,
+            tapeLocks = bp.tapeLocks,
+            initialTapeCount = bp.tapeLocks.size,
+            mechanicLabel = bp.mechanicLabel,
             board = initialBoard,
             boosters = boosters,
             soundEnabled = soundEnabled,
@@ -154,7 +160,6 @@ class PaperCrushViewModel(
         }
         soundSynth.playSwapWhoosh()
         if (level == current.level && current.status == GameStatus.PLAYING && current.score > 0) {
-            // Resume active level if already playing it
             _uiState.update { it.copy(showWorldMap = false, mapSelectedLevel = level) }
             scheduleIdleHint()
         } else {
@@ -193,8 +198,8 @@ class PaperCrushViewModel(
 
     fun advanceToNextLevel() {
         val current = _uiState.value
-        val nextLevel = current.level + 1
-        val nextHighest = maxOf(current.highestUnlockedLevel, nextLevel)
+        val nextLevel = if (current.level < TOTAL_LEVELS) current.level + 1 else 1
+        val nextHighest = maxOf(current.highestUnlockedLevel, nextLevel).coerceAtMost(TOTAL_LEVELS)
         val rewardedBoosters = current.boosters.toMutableMap().apply {
             put(BoosterType.SCISSORS, (get(BoosterType.SCISSORS) ?: 0) + 1)
             val bonusType = if (nextLevel % 2 == 0) BoosterType.HAMMER else BoosterType.GLUE
@@ -240,7 +245,7 @@ class PaperCrushViewModel(
         if (pos.row !in 0 until BOARD_SIZE || pos.col !in 0 until BOARD_SIZE) return
         idleHintJob?.cancel()
 
-        // Handle active booster first
+        // Handle active booster first (Boosters can target even taped/wax-sealed tiles!)
         when (state.activeBooster) {
             BoosterType.SCISSORS -> {
                 executeScissorsCut(pos)
@@ -265,15 +270,27 @@ class PaperCrushViewModel(
             null -> Unit
         }
 
-        // Standard tap-to-select / tap-adjacent-to-swap
+        // Check if tapped tile is locked under Masking Tape or a Red Wax Seal
+        if ((state.tapeLocks[pos] ?: 0) > 0) {
+            pulseLockedTileWarning(pos)
+            return
+        }
+
         val currentSelected = state.selectedPos
+        val tappedTile = state.board[pos.row][pos.col]
+
         if (currentSelected == null) {
             soundSynth.playPaperCrinkle(1)
             _uiState.update { it.copy(selectedPos = pos, hintPair = null) }
             scheduleIdleHint()
         } else if (currentSelected == pos) {
-            _uiState.update { it.copy(selectedPos = null) }
-            scheduleIdleHint()
+            // Double-tapping a selected Special Power-Up Tile activates it right in place!
+            if (tappedTile.special != TileSpecial.NONE) {
+                triggerSingleSpecialTileInPlace(pos)
+            } else {
+                _uiState.update { it.copy(selectedPos = null) }
+                scheduleIdleHint()
+            }
         } else if (currentSelected.isAdjacentTo(pos)) {
             attemptSwap(currentSelected, pos)
         } else {
@@ -297,21 +314,158 @@ class PaperCrushViewModel(
             from.isAdjacentTo(to)
         ) {
             idleHintJob?.cancel()
+            if ((state.tapeLocks[from] ?: 0) > 0) {
+                pulseLockedTileWarning(from)
+                return
+            }
+            if ((state.tapeLocks[to] ?: 0) > 0) {
+                pulseLockedTileWarning(to)
+                return
+            }
             attemptSwap(from, to)
         }
     }
 
+    private fun pulseLockedTileWarning(pos: GridPos) {
+        viewModelScope.launch {
+            soundSynth.playInvalidShake()
+            val hp = _uiState.value.tapeLocks[pos] ?: 1
+            val msg = if (hp >= 2) "WAX SEALED! MATCH ADJACENT TO CRACK!" else "TAPED! MATCH ADJACENT TO FREE!"
+            _uiState.update {
+                it.copy(
+                    selectedPos = null,
+                    invalidSwapPair = pos to pos,
+                    comboBannerText = msg
+                )
+            }
+            delay(480)
+            _uiState.update {
+                it.copy(
+                    invalidSwapPair = null,
+                    comboBannerText = if (it.comboBannerText == msg) null else it.comboBannerText
+                )
+            }
+            scheduleIdleHint()
+        }
+    }
+
+    private fun triggerSingleSpecialTileInPlace(pos: GridPos) {
+        viewModelScope.launch {
+            val state = _uiState.value
+            val tile = state.board[pos.row][pos.col]
+            if (tile.special == TileSpecial.NONE) return@launch
+
+            _uiState.update {
+                it.copy(
+                    isAnimating = true,
+                    selectedPos = null,
+                    hintPair = null,
+                    movesRemaining = (it.movesRemaining - 1).coerceAtLeast(0),
+                    streakCount = it.streakCount + 1,
+                    feverMovesLeft = (it.feverMovesLeft - 1).coerceAtLeast(0)
+                )
+            }
+
+            val blastSet = expandSpecialChain(state.board, setOf(pos))
+            val banner = when (tile.special) {
+                TileSpecial.ROW_CUTTER -> "ROW CUTTER SLICE!"
+                TileSpecial.COL_CUTTER -> "COLUMN CUTTER SLICE!"
+                TileSpecial.PAPER_BOMB -> "ORIGAMI BOMB BLAST!"
+                TileSpecial.PINWHEEL_RAINBOW -> "RAINBOW PINWHEEL STORM!"
+                TileSpecial.NONE -> null
+            }
+            soundSynth.playScissorsSnip()
+            _uiState.update {
+                it.copy(
+                    comboBannerText = banner,
+                    boardPunchSeq = nextPunchSeq++,
+                    boardPunchStrength = 0.9f
+                )
+            }
+            crushPositionsAndCascade(blastSet, bonusPerTile = 55, forceDestroyTape = true)
+        }
+    }
+
     private fun attemptSwap(posA: GridPos, posB: GridPos) {
+        val initialState = _uiState.value
+        if ((initialState.tapeLocks[posA] ?: 0) > 0) {
+            pulseLockedTileWarning(posA)
+            return
+        }
+        if ((initialState.tapeLocks[posB] ?: 0) > 0) {
+            pulseLockedTileWarning(posB)
+            return
+        }
+
         viewModelScope.launch {
             _uiState.update {
                 it.copy(isAnimating = true, selectedPos = null, hintPair = null)
             }
             soundSynth.playSwapWhoosh()
-            val swappedBoard = swapPositions(_uiState.value.board, posA, posB)
+            val preBoard = _uiState.value.board
+            val tileA = preBoard[posA.row][posA.col]
+            val tileB = preBoard[posB.row][posB.col]
+            val swappedBoard = swapPositions(preBoard, posA, posB)
+
+            // Check for Special Power-Up Combo Swap (e.g., Rainbow Pinwheel or Two Special Tiles!)
+            val isRainbowSwap = tileA.special == TileSpecial.PINWHEEL_RAINBOW || tileB.special == TileSpecial.PINWHEEL_RAINBOW
+            val isDoubleSpecialSwap = tileA.special != TileSpecial.NONE && tileB.special != TileSpecial.NONE
+
+            if (isRainbowSwap || isDoubleSpecialSwap) {
+                _uiState.update {
+                    it.copy(
+                        board = swappedBoard,
+                        movesRemaining = (it.movesRemaining - 1).coerceAtLeast(0),
+                        streakCount = it.streakCount + 1,
+                        feverMovesLeft = (it.feverMovesLeft - 1).coerceAtLeast(0)
+                    )
+                }
+                delay(245)
+                val settledSwapBoard = clearTileMotion(swappedBoard)
+                _uiState.update { it.copy(board = settledSwapBoard) }
+
+                val specialBlast = mutableSetOf(posA, posB)
+                val bannerText: String
+                if (isRainbowSwap) {
+                    val targetColor = if (tileA.special == TileSpecial.PINWHEEL_RAINBOW) tileB.type else tileA.type
+                    for (r in 0 until BOARD_SIZE) {
+                        for (c in 0 until BOARD_SIZE) {
+                            if (settledSwapBoard[r][c].type == targetColor) {
+                                specialBlast.add(GridPos(r, c))
+                            }
+                        }
+                    }
+                    soundSynth.playFeverFanfare()
+                    bannerText = "RAINBOW PINWHEEL COLOR STORM!"
+                } else {
+                    // Double special combo: Cross Slice + 3x3 Bomb
+                    for (c in 0 until BOARD_SIZE) {
+                        specialBlast.add(GridPos(posA.row, c))
+                        specialBlast.add(GridPos(posB.row, c))
+                    }
+                    for (r in 0 until BOARD_SIZE) {
+                        specialBlast.add(GridPos(r, posA.col))
+                        specialBlast.add(GridPos(r, posB.col))
+                    }
+                    soundSynth.playCardboardSmash()
+                    bannerText = "MEGA ORIGAMI CROSS SLICE!"
+                }
+
+                val fullChain = expandSpecialChain(settledSwapBoard, specialBlast)
+                _uiState.update {
+                    it.copy(
+                        comboBannerText = bannerText,
+                        boardPunchSeq = nextPunchSeq++,
+                        boardPunchStrength = 1.15f
+                    )
+                }
+                crushPositionsAndCascade(fullChain, bonusPerTile = 65, forceDestroyTape = true)
+                return@launch
+            }
+
             val matches = findMatchedPositions(swappedBoard)
 
             if (matches.isEmpty()) {
-                // Step 1: Animate the two blocks arcing across to each other's positions
                 _uiState.update {
                     it.copy(
                         board = swappedBoard,
@@ -320,7 +474,6 @@ class PaperCrushViewModel(
                 }
                 delay(240)
 
-                // Step 2: Brief invalid shake at swapped position
                 soundSynth.playInvalidShake()
                 _uiState.update {
                     it.copy(
@@ -330,7 +483,6 @@ class PaperCrushViewModel(
                 }
                 delay(170)
 
-                // Step 3: Animate the two blocks arcing back to their original positions
                 soundSynth.playSwapWhoosh()
                 val restoredBoard = swapPositions(swappedBoard, posA, posB)
                 _uiState.update {
@@ -350,7 +502,6 @@ class PaperCrushViewModel(
                 }
                 scheduleIdleHint()
             } else {
-                // Valid swap: animate the two blocks arcing into place, then run match & cascade loop
                 soundSynth.playPaperCrinkle(2)
                 _uiState.update {
                     it.copy(
@@ -363,7 +514,7 @@ class PaperCrushViewModel(
                 delay(245)
                 val settledSwapBoard = clearTileMotion(swappedBoard)
                 _uiState.update { it.copy(board = settledSwapBoard) }
-                resolveCascades(settledSwapBoard)
+                resolveCascades(settledSwapBoard, preferredAnchor = posB)
             }
         }
     }
@@ -389,7 +540,8 @@ class PaperCrushViewModel(
                     boardPunchStrength = 0.55f
                 )
             }
-            crushPositionsAndCascade(setOf(pos), bonusPerTile = 65)
+            val chain = expandSpecialChain(current.board, setOf(pos))
+            crushPositionsAndCascade(chain, bonusPerTile = 65, forceDestroyTape = true)
         }
     }
 
@@ -404,6 +556,11 @@ class PaperCrushViewModel(
             val updatedBoosters = current.boosters.toMutableMap().apply {
                 put(BoosterType.GLUE, count - 1)
             }
+            // Glue swap also frees any tape on the two glued positions!
+            val updatedTape = current.tapeLocks.toMutableMap().apply {
+                remove(posA)
+                remove(posB)
+            }
             val swappedBoard = swapPositions(current.board, posA, posB)
             val tileA = current.board[posA.row][posA.col]
             val tileB = current.board[posB.row][posB.col]
@@ -412,6 +569,7 @@ class PaperCrushViewModel(
             _uiState.update {
                 it.copy(
                     board = swappedBoard,
+                    tapeLocks = updatedTape,
                     isAnimating = true,
                     activeBooster = null,
                     glueFirstPos = null,
@@ -423,7 +581,7 @@ class PaperCrushViewModel(
             delay(270)
             val settledSwapBoard = clearTileMotion(swappedBoard)
             _uiState.update { it.copy(board = settledSwapBoard) }
-            resolveCascades(settledSwapBoard)
+            resolveCascades(settledSwapBoard, preferredAnchor = posB)
         }
     }
 
@@ -447,6 +605,7 @@ class PaperCrushViewModel(
                     }
                 }
             }
+            val fullChain = expandSpecialChain(current.board, smashedPositions)
             _uiState.update {
                 it.copy(
                     isAnimating = true,
@@ -458,29 +617,54 @@ class PaperCrushViewModel(
                     boardPunchStrength = 1.15f
                 )
             }
-            crushPositionsAndCascade(smashedPositions, bonusPerTile = 55)
+            crushPositionsAndCascade(fullChain, bonusPerTile = 55, forceDestroyTape = true)
         }
     }
 
     private suspend fun crushPositionsAndCascade(
         positions: Set<GridPos>,
-        bonusPerTile: Int
+        bonusPerTile: Int,
+        forceDestroyTape: Boolean = false
     ) {
-        val board = _uiState.value.board
-        val crushedTiles = positions.map { board[it.row][it.col] }
+        val stateBefore = _uiState.value
+        val board = stateBefore.board
+
+        val (actualCrushed, nextTapeLocks, tapeDamagedCount) = applyTapeDamage(
+            matchedPositions = positions,
+            currentTapeLocks = stateBefore.tapeLocks,
+            forceDestroy = forceDestroyTape,
+            damageAdjacent = !forceDestroyTape
+        )
+
+        val nextGoldCells = stateBefore.goldCells - actualCrushed
+        val goldCollectedCount = (stateBefore.goldCells.size - nextGoldCells.size).coerceAtLeast(0)
+
+        val crushedTiles = actualCrushed.map { board[it.row][it.col] }
         spawnConfettiForTiles(crushedTiles, scrapsPerTile = 18)
 
         val markedBoard = board.mapIndexed { r, rowList ->
             rowList.mapIndexed { c, tile ->
-                if (GridPos(r, c) in positions) tile.copy(isCrushing = true) else tile
+                if (GridPos(r, c) in actualCrushed) tile.copy(isCrushing = true) else tile
             }
         }
-        applyProgressForClearedTiles(crushedTiles, comboStep = 1, pointsPerTile = bonusPerTile)
+        _uiState.update {
+            it.copy(
+                goldCells = nextGoldCells,
+                tapeLocks = nextTapeLocks
+            )
+        }
+        applyProgressForClearedTiles(
+            clearedTiles = crushedTiles,
+            comboStep = 1,
+            pointsPerTile = bonusPerTile,
+            goldCollected = goldCollectedCount,
+            tapeCleared = tapeDamagedCount
+        )
         _uiState.update { it.copy(board = markedBoard) }
         delay(220)
 
-        val cascadedBoard = dropAndRefillBoard(markedBoard, positions)
-        soundSynth.playDropBounce(positions.size)
+        val cascadedBoard = dropAndRefillBoard(markedBoard, actualCrushed, emptyMap())
+        soundSynth.playDropBounce(actualCrushed.size)
         _uiState.update { it.copy(board = cascadedBoard) }
         delay(340)
 
@@ -489,20 +673,89 @@ class PaperCrushViewModel(
         resolveCascades(settledBoard, startCombo = 1)
     }
 
+    /**
+     * Expands any matched Special Tiles (Row Cutter, Col Cutter, 3x3 Origami Bomb, Rainbow Pinwheel)
+     * recursively so chain-reactions detonate across the board.
+     */
+    private fun expandSpecialChain(
+        board: List<List<BoardTile>>,
+        initialMatched: Set<GridPos>
+    ): Set<GridPos> {
+        val result = initialMatched.toMutableSet()
+        val queue = ArrayDeque<GridPos>()
+        queue.addAll(initialMatched)
+        val processedSpecials = mutableSetOf<GridPos>()
+
+        while (queue.isNotEmpty()) {
+            val pos = queue.removeFirst()
+            if (pos in processedSpecials) continue
+            val tile = board.getOrNull(pos.row)?.getOrNull(pos.col) ?: continue
+            if (tile.special == TileSpecial.NONE) continue
+            processedSpecials.add(pos)
+
+            when (tile.special) {
+                TileSpecial.ROW_CUTTER -> {
+                    for (c in 0 until BOARD_SIZE) {
+                        val p = GridPos(pos.row, c)
+                        if (result.add(p)) queue.add(p)
+                    }
+                }
+                TileSpecial.COL_CUTTER -> {
+                    for (r in 0 until BOARD_SIZE) {
+                        val p = GridPos(r, pos.col)
+                        if (result.add(p)) queue.add(p)
+                    }
+                }
+                TileSpecial.PAPER_BOMB -> {
+                    for (dr in -1..1) {
+                        for (dc in -1..1) {
+                            val nr = pos.row + dr
+                            val nc = pos.col + dc
+                            if (nr in 0 until BOARD_SIZE && nc in 0 until BOARD_SIZE) {
+                                val p = GridPos(nr, nc)
+                                if (result.add(p)) queue.add(p)
+                            }
+                        }
+                    }
+                }
+                TileSpecial.PINWHEEL_RAINBOW -> {
+                    for (r in 0 until BOARD_SIZE) {
+                        for (c in 0 until BOARD_SIZE) {
+                            if (board[r][c].type == tile.type) {
+                                val p = GridPos(r, c)
+                                if (result.add(p)) queue.add(p)
+                            }
+                        }
+                    }
+                }
+                TileSpecial.NONE -> Unit
+            }
+        }
+        return result
+    }
+
     private data class MatchAnalysis(
         val allMatched: Set<GridPos>,
-        val maxRunLength: Int,
+        val spawnedSpecials: Map<GridPos, Pair<PieceType, TileSpecial>>,
         val triggeredLineRip: Boolean,
+        val triggeredPaperBomb: Boolean,
         val triggeredColorStorm: Boolean
     )
 
-    private fun analyzeMatchesWithSpecials(board: List<List<BoardTile>>): MatchAnalysis {
-        if (board.size != BOARD_SIZE) return MatchAnalysis(emptySet(), 0, false, false)
-        val matched = mutableSetOf<GridPos>()
-        var maxRun = 0
-        val ripRows = mutableSetOf<Int>()
-        val ripCols = mutableSetOf<Int>()
+    private fun analyzeMatchesWithSpecials(
+        board: List<List<BoardTile>>,
+        preferredAnchor: GridPos? = null
+    ): MatchAnalysis {
+        if (board.size != BOARD_SIZE) {
+            return MatchAnalysis(emptySet(), emptyMap(), false, false, false)
+        }
+        val baseMatched = mutableSetOf<GridPos>()
+        val horizCells = mutableSetOf<GridPos>()
+        val vertCells = mutableSetOf<GridPos>()
+        val spawnedSpecials = mutableMapOf<GridPos, Pair<PieceType, TileSpecial>>()
         val stormTypes = mutableSetOf<PieceType>()
+        var hasLineCutter = false
+        var hasBomb = false
 
         // Horizontal runs
         for (r in 0 until BOARD_SIZE) {
@@ -513,10 +766,18 @@ class PaperCrushViewModel(
                 while (end < BOARD_SIZE && board[r][end].type == type) end++
                 val len = end - c
                 if (len >= 3) {
-                    maxRun = maxOf(maxRun, len)
-                    for (k in c until end) matched.add(GridPos(r, k))
-                    if (len == 4) ripRows.add(r)
-                    if (len >= 5) stormTypes.add(type)
+                    val runPositions = (c until end).map { GridPos(r, it) }
+                    baseMatched.addAll(runPositions)
+                    horizCells.addAll(runPositions)
+                    val anchor = runPositions.firstOrNull { it == preferredAnchor }
+                        ?: runPositions[runPositions.size / 2]
+                    if (len == 4) {
+                        spawnedSpecials[anchor] = type to TileSpecial.COL_CUTTER
+                        hasLineCutter = true
+                    } else if (len >= 5) {
+                        spawnedSpecials[anchor] = type to TileSpecial.PINWHEEL_RAINBOW
+                        stormTypes.add(type)
+                    }
                 }
                 c = end
             }
@@ -531,21 +792,35 @@ class PaperCrushViewModel(
                 while (end < BOARD_SIZE && board[end][c].type == type) end++
                 val len = end - r
                 if (len >= 3) {
-                    maxRun = maxOf(maxRun, len)
-                    for (k in r until end) matched.add(GridPos(k, c))
-                    if (len == 4) ripCols.add(c)
-                    if (len >= 5) stormTypes.add(type)
+                    val runPositions = (r until end).map { GridPos(it, c) }
+                    baseMatched.addAll(runPositions)
+                    vertCells.addAll(runPositions)
+                    val anchor = runPositions.firstOrNull { it == preferredAnchor }
+                        ?: runPositions[runPositions.size / 2]
+                    if (len == 4) {
+                        spawnedSpecials[anchor] = type to TileSpecial.ROW_CUTTER
+                        hasLineCutter = true
+                    } else if (len >= 5) {
+                        spawnedSpecials[anchor] = type to TileSpecial.PINWHEEL_RAINBOW
+                        stormTypes.add(type)
+                    }
                 }
                 r = end
             }
         }
 
-        // Expand 4-in-a-row into full Row/Column Paper Rip
-        for (r in ripRows) {
-            for (c in 0 until BOARD_SIZE) matched.add(GridPos(r, c))
+        // Detect L-shape or T-shape intersections (cells belonging to both a horizontal and vertical 3+ run)
+        val intersections = horizCells.intersect(vertCells)
+        for (inter in intersections) {
+            val type = board[inter.row][inter.col].type
+            spawnedSpecials[inter] = type to TileSpecial.PAPER_BOMB
+            hasBomb = true
         }
-        for (c in ripCols) {
-            for (r in 0 until BOARD_SIZE) matched.add(GridPos(r, c))
+
+        // Expand any existing Special Tiles that were part of baseMatched
+        val expanded = expandSpecialChain(board, baseMatched).toMutableSet()
+        if (expanded.size > baseMatched.size) {
+            hasLineCutter = true
         }
 
         // Expand 5-in-a-row into full-board Origami Color Storm
@@ -553,46 +828,127 @@ class PaperCrushViewModel(
             for (r in 0 until BOARD_SIZE) {
                 for (c in 0 until BOARD_SIZE) {
                     if (board[r][c].type in stormTypes) {
-                        matched.add(GridPos(r, c))
+                        expanded.add(GridPos(r, c))
                     }
                 }
             }
         }
 
         return MatchAnalysis(
-            allMatched = matched,
-            maxRunLength = maxRun,
-            triggeredLineRip = ripRows.isNotEmpty() || ripCols.isNotEmpty(),
+            allMatched = expanded,
+            spawnedSpecials = spawnedSpecials,
+            triggeredLineRip = hasLineCutter,
+            triggeredPaperBomb = hasBomb,
             triggeredColorStorm = stormTypes.isNotEmpty()
         )
     }
 
+    /**
+     * Applies damage to Masking Tape (1 HP) & Red Wax Seals (2 HP) for direct matches
+     * and orthogonally adjacent matches.
+     * If a directly matched tile had a 2-HP Red Wax Seal, the seal cracks down to 1-HP Masking Tape
+     * and the tile remains on the board until the tape is ripped on the next hit.
+     */
+    private fun applyTapeDamage(
+        matchedPositions: Set<GridPos>,
+        currentTapeLocks: Map<GridPos, Int>,
+        forceDestroy: Boolean = false,
+        damageAdjacent: Boolean = true
+    ): Triple<Set<GridPos>, Map<GridPos, Int>, Int> {
+        if (currentTapeLocks.isEmpty()) {
+            return Triple(matchedPositions, emptyMap(), 0)
+        }
+        val nextLocks = currentTapeLocks.toMutableMap()
+        val actualCrushed = matchedPositions.toMutableSet()
+        var damagedCount = 0
+
+        // 1. Direct hits on matched positions
+        for (pos in matchedPositions) {
+            val hp = nextLocks[pos] ?: 0
+            if (hp > 0) {
+                damagedCount++
+                if (forceDestroy || hp <= 1) {
+                    nextLocks.remove(pos)
+                } else {
+                    // 2 HP Red Wax Seal cracks down to 1 HP Masking Tape; tile survives this wave
+                    nextLocks[pos] = hp - 1
+                    actualCrushed.remove(pos)
+                }
+            }
+        }
+
+        // 2. Orthogonally adjacent matches tear 1 layer of Wax/Tape off neighboring locked cells!
+        if (damageAdjacent) {
+            val adjacentLocked = mutableSetOf<GridPos>()
+            for (pos in matchedPositions) {
+                val neighbors = listOf(
+                    GridPos(pos.row - 1, pos.col),
+                    GridPos(pos.row + 1, pos.col),
+                    GridPos(pos.row, pos.col - 1),
+                    GridPos(pos.row, pos.col + 1)
+                )
+                for (n in neighbors) {
+                    if (n !in matchedPositions && (nextLocks[n] ?: 0) > 0) {
+                        adjacentLocked.add(n)
+                    }
+                }
+            }
+            for (adj in adjacentLocked) {
+                val hp = nextLocks[adj] ?: 0
+                if (hp > 0) {
+                    damagedCount++
+                    if (hp <= 1) {
+                        nextLocks.remove(adj)
+                    } else {
+                        nextLocks[adj] = hp - 1
+                    }
+                }
+            }
+        }
+
+        return Triple(actualCrushed, nextLocks, damagedCount)
+    }
+
     private suspend fun resolveCascades(
         startingBoard: List<List<BoardTile>>,
-        startCombo: Int = 0
+        startCombo: Int = 0,
+        preferredAnchor: GridPos? = null
     ) {
         var currentBoard = startingBoard
         var combo = startCombo
+        var anchor = preferredAnchor
 
         while (true) {
-            val analysis = analyzeMatchesWithSpecials(currentBoard)
-            val matchedPositions = analysis.allMatched
-            if (matchedPositions.isEmpty()) break
+            val analysis = analyzeMatchesWithSpecials(currentBoard, anchor)
+            anchor = null
+            val rawMatched = analysis.allMatched
+            if (rawMatched.isEmpty()) break
 
             combo += 1
             soundSynth.playComboChord(combo)
 
-            val matchedTiles = matchedPositions.map { currentBoard[it.row][it.col] }
+            val preState = _uiState.value
+            val (actualCrushed, nextTapeLocks, tapeDamagedCount) = applyTapeDamage(
+                matchedPositions = rawMatched,
+                currentTapeLocks = preState.tapeLocks,
+                forceDestroy = analysis.triggeredColorStorm,
+                damageAdjacent = true
+            )
+
+            // Collect Gold Washi Stamps on any crushed cell (or special-spawn anchor cell)
+            val nextGoldCells = preState.goldCells - rawMatched
+            val goldCollectedCount = (preState.goldCells.size - nextGoldCells.size).coerceAtLeast(0)
+
+            val matchedTiles = actualCrushed.map { currentBoard[it.row][it.col] }
             spawnConfettiForTiles(
                 tiles = matchedTiles,
                 scrapsPerTile = when {
                     analysis.triggeredColorStorm -> 22
-                    analysis.triggeredLineRip || combo >= 2 -> 18
+                    analysis.triggeredLineRip || analysis.triggeredPaperBomb || combo >= 2 -> 18
                     else -> 15
                 }
             )
 
-            // Reward +1 random booster on a 5-match Color Storm!
             if (analysis.triggeredColorStorm) {
                 soundSynth.playFeverFanfare()
                 _uiState.update { st ->
@@ -606,12 +962,16 @@ class PaperCrushViewModel(
 
             val matchLengthBonus = when {
                 analysis.triggeredColorStorm -> 65
+                analysis.triggeredPaperBomb -> 54
                 analysis.triggeredLineRip -> 48
                 else -> 32
             }
             val banner = when {
-                analysis.triggeredColorStorm -> "5-FOLD COLOR STORM! +1 BOOSTER"
-                analysis.triggeredLineRip -> "4-FOLD LINE RIP!"
+                analysis.triggeredColorStorm -> "5-FOLD RAINBOW PINWHEEL! +1 BOOSTER"
+                analysis.triggeredPaperBomb -> "L/T FOLD • ORIGAMI BOMB CRAFTED!"
+                analysis.triggeredLineRip -> "4-FOLD • LINE CUTTER CRAFTED!"
+                goldCollectedCount > 0 -> "GOLD WASHI STAMP COLLECTED! +${goldCollectedCount * 80}"
+                tapeDamagedCount > 0 -> "TAPE / WAX SEAL RIPPED!"
                 combo >= 3 -> "ORIGAMI FEVER COMBO x$combo!"
                 combo == 2 -> "DOUBLE FOLD x2!"
                 _uiState.value.streakCount >= 3 -> "HOT STREAK x${_uiState.value.streakCount}!"
@@ -620,17 +980,29 @@ class PaperCrushViewModel(
 
             val punchStrength = when {
                 analysis.triggeredColorStorm -> 1.25f
-                analysis.triggeredLineRip || combo >= 3 -> 0.9f
+                analysis.triggeredPaperBomb || analysis.triggeredLineRip || combo >= 3 -> 0.9f
                 combo == 2 -> 0.55f
                 else -> 0.28f
             }
 
             val crushingBoard = currentBoard.mapIndexed { r, row ->
                 row.mapIndexed { c, tile ->
-                    if (GridPos(r, c) in matchedPositions) tile.copy(isCrushing = true) else tile
+                    if (GridPos(r, c) in actualCrushed) tile.copy(isCrushing = true) else tile
                 }
             }
-            applyProgressForClearedTiles(matchedTiles, comboStep = combo, pointsPerTile = matchLengthBonus)
+            _uiState.update {
+                it.copy(
+                    goldCells = nextGoldCells,
+                    tapeLocks = nextTapeLocks
+                )
+            }
+            applyProgressForClearedTiles(
+                clearedTiles = matchedTiles,
+                comboStep = combo,
+                pointsPerTile = matchLengthBonus,
+                goldCollected = goldCollectedCount,
+                tapeCleared = tapeDamagedCount
+            )
             _uiState.update {
                 it.copy(
                     board = crushingBoard,
@@ -642,8 +1014,13 @@ class PaperCrushViewModel(
             }
             delay(225)
 
-            val refilledBoard = dropAndRefillBoard(crushingBoard, matchedPositions)
-            soundSynth.playDropBounce(matchedPositions.size)
+            // Filter spawnedSpecials to positions that were actually crushed and aren't locked
+            val validSpawnedSpecials = analysis.spawnedSpecials.filterKeys { pos ->
+                pos in actualCrushed && (nextTapeLocks[pos] ?: 0) == 0
+            }
+
+            val refilledBoard = dropAndRefillBoard(crushingBoard, actualCrushed, validSpawnedSpecials)
+            soundSynth.playDropBounce(actualCrushed.size.coerceAtLeast(2))
             _uiState.update { it.copy(board = refilledBoard) }
             delay(345)
 
@@ -651,13 +1028,14 @@ class PaperCrushViewModel(
             _uiState.update { it.copy(board = currentBoard) }
         }
 
-        // Ensure board has at least one valid move
-        if (!hasValidMove(currentBoard)) {
-            currentBoard = generatePlayableBoard()
+        // Ensure board has at least one valid unlocked move
+        val activeLocks = _uiState.value.tapeLocks.keys
+        if (!hasValidMove(currentBoard, activeLocks)) {
+            currentBoard = generatePlayableBoard(activeLocks)
         }
 
         val postState = _uiState.value
-        val allGoalsDone = postState.goal.isCompleted && (postState.secondaryGoal?.isCompleted != false)
+        val allGoalsDone = postState.areAllObjectivesComplete
         val nextStatus = when {
             allGoalsDone -> GameStatus.WON
             postState.movesRemaining <= 0 -> GameStatus.LOST
@@ -671,13 +1049,13 @@ class PaperCrushViewModel(
         if (nextStatus == GameStatus.WON) {
             soundSynth.playFeverFanfare()
             earnedStars = when {
-                postState.movesRemaining >= 9 || postState.score >= 2200 -> 3
+                postState.movesRemaining >= 8 || postState.score >= 2200 -> 3
                 postState.movesRemaining >= 4 || postState.score >= 1300 -> 2
                 else -> 1
             }
             val prevBest = updatedStarsMap[postState.level] ?: 0
             updatedStarsMap = updatedStarsMap + (postState.level to maxOf(prevBest, earnedStars))
-            updatedHighestLevel = maxOf(updatedHighestLevel, postState.level + 1)
+            updatedHighestLevel = maxOf(updatedHighestLevel, (postState.level + 1).coerceAtMost(TOTAL_LEVELS))
         }
 
         _uiState.update {
@@ -701,9 +1079,11 @@ class PaperCrushViewModel(
     private fun applyProgressForClearedTiles(
         clearedTiles: List<BoardTile>,
         comboStep: Int,
-        pointsPerTile: Int
+        pointsPerTile: Int,
+        goldCollected: Int = 0,
+        tapeCleared: Int = 0
     ) {
-        if (clearedTiles.isEmpty()) return
+        if (clearedTiles.isEmpty() && goldCollected == 0 && tapeCleared == 0) return
         val popupId = nextPopupId++
 
         _uiState.update { state ->
@@ -714,12 +1094,12 @@ class PaperCrushViewModel(
 
             val isFeverActive = state.feverMovesLeft > 0
             val feverMult = if (isFeverActive) 2 else 1
-            val gainedScore = clearedTiles.size * pointsPerTile * comboStep * feverMult
+            val mechanicBonus = (goldCollected * 80) + (tapeCleared * 60)
+            val gainedScore = ((clearedTiles.size * pointsPerTile * comboStep) + mechanicBonus) * feverMult
             val newScore = state.score + gainedScore
             val newHigh = maxOf(state.highScore, newScore)
 
-            // Charge Fever Meter
-            val chargeDelta = (clearedTiles.size * 0.065f) + (if (comboStep >= 2) 0.14f else 0f)
+            val chargeDelta = (clearedTiles.size * 0.065f) + (if (comboStep >= 2) 0.14f else 0f) + (goldCollected * 0.05f)
             val rawNextCharge = state.feverCharge + chargeDelta
             val triggeredNewFever = rawNextCharge >= 1f
             if (triggeredNewFever) {
@@ -732,22 +1112,25 @@ class PaperCrushViewModel(
                 state.feverMovesLeft
             }
 
-            // Compute average row/col for floating score popup
-            val avgRow = clearedTiles.map { it.row }.average().toFloat()
-            val avgCol = clearedTiles.map { it.col }.average().toFloat()
+            val avgRow = if (clearedTiles.isNotEmpty()) clearedTiles.map { it.row }.average().toFloat() else 3f
+            val avgCol = if (clearedTiles.isNotEmpty()) clearedTiles.map { it.col }.average().toFloat() else 3f
             val popupText = when {
                 triggeredNewFever -> "+$gainedScore FEVER 2x!"
+                goldCollected > 0 -> "+$gainedScore ★STAMP!"
+                tapeCleared > 0 -> "+$gainedScore RIP!"
                 isFeverActive -> "+$gainedScore (2x!)"
                 comboStep >= 2 -> "+$gainedScore x$comboStep!"
                 else -> "+$gainedScore"
             }
+            val popupColor = clearedTiles.firstOrNull()?.type?.primaryColor
+                ?: state.goal.targetPiece.primaryColor
             val popup = FloatingScorePopup(
                 id = popupId,
                 row = avgRow,
                 col = avgCol,
                 text = popupText,
-                color = clearedTiles.first().type.primaryColor,
-                isBig = isFeverActive || comboStep >= 2 || clearedTiles.size >= 4
+                color = popupColor,
+                isBig = isFeverActive || comboStep >= 2 || clearedTiles.size >= 4 || goldCollected > 0
             )
 
             state.copy(
@@ -771,14 +1154,10 @@ class PaperCrushViewModel(
         }
     }
 
-    /**
-     * Detects all horizontal and vertical matches of 3, 4, and 5+ across the 7x7 board.
-     */
     fun findMatchedPositions(board: List<List<BoardTile>>): Set<GridPos> {
         if (board.size != BOARD_SIZE) return emptySet()
         val matched = mutableSetOf<GridPos>()
 
-        // Horizontal matches
         for (r in 0 until BOARD_SIZE) {
             var c = 0
             while (c < BOARD_SIZE) {
@@ -795,7 +1174,6 @@ class PaperCrushViewModel(
             }
         }
 
-        // Vertical matches
         for (c in 0 until BOARD_SIZE) {
             var r = 0
             while (r < BOARD_SIZE) {
@@ -817,21 +1195,37 @@ class PaperCrushViewModel(
 
     private fun dropAndRefillBoard(
         board: List<List<BoardTile>>,
-        removed: Set<GridPos>
+        removed: Set<GridPos>,
+        spawnedSpecials: Map<GridPos, Pair<PieceType, TileSpecial>>
     ): List<List<BoardTile>> {
         val newCols = Array(BOARD_SIZE) { ArrayList<BoardTile>(BOARD_SIZE) }
 
         for (c in 0 until BOARD_SIZE) {
             val survivors = mutableListOf<BoardTile>()
             for (r in (BOARD_SIZE - 1) downTo 0) {
-                if (GridPos(r, c) !in removed) {
+                val pos = GridPos(r, c)
+                val spawned = spawnedSpecials[pos]
+                if (spawned != null) {
+                    // Leave the newly crafted Special Power-Up Tile right on the board!
+                    survivors.add(
+                        BoardTile(
+                            id = nextTileId++,
+                            type = spawned.first,
+                            row = r,
+                            col = c,
+                            special = spawned.second,
+                            spawnDistance = 0.4f,
+                            slideFromRowDelta = -0.4f,
+                            animSeq = nextAnimSeq++
+                        )
+                    )
+                } else if (pos !in removed) {
                     survivors.add(board[r][c])
                 }
             }
             val missingCount = BOARD_SIZE - survivors.size
             val colResult = ArrayList<BoardTile>(BOARD_SIZE)
 
-            // Top new tiles cascading down from above the board rim
             for (i in 0 until missingCount) {
                 val targetRow = i
                 val fallDistance = (missingCount - i + 0.85f) + (i * 0.45f)
@@ -841,6 +1235,7 @@ class PaperCrushViewModel(
                         type = randomPiece(),
                         row = targetRow,
                         col = c,
+                        special = TileSpecial.NONE,
                         spawnDistance = fallDistance,
                         slideFromRowDelta = -fallDistance,
                         slideFromColDelta = 0f,
@@ -850,7 +1245,6 @@ class PaperCrushViewModel(
                 )
             }
 
-            // Existing tiles dropping down by gravity
             val topToBottomSurvivors = survivors.reversed()
             for (i in topToBottomSurvivors.indices) {
                 val oldTile = topToBottomSurvivors[i]
@@ -939,7 +1333,7 @@ class PaperCrushViewModel(
             delay(3500)
             val st = _uiState.value
             if (!st.isAnimating && st.status == GameStatus.PLAYING && st.selectedPos == null && st.activeBooster == null) {
-                val hint = findFirstValidMove(st.board)
+                val hint = findFirstValidMove(st.board, st.tapeLocks.keys)
                 if (hint != null) {
                     _uiState.update { it.copy(hintPair = hint) }
                 }
@@ -947,17 +1341,29 @@ class PaperCrushViewModel(
         }
     }
 
-    private fun findFirstValidMove(board: List<List<BoardTile>>): Pair<GridPos, GridPos>? {
+    private fun findFirstValidMove(
+        board: List<List<BoardTile>>,
+        lockedPositions: Set<GridPos> = emptySet()
+    ): Pair<GridPos, GridPos>? {
         val goalTypes = setOfNotNull(_uiState.value.goal.targetPiece, _uiState.value.secondaryGoal?.targetPiece)
         var fallbackPair: Pair<GridPos, GridPos>? = null
         for (r in 0 until BOARD_SIZE) {
             for (c in 0 until BOARD_SIZE) {
                 val here = GridPos(r, c)
+                if (here in lockedPositions) continue
                 val neighbors = listOfNotNull(
                     if (c + 1 < BOARD_SIZE) GridPos(r, c + 1) else null,
                     if (r + 1 < BOARD_SIZE) GridPos(r + 1, c) else null
                 )
                 for (next in neighbors) {
+                    if (next in lockedPositions) continue
+                    val tA = board[here.row][here.col]
+                    val tB = board[next.row][next.col]
+                    if (tA.special == TileSpecial.PINWHEEL_RAINBOW || tB.special == TileSpecial.PINWHEEL_RAINBOW ||
+                        (tA.special != TileSpecial.NONE && tB.special != TileSpecial.NONE)
+                    ) {
+                        return here to next
+                    }
                     val swapped = swapPositions(board, here, next)
                     val matches = findMatchedPositions(swapped)
                     if (matches.isNotEmpty()) {
@@ -971,8 +1377,10 @@ class PaperCrushViewModel(
         return fallbackPair
     }
 
-    private fun generatePlayableBoard(): List<List<BoardTile>> {
+    private fun generatePlayableBoard(lockedPositions: Set<GridPos> = emptySet()): List<List<BoardTile>> {
+        var attempts = 0
         while (true) {
+            attempts++
             val rows = ArrayList<ArrayList<BoardTile>>(BOARD_SIZE)
             for (r in 0 until BOARD_SIZE) {
                 val rowList = ArrayList<BoardTile>(BOARD_SIZE)
@@ -997,25 +1405,16 @@ class PaperCrushViewModel(
                 }
                 rows.add(rowList)
             }
-            if (hasValidMove(rows)) return rows
+            val effectiveLocks = if (attempts > 25) emptySet() else lockedPositions
+            if (hasValidMove(rows, effectiveLocks)) return rows
         }
     }
 
-    private fun hasValidMove(board: List<List<BoardTile>>): Boolean {
-        for (r in 0 until BOARD_SIZE) {
-            for (c in 0 until BOARD_SIZE) {
-                val here = GridPos(r, c)
-                if (c + 1 < BOARD_SIZE) {
-                    val swapped = swapPositions(board, here, GridPos(r, c + 1))
-                    if (findMatchedPositions(swapped).isNotEmpty()) return true
-                }
-                if (r + 1 < BOARD_SIZE) {
-                    val swapped = swapPositions(board, here, GridPos(r + 1, c))
-                    if (findMatchedPositions(swapped).isNotEmpty()) return true
-                }
-            }
-        }
-        return false
+    private fun hasValidMove(
+        board: List<List<BoardTile>>,
+        lockedPositions: Set<GridPos> = emptySet()
+    ): Boolean {
+        return findFirstValidMove(board, lockedPositions) != null
     }
 
     private fun spawnConfettiForTiles(
@@ -1071,7 +1470,6 @@ class PaperCrushViewModel(
                 _confettiScraps.update { current ->
                     current.mapNotNull { s ->
                         if (s.isLanded) {
-                            // Landed scraps rest on their diorama layer contour and fade out gently
                             val nextAlpha = s.alpha - (0.0062f * dtScale)
                             if (nextAlpha <= 0f) {
                                 null
@@ -1094,7 +1492,6 @@ class PaperCrushViewModel(
                                 val contourY = computeDioramaLandingY(rawX, s.depthLayer, s.landingBandOffset)
                                 if (rawY >= contourY && nextVy > 0f) {
                                     if (s.bounceCount == 0 && nextVy > 0.0032f) {
-                                        // Crisp paper bounce on the diorama hill or craft table
                                         s.copy(
                                             x = rawX,
                                             y = contourY,
@@ -1108,7 +1505,6 @@ class PaperCrushViewModel(
                                             alpha = nextAlpha
                                         )
                                     } else {
-                                        // Settle flat onto the paper landscape layer
                                         s.copy(
                                             x = rawX,
                                             y = contourY,

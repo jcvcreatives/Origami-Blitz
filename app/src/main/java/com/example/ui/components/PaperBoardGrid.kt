@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -73,6 +74,7 @@ import com.example.model.FloatingScorePopup
 import com.example.model.GameStatus
 import com.example.model.GridPos
 import com.example.model.PaperGameState
+import com.example.model.TileSpecial
 import com.example.ui.theme.BoardCellColors
 import com.example.ui.theme.CardboardDark
 import com.example.ui.theme.CardboardLight
@@ -197,6 +199,8 @@ fun PaperCardboardBoard(
                             val pos = GridPos(r, c)
                             val tile = state.board.getOrNull(r)?.getOrNull(c)
                             val cellColor = BoardCellColors[(r + c) % BoardCellColors.size]
+                            val hasGoldStamp = pos in state.goldCells
+                            val tapeLockHp = state.tapeLocks[pos] ?: 0
                             val isSelected = state.selectedPos == pos || state.glueFirstPos == pos
                             val isInvalidShake = state.invalidSwapPair?.let {
                                 it.first == pos || it.second == pos
@@ -243,6 +247,8 @@ fun PaperCardboardBoard(
                                             pos = pos,
                                             cellSize = cellSize,
                                             cellPaperColor = cellColor,
+                                            hasGoldStamp = hasGoldStamp,
+                                            tapeLockHp = tapeLockHp,
                                             isSelected = isSelected,
                                             isHinted = isHinted,
                                             hintPartnerDelta = hintPartnerDelta,
@@ -355,6 +361,8 @@ private fun PaperBoardCell(
     pos: GridPos,
     cellSize: Dp,
     cellPaperColor: Color,
+    hasGoldStamp: Boolean,
+    tapeLockHp: Int,
     isSelected: Boolean,
     isHinted: Boolean,
     hintPartnerDelta: Offset?,
@@ -383,7 +391,6 @@ private fun PaperBoardCell(
 
             if (isGravityDrop) {
                 swapArcProgress.snapTo(0f)
-                // Stagger column/row so falling blocks cascade like real domino cards
                 delay((pos.col * 14L) + (pos.row * 9L))
                 offsetRowAnim.animateTo(
                     targetValue = 0f,
@@ -392,7 +399,6 @@ private fun PaperBoardCell(
                         easing = GravityDropEasing
                     )
                 )
-                // Trigger expanding paper impact ring + multi-bounce squash & stretch!
                 launch {
                     impactRingAnim.snapTo(0.01f)
                     impactRingAnim.animateTo(1f, tween(240, easing = FastOutSlowInEasing))
@@ -407,14 +413,12 @@ private fun PaperBoardCell(
                     )
                 )
             } else {
-                // 3D Parabolic Origami Vault Swap Animation
                 swapArcProgress.snapTo(1f)
                 launch {
                     swapArcProgress.animateTo(
                         targetValue = 0f,
                         animationSpec = tween(durationMillis = 235, easing = FastOutSlowInEasing)
                     )
-                    // Subtle landing settle when the swapped block touches down
                     landingSquashAnim.snapTo(0.45f)
                     landingSquashAnim.animateTo(
                         targetValue = 0f,
@@ -450,7 +454,6 @@ private fun PaperBoardCell(
         }
     }
 
-    // Explosive Crush Pop: inflate to 1.38x with 3D tilt & shockwave ring, then snap to 0
     val crushScaleAnim = remember(tile.id) { Animatable(1f) }
     val crushRotAnim = remember(tile.id) { Animatable(0f) }
     val crushRingAnim = remember(tile.id) { Animatable(0f) }
@@ -463,7 +466,7 @@ private fun PaperBoardCell(
             launch {
                 crushRotAnim.animateTo(32f, tween(205))
             }
-            crushScaleAnim.animateTo(1.38f, tween(65, easing = FastOutSlowInEasing))
+            crushScaleAnim.animateTo(1.26f, tween(65, easing = FastOutSlowInEasing))
             crushScaleAnim.animateTo(0.02f, tween(140, easing = FastOutSlowInEasing))
         } else {
             crushScaleAnim.snapTo(1f)
@@ -476,7 +479,7 @@ private fun PaperBoardCell(
     LaunchedEffect(isInvalidShake) {
         if (isInvalidShake) {
             for (i in 0..3) {
-                shakeAnim.animateTo(if (i % 2 == 0) 11f else -11f, tween(36))
+                shakeAnim.animateTo(if (i % 2 == 0) 9f else -9f, tween(36))
             }
             shakeAnim.animateTo(0f, tween(35))
         } else {
@@ -541,7 +544,7 @@ private fun PaperBoardCell(
             .testTag("board_tile_${pos.row}_${pos.col}"),
         contentAlignment = Alignment.Center
     ) {
-        // Recessed warm kraft slot well
+        // 1. Recessed Kraft Slot Well OR Gold Washi Stamp Foil Cell Underlay
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -551,22 +554,24 @@ private fun PaperBoardCell(
                         isSelected -> StickyNoteYellow
                         isHinted -> StickyNoteYellow.copy(alpha = 0.55f)
                         isInvalidShake -> PeppermintRed.copy(alpha = 0.22f)
+                        hasGoldStamp -> StarCardboardGold.copy(alpha = 0.62f)
                         else -> cellPaperColor
                     },
                     cellShape
                 )
                 .border(
-                    width = if (isSelected || isHinted) 2.dp else 0.8.dp,
+                    width = if (isSelected || isHinted || hasGoldStamp) 2.dp else 0.8.dp,
                     color = when {
                         isSelected -> PeppermintRed
                         isHinted -> OrigamiFoxOrange
+                        hasGoldStamp -> Color(0xFFFFE066)
                         else -> CardboardDark.copy(alpha = 0.45f)
                     },
                     shape = cellShape
                 )
         )
 
-        // Landing shockwave & match crush ring overlay (drawn purely in Canvas draw phase)
+        // 2. Landing shockwave & match crush ring overlay
         Canvas(modifier = Modifier.fillMaxSize()) {
             val crushP = crushRingAnim.value
             if (crushP > 0.01f) {
@@ -587,9 +592,8 @@ private fun PaperBoardCell(
             }
         }
 
-        // Tactile 3D pressed-paper block tile with smooth, planar 60fps transforms (zero dizzying 3D pitch/yaw)
-        PaperPieceVector(
-            pieceType = tile.type,
+        // 3. Tactile 3D pressed-paper block tile + Craftable Special Power-Up Badge
+        Box(
             modifier = Modifier
                 .fillMaxSize(0.95f)
                 .graphicsLayer {
@@ -613,7 +617,6 @@ private fun PaperBoardCell(
                         -arcSin * arcSign * 0.24f * cellPx
                     } else 0f
 
-                    // Calm directional hint nudge toward partner tile
                     val hintNudgeFactor = ((wave + 1f) * 0.5f)
                     val hintNudgeX = if (hintPartnerDelta != null) {
                         hintPartnerDelta.x * hintNudgeFactor * cellPx * 0.08f
@@ -622,9 +625,12 @@ private fun PaperBoardCell(
                         hintPartnerDelta.y * hintNudgeFactor * cellPx * 0.08f
                     } else 0f
 
-                    // Live tactile finger drag follow before swipe threshold triggers
-                    val dragFollowX = (dragAccum.x * 0.38f).coerceIn(-cellPx * 0.24f, cellPx * 0.24f)
-                    val dragFollowY = (dragAccum.y * 0.38f).coerceIn(-cellPx * 0.24f, cellPx * 0.24f)
+                    val dragFollowX = if (tapeLockHp == 0) {
+                        (dragAccum.x * 0.38f).coerceIn(-cellPx * 0.24f, cellPx * 0.24f)
+                    } else 0f
+                    val dragFollowY = if (tapeLockHp == 0) {
+                        (dragAccum.y * 0.38f).coerceIn(-cellPx * 0.24f, cellPx * 0.24f)
+                    } else 0f
                     val isDraggingNow = abs(dragFollowX) > 1f || abs(dragFollowY) > 1f
 
                     translationX = colOff * cellPx + arcOffsetX + shakeAnim.value + hintNudgeX + dragFollowX
@@ -637,7 +643,6 @@ private fun PaperBoardCell(
                     val hintScaleBoost = if (isHinted) 0.03f + wave * 0.02f else 0f
                     val selectedBobBoost = if (isSelected) wave * 0.018f else 0f
 
-                    // Cushioned squash-and-stretch on landing
                     val squashWave = sin(squash * PI * 1.5).toFloat() * squash
                     scaleX = when {
                         tile.isCrushing -> crushScaleAnim.value
@@ -652,15 +657,134 @@ private fun PaperBoardCell(
                         else -> baseScale + swapBoost + dragBoost + hintScaleBoost + selectedBobBoost
                     }
 
-                    // Gentle planar rotation only during active swap or crush (zero idle wobble)
                     rotationZ = when {
                         tile.isCrushing -> crushRotAnim.value * 0.35f
                         swapP > 0.01f -> arcSin * arcSign * 6f
                         isDraggingNow -> (dragFollowX / cellPx) * 6f
                         else -> 0f
                     }
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            PaperPieceVector(
+                pieceType = tile.type,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Gold Washi Stamp Corner Star Indicator
+            if (hasGoldStamp) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(1.dp)
+                        .size(13.dp)
+                        .background(StarCardboardGold, CircleShape)
+                        .border(1.dp, InkBrown, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "★",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        ),
+                        color = InkBrown
+                    )
                 }
-        )
+            }
+
+            // Crafted Special Power-Up Badge (Row Cutter ↔, Col Cutter ↕, Paper Bomb ✦, Rainbow Pinwheel ✹)
+            if (tile.special != TileSpecial.NONE) {
+                val badgeBg = when (tile.special) {
+                    TileSpecial.ROW_CUTTER, TileSpecial.COL_CUTTER -> StickyNoteYellow
+                    TileSpecial.PAPER_BOMB -> OrigamiFoxOrange
+                    TileSpecial.PINWHEEL_RAINBOW -> PeppermintRed
+                    TileSpecial.NONE -> StickyNoteYellow
+                }
+                val badgeFg = when (tile.special) {
+                    TileSpecial.ROW_CUTTER, TileSpecial.COL_CUTTER -> InkBrown
+                    else -> PeppermintWhite
+                }
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(1.dp)
+                        .size(18.dp)
+                        .shadow(2.dp, CircleShape)
+                        .background(badgeBg, CircleShape)
+                        .border(1.5.dp, InkBrown, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = tile.special.badgeLabel,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        ),
+                        color = badgeFg
+                    )
+                }
+            }
+        }
+
+        // 4. Masking Tape Straps (1 HP) & Red Wax Seal (2 HP) Blocker Overlay
+        if (tapeLockHp > 0) {
+            Canvas(modifier = Modifier.fillMaxSize().padding(2.dp)) {
+                val w = size.width
+                val h = size.height
+                val tapeStroke = w * 0.19f
+                val borderStroke = w * 0.24f
+
+                // Diagonal Masking Tape Strip 1 (\)
+                drawLine(
+                    color = InkBrown,
+                    start = Offset(w * 0.10f, h * 0.10f),
+                    end = Offset(w * 0.90f, h * 0.90f),
+                    strokeWidth = borderStroke
+                )
+                drawLine(
+                    color = MaskingTapeCream,
+                    start = Offset(w * 0.10f, h * 0.10f),
+                    end = Offset(w * 0.90f, h * 0.90f),
+                    strokeWidth = tapeStroke
+                )
+
+                // Diagonal Masking Tape Strip 2 (/)
+                drawLine(
+                    color = InkBrown,
+                    start = Offset(w * 0.90f, h * 0.10f),
+                    end = Offset(w * 0.10f, h * 0.90f),
+                    strokeWidth = borderStroke
+                )
+                drawLine(
+                    color = MaskingTapeCream,
+                    start = Offset(w * 0.90f, h * 0.10f),
+                    end = Offset(w * 0.10f, h * 0.90f),
+                    strokeWidth = tapeStroke
+                )
+
+                // Red Wax Seal Stamp in center for 2-HP lock
+                if (tapeLockHp >= 2) {
+                    val sealRadius = w * 0.24f
+                    drawCircle(
+                        color = InkBrown,
+                        radius = sealRadius + 2.dp.toPx(),
+                        center = center
+                    )
+                    drawCircle(
+                        color = PeppermintRed,
+                        radius = sealRadius,
+                        center = center
+                    )
+                    drawCircle(
+                        color = StickyNoteYellow,
+                        radius = sealRadius * 0.55f,
+                        center = center,
+                        style = Stroke(width = 1.5.dp.toPx())
+                    )
+                }
+            }
+        }
     }
 }
 
