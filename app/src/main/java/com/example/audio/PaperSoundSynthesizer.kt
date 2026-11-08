@@ -304,40 +304,48 @@ class PaperSoundSynthesizer {
 
     /**
      * Staggered cascade of warm marimba/bubble plops pitched across a pentatonic chord
-     * when blocks land and bounce into place.
+     * when blocks land and bounce into place. Escalates in pitch and harmonic punch
+     * as cascade combo chains climb (x2, x3, x4, x5+).
      */
-    fun playDropBounce(tileCount: Int = 3) {
+    fun playDropBounce(tileCount: Int = 3, comboStep: Int = 1) {
         if (!isEnabled) return
         scope.launch {
-            val durationSec = 0.28f
+            val durationSec = 0.30f
             val numSamples = (sampleRate * durationSec).toInt()
             val samples = ShortArray(numSamples)
-            val hits = tileCount.coerceIn(2, 5)
-            // Warm low-mid pentatonic marimba notes (C4, D4, E4, G4, A4)
-            val dropNotes = doubleArrayOf(261.63, 293.66, 329.63, 392.00, 440.00)
+            val hits = tileCount.coerceIn(2, 6)
+            // Warm low-mid pentatonic marimba notes (C4, D4, E4, G4, A4, C5)
+            val dropNotes = doubleArrayOf(261.63, 293.66, 329.63, 392.00, 440.00, 523.25)
+            val semitoneShift = (comboStep - 1).coerceIn(0, 10) * 2
+            val pitchMult = 2.0.pow(semitoneShift / 12.0)
+            val shimmerBoost = (comboStep - 1).coerceIn(0, 5) * 0.06f
 
             for (i in 0 until numSamples) {
                 val t = i.toFloat() / sampleRate
                 var acc = 0f
                 for (h in 0 until hits) {
-                    val delay = h * 0.030f
+                    val delay = h * 0.026f
                     if (t >= delay) {
                         val lt = t - delay
                         val attack = (lt / 0.003f).coerceIn(0f, 1f)
-                        val baseNote = dropNotes[h % dropNotes.size]
-                        // Subtle upward bubble inflection on landing
-                        val f = baseNote * (1.0 - 0.10 * exp(-45.0 * lt))
-                        val env = exp(-22.0 * lt).toFloat()
-                        val overtoneEnv = exp(-42.0 * lt).toFloat()
+                        val baseNote = dropNotes[h % dropNotes.size] * pitchMult
+                        // Punchy downward impact thump + upward bubble inflection on landing
+                        val f = baseNote * (1.0 + 0.14 * exp(-60.0 * lt))
+                        val env = exp(-20.0 * lt).toFloat()
+                        val overtoneEnv = exp(-38.0 * lt).toFloat()
+                        val bellSparkle = if (comboStep >= 2) {
+                            sin(2.0 * PI * (f * 3.0) * lt).toFloat() * exp(-48.0 * lt).toFloat() * shimmerBoost
+                        } else 0f
                         val plop = (
-                            sin(2.0 * PI * f * lt).toFloat() * env * 0.75f +
-                            sin(2.0 * PI * (f * 2.0) * lt).toFloat() * overtoneEnv * 0.25f
+                            sin(2.0 * PI * f * lt).toFloat() * env * 0.76f +
+                            sin(2.0 * PI * (f * 2.0) * lt).toFloat() * overtoneEnv * (0.24f + shimmerBoost) +
+                            bellSparkle
                         ) * attack
-                        acc += plop * 0.38f
+                        acc += plop * 0.40f
                     }
                 }
                 val value = softClip(acc)
-                samples[i] = (value * Short.MAX_VALUE * 0.58f).toInt().toShort()
+                samples[i] = (value * Short.MAX_VALUE * 0.64f).toInt().toShort()
             }
             playPcmBuffer(samples, durationSec)
         }

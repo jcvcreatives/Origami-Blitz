@@ -93,8 +93,16 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.sin
 
-// Realistic gravity acceleration curve (starts slow, accelerates toward landing impact)
-private val GravityDropEasing = CubicBezierEasing(0.32f, 0.0f, 0.82f, 0.94f)
+// Realistic gravity acceleration curve (starts crisp, accelerates hard toward landing impact)
+private val GravityDropEasing = CubicBezierEasing(0.36f, 0.0f, 0.88f, 0.96f)
+
+private fun comboTierAccentColor(combo: Int): Color = when {
+    combo >= 5 -> Color(0xFFFF2A85) // Supernova Magenta-Gold
+    combo == 4 -> Color(0xFF8A56AC) // Ultra Royal Amethyst
+    combo == 3 -> PeppermintRed     // Mega Peppermint Crimson
+    combo == 2 -> OrigamiFoxOrange  // Super Fox Orange
+    else -> StarCardboardGold
+}
 
 /**
  * 7x7 Washi & Corrugated Cardboard Board engineered for locked 60fps rendering.
@@ -112,7 +120,8 @@ fun PaperCardboardBoard(
     val outerShape = RoundedCornerShape(16.dp)
     val innerShape = RoundedCornerShape(12.dp)
     val isFever = state.feverMovesLeft > 0
-    val density = LocalDensity.current
+    val activeCombo = state.comboCount
+    val comboAccent = comboTierAccentColor(activeCombo)
 
     // Single shared infinite transition for calm, non-dizzying idle hints & selection breathing
     val infiniteTransition = rememberInfiniteTransition(label = "board_shared_pulse")
@@ -130,11 +139,14 @@ fun PaperCardboardBoard(
     val boardPunchAnim = remember { Animatable(0f) }
     LaunchedEffect(state.boardPunchSeq) {
         if (state.boardPunchSeq > 0L && state.boardPunchStrength > 0f) {
-            val s = state.boardPunchStrength.coerceAtMost(1f)
+            val s = state.boardPunchStrength.coerceAtMost(1.4f)
             boardPunchAnim.snapTo(1f * s)
             boardPunchAnim.animateTo(
                 targetValue = 0f,
-                animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing)
+                animationSpec = spring(
+                    dampingRatio = 0.42f,
+                    stiffness = Spring.StiffnessMedium
+                )
             )
         }
     }
@@ -143,17 +155,28 @@ fun PaperCardboardBoard(
         modifier = modifier
             .graphicsLayer {
                 val punchVal = boardPunchAnim.value
-                val punchScale = 1f + (punchVal * 0.009f)
+                val punchScale = 1f + (punchVal * 0.012f)
                 scaleX = punchScale
                 scaleY = punchScale
             }
             .aspectRatio(1f)
-            .shadow(if (isFever) 14.dp else 10.dp, outerShape)
+            .shadow(if (isFever || activeCombo >= 2) 14.dp else 10.dp, outerShape)
             .clip(outerShape)
-            .background(if (isFever) StarCardboardGold else CardboardMedium, outerShape)
+            .background(
+                when {
+                    isFever -> StarCardboardGold
+                    activeCombo >= 3 -> comboAccent.copy(alpha = 0.32f)
+                    else -> CardboardMedium
+                },
+                outerShape
+            )
             .border(
-                width = if (isFever) 3.5.dp else 3.dp,
-                color = if (isFever) PeppermintRed else CardboardDark,
+                width = if (isFever || activeCombo >= 2) 3.5.dp else 3.dp,
+                color = when {
+                    isFever -> PeppermintRed
+                    activeCombo >= 2 -> comboAccent
+                    else -> CardboardDark
+                },
                 shape = outerShape
             )
             .padding(9.dp)
@@ -275,30 +298,83 @@ fun PaperCardboardBoard(
                 }
             }
 
-            // Juicy floating combo pill
+            // Corner Live Cascade Multiplier Badge (x2, x3, x4, x5+!)
+            AnimatedVisibility(
+                visible = activeCombo >= 2,
+                enter = scaleIn(spring(dampingRatio = 0.42f, stiffness = Spring.StiffnessMediumLow)) + fadeIn(),
+                exit = scaleOut() + fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
+                    .zIndex(28f)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(99.dp),
+                    color = comboAccent,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier.border(2.dp, StickyNoteYellow, RoundedCornerShape(99.dp))
+                ) {
+                    Text(
+                        text = "DROP x$activeCombo${"!".repeat((activeCombo - 1).coerceIn(1, 4))}",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = (14 + activeCombo.coerceAtMost(5)).sp,
+                            fontWeight = FontWeight.ExtraBold
+                        ),
+                        color = PeppermintWhite,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            // Juicy floating combo pill with escalating x2, x3, x4+ styling
             AnimatedVisibility(
                 visible = state.comboBannerText != null,
-                enter = scaleIn(spring(dampingRatio = 0.52f, stiffness = Spring.StiffnessMedium)) + fadeIn(),
+                enter = scaleIn(spring(dampingRatio = 0.44f, stiffness = Spring.StiffnessMedium)) + fadeIn(),
                 exit = scaleOut() + fadeOut(),
                 modifier = Modifier
                     .align(Alignment.Center)
                     .zIndex(25f)
             ) {
+                val bannerBorderColor = if (activeCombo >= 2) comboAccent else PeppermintRed
                 Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = StickyNoteYellow,
-                    shadowElevation = 8.dp,
-                    modifier = Modifier.border(2.dp, PeppermintRed, RoundedCornerShape(14.dp))
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (activeCombo >= 3) comboAccent else StickyNoteYellow,
+                    shadowElevation = 10.dp,
+                    modifier = Modifier.border(2.5.dp, if (activeCombo >= 3) StickyNoteYellow else bannerBorderColor, RoundedCornerShape(16.dp))
                 ) {
-                    Text(
-                        text = state.comboBannerText.orEmpty(),
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontSize = 19.sp,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = InkBrown,
-                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 7.dp)
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (activeCombo >= 2) {
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        if (activeCombo >= 3) StickyNoteYellow else comboAccent,
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(horizontal = 7.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "x$activeCombo",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Black
+                                    ),
+                                    color = if (activeCombo >= 3) InkBrown else PeppermintWhite
+                                )
+                            }
+                        }
+                        Text(
+                            text = state.comboBannerText.orEmpty(),
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontSize = if (activeCombo >= 3) 20.sp else 18.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            ),
+                            color = if (activeCombo >= 3) PeppermintWhite else InkBrown
+                        )
+                    }
                 }
             }
         }
@@ -313,44 +389,54 @@ private fun FloatingScoreBadge(
     val density = LocalDensity.current
     val cellPx = with(density) { cellSize.toPx() }
     val progress = remember { Animatable(0f) }
+    val mult = popup.comboMultiplier.coerceAtLeast(1)
+    val multBoost = (mult - 1).coerceIn(0, 5) * 0.10f
 
     LaunchedEffect(popup.id) {
         progress.animateTo(
             targetValue = 1f,
-            animationSpec = tween(durationMillis = 720, easing = FastOutSlowInEasing)
+            animationSpec = tween(durationMillis = 760, easing = FastOutSlowInEasing)
         )
     }
 
     Box(
         modifier = Modifier
-            .zIndex(22f)
+            .zIndex(22f + mult)
             .graphicsLayer {
                 val p = progress.value
-                val scale = if (p < 0.22f) {
-                    0.5f + (p / 0.22f) * (if (popup.isBig) 0.85f else 0.65f)
+                val peakScale = (if (popup.isBig) 1.38f else 1.15f) + multBoost
+                val scale = if (p < 0.20f) {
+                    0.45f + (p / 0.20f) * (peakScale - 0.45f)
                 } else {
-                    (if (popup.isBig) 1.35f else 1.15f) - (p - 0.22f) * 0.25f
+                    peakScale - (p - 0.20f) * 0.26f
                 }
-                val alphaVal = if (p < 0.7f) 1f else ((1f - p) / 0.3f).coerceIn(0f, 1f)
-                val risePx = -p * cellPx * 1.15f
-                translationX = (popup.col + 0.1f) * cellPx
-                translationY = (popup.row + 0.15f) * cellPx + risePx
+                val alphaVal = if (p < 0.72f) 1f else ((1f - p) / 0.28f).coerceIn(0f, 1f)
+                val risePx = -p * cellPx * (1.18f + multBoost * 0.6f)
+                translationX = (popup.col + 0.08f) * cellPx
+                translationY = (popup.row + 0.12f) * cellPx + risePx
                 scaleX = scale
                 scaleY = scale
                 alpha = alphaVal
             }
-            .shadow(4.dp, RoundedCornerShape(10.dp))
-            .background(MaskingTapeCream, RoundedCornerShape(10.dp))
-            .border(1.5.dp, popup.color, RoundedCornerShape(10.dp))
-            .padding(horizontal = 8.dp, vertical = 2.dp)
+            .shadow(if (mult >= 2) 6.dp else 4.dp, RoundedCornerShape(10.dp))
+            .background(
+                if (mult >= 3) comboTierAccentColor(mult) else MaskingTapeCream,
+                RoundedCornerShape(10.dp)
+            )
+            .border(
+                width = if (mult >= 2) 2.dp else 1.5.dp,
+                color = if (mult >= 3) StickyNoteYellow else popup.color,
+                shape = RoundedCornerShape(10.dp)
+            )
+            .padding(horizontal = 9.dp, vertical = 3.dp)
     ) {
         Text(
             text = popup.text,
             style = MaterialTheme.typography.labelLarge.copy(
-                fontSize = if (popup.isBig) 15.sp else 13.sp,
-                fontWeight = FontWeight.Bold
+                fontSize = (if (popup.isBig) 15 else 13).plus((mult - 1).coerceIn(0, 4)).sp,
+                fontWeight = FontWeight.ExtraBold
             ),
-            color = InkBrown
+            color = if (mult >= 3) PeppermintWhite else InkBrown
         )
     }
 }
@@ -373,6 +459,9 @@ private fun PaperBoardCell(
 ) {
     val density = LocalDensity.current
     val cellPx = with(density) { cellSize.toPx() }
+    val comboTier = tile.dropComboTier.coerceAtLeast(1)
+    val tierBoost = (comboTier - 1).coerceIn(0, 5)
+    val tierColor = comboTierAccentColor(comboTier)
 
     val offsetColAnim = remember(tile.id) { Animatable(tile.slideFromColDelta) }
     val offsetRowAnim = remember(tile.id) { Animatable(tile.slideFromRowDelta) }
@@ -391,24 +480,32 @@ private fun PaperBoardCell(
 
             if (isGravityDrop) {
                 swapArcProgress.snapTo(0f)
-                delay((pos.col * 14L) + (pos.row * 9L))
+                // Tighter stagger & faster terminal velocity on x2, x3, x4+ cascade waves!
+                val staggerMs = ((pos.col * 12L) + (pos.row * 8L) - (tierBoost * 2L)).coerceAtLeast(4L)
+                delay(staggerMs)
+                val baseDropMs = 142 + (tile.spawnDistance * 25f).toInt() - (tierBoost * 10)
                 offsetRowAnim.animateTo(
                     targetValue = 0f,
                     animationSpec = tween(
-                        durationMillis = (150 + (tile.spawnDistance * 28f).toInt()).coerceIn(155, 275),
+                        durationMillis = baseDropMs.coerceIn(120, 255),
                         easing = GravityDropEasing
                     )
                 )
                 launch {
                     impactRingAnim.snapTo(0.01f)
-                    impactRingAnim.animateTo(1f, tween(240, easing = FastOutSlowInEasing))
+                    impactRingAnim.animateTo(
+                        1f,
+                        tween(230 + tierBoost * 22, easing = FastOutSlowInEasing)
+                    )
                     impactRingAnim.snapTo(0f)
                 }
-                landingSquashAnim.snapTo(1f)
+                // High-energy elastic landing slam that scales up with x2, x3, x4+ combo drops!
+                val slamPeak = (1f + tierBoost * 0.16f).coerceAtMost(1.75f)
+                landingSquashAnim.snapTo(slamPeak)
                 landingSquashAnim.animateTo(
                     targetValue = 0f,
                     animationSpec = spring(
-                        dampingRatio = 0.34f,
+                        dampingRatio = (0.31f - tierBoost * 0.02f).coerceAtLeast(0.22f),
                         stiffness = Spring.StiffnessMedium
                     )
                 )
@@ -419,11 +516,11 @@ private fun PaperBoardCell(
                         targetValue = 0f,
                         animationSpec = tween(durationMillis = 235, easing = FastOutSlowInEasing)
                     )
-                    landingSquashAnim.snapTo(0.45f)
+                    landingSquashAnim.snapTo(0.48f)
                     landingSquashAnim.animateTo(
                         targetValue = 0f,
                         animationSpec = spring(
-                            dampingRatio = 0.42f,
+                            dampingRatio = 0.40f,
                             stiffness = Spring.StiffnessMedium
                         )
                     )
@@ -459,15 +556,16 @@ private fun PaperBoardCell(
     val crushRingAnim = remember(tile.id) { Animatable(0f) }
     LaunchedEffect(tile.isCrushing) {
         if (tile.isCrushing) {
+            val popPeak = (1.28f + tierBoost * 0.05f).coerceAtMost(1.50f)
             launch {
-                crushRingAnim.snapTo(0.05f)
-                crushRingAnim.animateTo(1f, tween(210, easing = FastOutSlowInEasing))
+                crushRingAnim.snapTo(0.04f)
+                crushRingAnim.animateTo(1f, tween(215, easing = FastOutSlowInEasing))
             }
             launch {
-                crushRotAnim.animateTo(32f, tween(205))
+                crushRotAnim.animateTo(34f + tierBoost * 5f, tween(205))
             }
-            crushScaleAnim.animateTo(1.26f, tween(65, easing = FastOutSlowInEasing))
-            crushScaleAnim.animateTo(0.02f, tween(140, easing = FastOutSlowInEasing))
+            crushScaleAnim.animateTo(popPeak, tween(68, easing = FastOutSlowInEasing))
+            crushScaleAnim.animateTo(0.02f, tween(138, easing = FastOutSlowInEasing))
         } else {
             crushScaleAnim.snapTo(1f)
             crushRotAnim.snapTo(0f)
@@ -571,24 +669,87 @@ private fun PaperBoardCell(
                 )
         )
 
-        // 2. Landing shockwave & match crush ring overlay
+        // 2. Speed-Streak Wake Lines, Dual Concentric Landing Shockwaves & Starburst Crush Rings
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val crushP = crushRingAnim.value
-            if (crushP > 0.01f) {
-                val maxR = size.minDimension * 0.62f
-                drawCircle(
-                    color = tile.type.primaryColor.copy(alpha = (1f - crushP) * 0.65f),
-                    radius = maxR * (0.35f + crushP * 0.70f),
-                    style = Stroke(width = size.minDimension * 0.09f * (1f - crushP * 0.5f))
+            val rowOff = offsetRowAnim.value
+            // Draw vertical paper speed-streak wake lines above fast-dropping blocks
+            if (tile.spawnDistance > 0.001f && rowOff < -0.08f) {
+                val streakAlpha = ((-rowOff / tile.spawnDistance.coerceAtLeast(1f)).coerceIn(0f, 1f)) *
+                    (0.45f + tierBoost * 0.11f).coerceAtMost(0.92f)
+                val topY = (rowOff * size.height) - size.height * (0.28f + tierBoost * 0.08f)
+                val midY = (rowOff * size.height) + size.height * 0.15f
+                val strokeW = size.width * (0.045f + tierBoost * 0.01f)
+                val streakColor = if (comboTier >= 2) tierColor.copy(alpha = streakAlpha)
+                else tile.type.primaryColor.copy(alpha = streakAlpha * 0.75f)
+
+                drawLine(
+                    color = streakColor,
+                    start = Offset(size.width * 0.26f, topY),
+                    end = Offset(size.width * 0.26f, midY),
+                    strokeWidth = strokeW
+                )
+                drawLine(
+                    color = PeppermintWhite.copy(alpha = streakAlpha * 0.85f),
+                    start = Offset(size.width * 0.50f, topY - size.height * 0.14f),
+                    end = Offset(size.width * 0.50f, midY),
+                    strokeWidth = strokeW * 1.15f
+                )
+                drawLine(
+                    color = streakColor,
+                    start = Offset(size.width * 0.74f, topY),
+                    end = Offset(size.width * 0.74f, midY),
+                    strokeWidth = strokeW
                 )
             }
+
+            val crushP = crushRingAnim.value
+            if (crushP > 0.01f) {
+                val maxR = size.minDimension * (0.64f + tierBoost * 0.06f)
+                drawCircle(
+                    color = tile.type.primaryColor.copy(alpha = (1f - crushP) * 0.78f),
+                    radius = maxR * (0.32f + crushP * 0.74f),
+                    style = Stroke(width = size.minDimension * 0.10f * (1f - crushP * 0.5f))
+                )
+                if (comboTier >= 2) {
+                    drawCircle(
+                        color = tierColor.copy(alpha = (1f - crushP) * 0.85f),
+                        radius = maxR * (0.18f + crushP * 0.92f),
+                        style = Stroke(width = size.minDimension * 0.06f * (1f - crushP))
+                    )
+                }
+            }
+
             val impactP = impactRingAnim.value
             if (impactP > 0.01f) {
+                val ringScale = 0.26f + impactP * (0.34f + tierBoost * 0.07f)
                 drawCircle(
-                    color = StarCardboardGold.copy(alpha = (1f - impactP) * 0.35f),
-                    radius = size.minDimension * (0.25f + impactP * 0.30f),
-                    style = Stroke(width = size.minDimension * 0.045f * (1f - impactP))
+                    color = tierColor.copy(alpha = (1f - impactP) * (0.48f + tierBoost * 0.09f).coerceAtMost(0.9f)),
+                    radius = size.minDimension * ringScale,
+                    style = Stroke(width = size.minDimension * (0.055f + tierBoost * 0.012f) * (1f - impactP))
                 )
+                // Second concentric shockwave ring + 8 radial burst rays for x2, x3, x4+ drops!
+                if (comboTier >= 2 && impactP > 0.12f) {
+                    val innerP = ((impactP - 0.12f) / 0.88f).coerceIn(0f, 1f)
+                    drawCircle(
+                        color = StickyNoteYellow.copy(alpha = (1f - innerP) * 0.75f),
+                        radius = size.minDimension * (0.18f + innerP * (0.44f + tierBoost * 0.06f)),
+                        style = Stroke(width = size.minDimension * 0.04f * (1f - innerP))
+                    )
+                    val rayCount = 8
+                    val rStart = size.minDimension * (0.24f + impactP * 0.22f)
+                    val rEnd = size.minDimension * (0.36f + impactP * (0.34f + tierBoost * 0.05f))
+                    for (i in 0 until rayCount) {
+                        val angle = (i * (PI / 4.0)).toFloat()
+                        val cosA = kotlin.math.cos(angle)
+                        val sinA = sin(angle)
+                        drawLine(
+                            color = tierColor.copy(alpha = (1f - impactP) * 0.75f),
+                            start = Offset(center.x + cosA * rStart, center.y + sinA * rStart),
+                            end = Offset(center.x + cosA * rEnd, center.y + sinA * rEnd),
+                            strokeWidth = size.minDimension * 0.035f * (1f - impactP)
+                        )
+                    }
+                }
             }
         }
 
@@ -603,11 +764,11 @@ private fun PaperBoardCell(
                     val squash = landingSquashAnim.value
                     val wave = sharedWaveState.value
 
-                    val isFallingMidAir = tile.spawnDistance > 0.001f && abs(rowOff) > 0.10f
+                    val isFallingMidAir = tile.spawnDistance > 0.001f && abs(rowOff) > 0.08f
                     val fallRatio = if (tile.spawnDistance > 0.001f) {
                         (abs(rowOff) / tile.spawnDistance.coerceAtLeast(1f)).coerceIn(0f, 1f)
                     } else 0f
-                    val fallSpeedFactor = if (isFallingMidAir) (1f - fallRatio * 0.65f) else 0f
+                    val fallSpeedFactor = if (isFallingMidAir) (1f - fallRatio * 0.58f) else 0f
 
                     val arcSin = sin(swapP * PI).toFloat()
                     val arcOffsetX = if (!isHorizontalSwap && swapP > 0.01f) {
@@ -633,8 +794,13 @@ private fun PaperBoardCell(
                     } else 0f
                     val isDraggingNow = abs(dragFollowX) > 1f || abs(dragFollowY) > 1f
 
+                    // Crisp vertical landing rebound hop on impact that scales with x2, x3, x4+
+                    val landingHopY = if (squash > 0.01f) {
+                        -sin(squash * PI).toFloat() * cellPx * (0.055f + tierBoost * 0.018f)
+                    } else 0f
+
                     translationX = colOff * cellPx + arcOffsetX + shakeAnim.value + hintNudgeX + dragFollowX
-                    translationY = rowOff * cellPx + arcOffsetY + hintNudgeY + dragFollowY
+                    translationY = rowOff * cellPx + arcOffsetY + hintNudgeY + dragFollowY + landingHopY
 
                     val swapBoost = if (swapP > 0.01f) {
                         if (arcSign > 0f) 0.18f * arcSin else 0.06f * arcSin
@@ -644,16 +810,21 @@ private fun PaperBoardCell(
                     val selectedBobBoost = if (isSelected) wave * 0.018f else 0f
 
                     val squashWave = sin(squash * PI * 1.5).toFloat() * squash
+                    val midAirNarrow = (0.09f + tierBoost * 0.022f).coerceAtMost(0.18f)
+                    val midAirStretch = (0.12f + tierBoost * 0.035f).coerceAtMost(0.26f)
+                    val slamSquashW = (0.14f + tierBoost * 0.025f).coerceAtMost(0.24f)
+                    val slamSquashH = (0.12f + tierBoost * 0.022f).coerceAtMost(0.21f)
+
                     scaleX = when {
                         tile.isCrushing -> crushScaleAnim.value
-                        isFallingMidAir -> 1f - (fallSpeedFactor * 0.07f)
-                        squash > 0.01f -> 1f + (squashWave * 0.12f)
+                        isFallingMidAir -> 1f - (fallSpeedFactor * midAirNarrow)
+                        squash > 0.01f -> 1f + (squashWave * slamSquashW)
                         else -> baseScale + swapBoost + dragBoost + hintScaleBoost + selectedBobBoost
                     }
                     scaleY = when {
                         tile.isCrushing -> crushScaleAnim.value
-                        isFallingMidAir -> 1f + (fallSpeedFactor * 0.09f)
-                        squash > 0.01f -> 1f - (squashWave * 0.10f)
+                        isFallingMidAir -> 1f + (fallSpeedFactor * midAirStretch)
+                        squash > 0.01f -> 1f - (squashWave * slamSquashH)
                         else -> baseScale + swapBoost + dragBoost + hintScaleBoost + selectedBobBoost
                     }
 

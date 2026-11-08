@@ -65,6 +65,7 @@ data class BoardTile(
     val slideFromRowDelta: Float = 0f,
     val slideFromColDelta: Float = 0f,
     val swapArcSign: Float = 0f,
+    val dropComboTier: Int = 1,
     val animSeq: Long = 0L,
     val isCrushing: Boolean = false
 )
@@ -75,7 +76,8 @@ data class FloatingScorePopup(
     val col: Float,
     val text: String,
     val color: Color,
-    val isBig: Boolean = false
+    val isBig: Boolean = false,
+    val comboMultiplier: Int = 1
 )
 
 enum class BoosterType(

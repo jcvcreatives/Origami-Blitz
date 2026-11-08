@@ -663,8 +663,8 @@ class PaperCrushViewModel(
         _uiState.update { it.copy(board = markedBoard) }
         delay(220)
 
-        val cascadedBoard = dropAndRefillBoard(markedBoard, actualCrushed, emptyMap())
-        soundSynth.playDropBounce(actualCrushed.size)
+        val cascadedBoard = dropAndRefillBoard(markedBoard, actualCrushed, emptyMap(), comboStep = 1)
+        soundSynth.playDropBounce(actualCrushed.size, comboStep = 1)
         _uiState.update { it.copy(board = cascadedBoard) }
         delay(340)
 
@@ -966,28 +966,35 @@ class PaperCrushViewModel(
                 analysis.triggeredLineRip -> 48
                 else -> 32
             }
+            val comboPrefix = if (combo >= 2) "x$combo " else ""
             val banner = when {
-                analysis.triggeredColorStorm -> "5-FOLD RAINBOW PINWHEEL! +1 BOOSTER"
-                analysis.triggeredPaperBomb -> "L/T FOLD • ORIGAMI BOMB CRAFTED!"
-                analysis.triggeredLineRip -> "4-FOLD • LINE CUTTER CRAFTED!"
+                analysis.triggeredColorStorm -> "${comboPrefix}5-FOLD RAINBOW PINWHEEL! +1 BOOSTER"
+                analysis.triggeredPaperBomb -> "${comboPrefix}L/T FOLD • ORIGAMI BOMB CRAFTED!"
+                analysis.triggeredLineRip -> "${comboPrefix}4-FOLD • LINE CUTTER CRAFTED!"
+                combo >= 5 -> "SUPERNOVA DROP x$combo!!!!"
+                combo == 4 -> "ULTRA CASCADE DROP x4!!!"
+                combo == 3 -> "MEGA CASCADE DROP x3!!"
+                combo == 2 -> "SUPER CASCADE DROP x2!"
                 goldCollectedCount > 0 -> "GOLD WASHI STAMP COLLECTED! +${goldCollectedCount * 80}"
                 tapeDamagedCount > 0 -> "TAPE / WAX SEAL RIPPED!"
-                combo >= 3 -> "ORIGAMI FEVER COMBO x$combo!"
-                combo == 2 -> "DOUBLE FOLD x2!"
                 _uiState.value.streakCount >= 3 -> "HOT STREAK x${_uiState.value.streakCount}!"
                 else -> null
             }
 
             val punchStrength = when {
-                analysis.triggeredColorStorm -> 1.25f
-                analysis.triggeredPaperBomb || analysis.triggeredLineRip || combo >= 3 -> 0.9f
-                combo == 2 -> 0.55f
-                else -> 0.28f
+                analysis.triggeredColorStorm || combo >= 4 -> 1.35f
+                analysis.triggeredPaperBomb || analysis.triggeredLineRip || combo == 3 -> 1.05f
+                combo == 2 -> 0.75f
+                else -> 0.35f
             }
 
             val crushingBoard = currentBoard.mapIndexed { r, row ->
                 row.mapIndexed { c, tile ->
-                    if (GridPos(r, c) in actualCrushed) tile.copy(isCrushing = true) else tile
+                    if (GridPos(r, c) in actualCrushed) {
+                        tile.copy(isCrushing = true, dropComboTier = combo)
+                    } else {
+                        tile
+                    }
                 }
             }
             _uiState.update {
@@ -1012,17 +1019,22 @@ class PaperCrushViewModel(
                     boardPunchStrength = punchStrength
                 )
             }
-            delay(225)
+            delay(215)
 
             // Filter spawnedSpecials to positions that were actually crushed and aren't locked
             val validSpawnedSpecials = analysis.spawnedSpecials.filterKeys { pos ->
                 pos in actualCrushed && (nextTapeLocks[pos] ?: 0) == 0
             }
 
-            val refilledBoard = dropAndRefillBoard(crushingBoard, actualCrushed, validSpawnedSpecials)
-            soundSynth.playDropBounce(actualCrushed.size.coerceAtLeast(2))
+            val refilledBoard = dropAndRefillBoard(
+                board = crushingBoard,
+                removed = actualCrushed,
+                spawnedSpecials = validSpawnedSpecials,
+                comboStep = combo
+            )
+            soundSynth.playDropBounce(actualCrushed.size.coerceAtLeast(2), comboStep = combo)
             _uiState.update { it.copy(board = refilledBoard) }
-            delay(345)
+            delay(335)
 
             currentBoard = clearTileMotion(refilledBoard)
             _uiState.update { it.copy(board = currentBoard) }
@@ -1114,12 +1126,13 @@ class PaperCrushViewModel(
 
             val avgRow = if (clearedTiles.isNotEmpty()) clearedTiles.map { it.row }.average().toFloat() else 3f
             val avgCol = if (clearedTiles.isNotEmpty()) clearedTiles.map { it.col }.average().toFloat() else 3f
+            val bang = "!".repeat(comboStep.coerceIn(1, 4))
             val popupText = when {
                 triggeredNewFever -> "+$gainedScore FEVER 2x!"
+                comboStep >= 2 -> "x$comboStep$bang +$gainedScore"
                 goldCollected > 0 -> "+$gainedScore ★STAMP!"
                 tapeCleared > 0 -> "+$gainedScore RIP!"
                 isFeverActive -> "+$gainedScore (2x!)"
-                comboStep >= 2 -> "+$gainedScore x$comboStep!"
                 else -> "+$gainedScore"
             }
             val popupColor = clearedTiles.firstOrNull()?.type?.primaryColor
@@ -1130,7 +1143,8 @@ class PaperCrushViewModel(
                 col = avgCol,
                 text = popupText,
                 color = popupColor,
-                isBig = isFeverActive || comboStep >= 2 || clearedTiles.size >= 4 || goldCollected > 0
+                isBig = isFeverActive || comboStep >= 2 || clearedTiles.size >= 4 || goldCollected > 0,
+                comboMultiplier = comboStep
             )
 
             state.copy(
@@ -1196,9 +1210,11 @@ class PaperCrushViewModel(
     private fun dropAndRefillBoard(
         board: List<List<BoardTile>>,
         removed: Set<GridPos>,
-        spawnedSpecials: Map<GridPos, Pair<PieceType, TileSpecial>>
+        spawnedSpecials: Map<GridPos, Pair<PieceType, TileSpecial>>,
+        comboStep: Int = 1
     ): List<List<BoardTile>> {
         val newCols = Array(BOARD_SIZE) { ArrayList<BoardTile>(BOARD_SIZE) }
+        val effectiveTier = comboStep.coerceAtLeast(1)
 
         for (c in 0 until BOARD_SIZE) {
             val survivors = mutableListOf<BoardTile>()
@@ -1214,8 +1230,9 @@ class PaperCrushViewModel(
                             row = r,
                             col = c,
                             special = spawned.second,
-                            spawnDistance = 0.4f,
-                            slideFromRowDelta = -0.4f,
+                            spawnDistance = 0.45f,
+                            slideFromRowDelta = -0.45f,
+                            dropComboTier = effectiveTier,
                             animSeq = nextAnimSeq++
                         )
                     )
@@ -1240,6 +1257,7 @@ class PaperCrushViewModel(
                         slideFromRowDelta = -fallDistance,
                         slideFromColDelta = 0f,
                         swapArcSign = 0f,
+                        dropComboTier = effectiveTier,
                         animSeq = nextAnimSeq++
                     )
                 )
@@ -1258,6 +1276,7 @@ class PaperCrushViewModel(
                         slideFromRowDelta = -dropRows,
                         slideFromColDelta = 0f,
                         swapArcSign = 0f,
+                        dropComboTier = if (dropRows > 0f) effectiveTier else 1,
                         animSeq = if (dropRows > 0f) nextAnimSeq++ else oldTile.animSeq,
                         isCrushing = false
                     )

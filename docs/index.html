@@ -422,6 +422,22 @@
       border-color: #FFB300;
       box-shadow: 0 0 22px rgba(255, 179, 0, 0.65), 0 12px 26px rgba(59, 35, 20, 0.30);
     }
+    #cardboard-lid.combo-heat-2 {
+      border-color: #F27D3A;
+      box-shadow: 0 0 18px rgba(242, 125, 58, 0.55), 0 12px 26px rgba(59, 35, 20, 0.28);
+    }
+    #cardboard-lid.combo-heat-3 {
+      border-color: #E63956;
+      box-shadow: 0 0 22px rgba(230, 57, 86, 0.65), 0 12px 26px rgba(59, 35, 20, 0.30);
+    }
+    #cardboard-lid.combo-heat-4 {
+      border-color: #8A56AC;
+      box-shadow: 0 0 26px rgba(138, 86, 172, 0.72), 0 12px 26px rgba(59, 35, 20, 0.32);
+    }
+    #cardboard-lid.combo-heat-5 {
+      border-color: #FF2A85;
+      box-shadow: 0 0 30px rgba(255, 42, 133, 0.82), 0 12px 26px rgba(59, 35, 20, 0.35);
+    }
 
     #board-grid {
       width: 100%;
@@ -604,19 +620,71 @@
     .cell-ring.crush-ring {
       border: 3.5px solid #FF3B5C;
       background: radial-gradient(circle, rgba(255,255,255,0.75) 0%, rgba(255,234,121,0.35) 60%, transparent 100%);
-      animation: cellCrushWave 0.23s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation: cellCrushWave 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
     .cell-ring.impact-ring {
       border: 2.5px solid #FFB703;
       animation: cellImpactWave 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
+    .cell-ring.impact-ring.combo-2 {
+      border: 3px solid #F27D3A;
+      background: radial-gradient(circle, rgba(242,125,58,0.28) 0%, transparent 72%);
+      animation: cellImpactWaveCombo 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .cell-ring.impact-ring.combo-3 {
+      border: 3.5px solid #E63956;
+      background: radial-gradient(circle, rgba(230,57,86,0.34) 0%, transparent 75%);
+      animation: cellImpactWaveCombo 0.31s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .cell-ring.impact-ring.combo-4 {
+      border: 4px solid #8A56AC;
+      background: radial-gradient(circle, rgba(138,86,172,0.38) 0%, transparent 78%);
+      animation: cellImpactWaveCombo 0.34s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .cell-ring.impact-ring.combo-5 {
+      border: 4.5px solid #FF2A85;
+      background: radial-gradient(circle, rgba(255,225,105,0.48) 0%, rgba(255,42,133,0.28) 65%, transparent 100%);
+      animation: cellImpactWaveCombo 0.36s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .cell-ring.impact-ring.combo-2::after,
+    .cell-ring.impact-ring.combo-3::after,
+    .cell-ring.impact-ring.combo-4::after,
+    .cell-ring.impact-ring.combo-5::after {
+      content: '';
+      position: absolute;
+      inset: 14%;
+      border-radius: 50%;
+      border: 2px solid #FFFDF7;
+    }
     @keyframes cellCrushWave {
       0% { transform: translate3d(-50%, -50%, 0) scale(0.35); opacity: 0.95; }
-      100% { transform: translate3d(-50%, -50%, 0) scale(1.55); opacity: 0; }
+      100% { transform: translate3d(-50%, -50%, 0) scale(1.62); opacity: 0; }
     }
     @keyframes cellImpactWave {
       0% { transform: translate3d(-50%, -50%, 0) scale(0.45); opacity: 0.72; }
       100% { transform: translate3d(-50%, -50%, 0) scale(1.28); opacity: 0; }
+    }
+    @keyframes cellImpactWaveCombo {
+      0% { transform: translate3d(-50%, -50%, 0) scale(0.32); opacity: 0.96; }
+      100% { transform: translate3d(-50%, -50%, 0) scale(1.68); opacity: 0; }
+    }
+
+    /* Vertical Speed-Streak Wake Lines above fast-falling blocks */
+    .tile-speed-streak {
+      position: absolute;
+      left: 16%;
+      right: 16%;
+      top: -42%;
+      height: 56%;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0;
+      transform-origin: bottom center;
+      will-change: transform, opacity;
+      background:
+        linear-gradient(to top, var(--streak-color, #FFB703) 0%, transparent 100%) 15% 0 / 2.5px 85% no-repeat,
+        linear-gradient(to top, #FFFDF7 0%, var(--streak-color, #FFB703) 45%, transparent 100%) 50% 0 / 3.5px 100% no-repeat,
+        linear-gradient(to top, var(--streak-color, #FFB703) 0%, transparent 100%) 85% 0 / 2.5px 85% no-repeat;
     }
 
     /* GPU-Composited 60fps Tile Piece Container */
@@ -665,11 +733,75 @@
       border-color: #FFFDF7;
       font-size: 14px;
     }
+    .floating-popup.combo-2 {
+      background: #F27D3A;
+      color: #FFFDF7;
+      border: 2px solid #FFFDF7;
+      font-size: 15px;
+    }
+    .floating-popup.combo-3 {
+      background: #E63956;
+      color: #FFFDF7;
+      border: 2px solid #FFE169;
+      font-size: 16px;
+    }
+    .floating-popup.combo-4 {
+      background: #8A56AC;
+      color: #FFFDF7;
+      border: 2px solid #FFE169;
+      font-size: 17px;
+    }
+    .floating-popup.combo-5 {
+      background: #FF2A85;
+      color: #FFFDF7;
+      border: 2.5px solid #FFE169;
+      font-size: 18px;
+      box-shadow: 0 6px 16px rgba(255,42,133,0.45);
+    }
     @keyframes floatScoreUp {
       0% { transform: translate3d(-50%, -30%, 0) scale(0.5); opacity: 0; }
-      22% { transform: translate3d(-50%, -65%, 0) scale(1.22); opacity: 1; }
-      78% { transform: translate3d(-50%, -145%, 0) scale(1.0); opacity: 1; }
-      100% { transform: translate3d(-50%, -175%, 0) scale(0.88); opacity: 0; }
+      22% { transform: translate3d(-50%, -65%, 0) scale(1.26); opacity: 1; }
+      78% { transform: translate3d(-50%, -155%, 0) scale(1.04); opacity: 1; }
+      100% { transform: translate3d(-50%, -185%, 0) scale(0.88); opacity: 0; }
+    }
+
+    /* Live Top-Right Cascade Multiplier Stamp (DROP x2!, x3!!, x4!!!) */
+    #cascade-stamp {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      transform: translate3d(0, 0, 0) scale(0) rotate(-5deg);
+      background: #F27D3A;
+      color: #FFFDF7;
+      border: 2px solid #FFFDF7;
+      padding: 4px 11px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 0.4px;
+      box-shadow: 0 5px 14px rgba(0,0,0,0.32);
+      pointer-events: none;
+      z-index: 36;
+      transition: transform 0.18s cubic-bezier(0.22, 1.5, 0.36, 1), background-color 0.15s ease;
+      white-space: nowrap;
+    }
+    #cascade-stamp.visible {
+      transform: translate3d(0, 0, 0) scale(1) rotate(-5deg);
+    }
+    #cascade-stamp.tier-3 {
+      background: #E63956;
+      border-color: #FFE169;
+      transform: translate3d(0, 0, 0) scale(1.08) rotate(-5deg);
+    }
+    #cascade-stamp.tier-4 {
+      background: #8A56AC;
+      border-color: #FFE169;
+      transform: translate3d(0, 0, 0) scale(1.14) rotate(-5deg);
+    }
+    #cascade-stamp.tier-5 {
+      background: #FF2A85;
+      border-color: #FFE169;
+      transform: translate3d(0, 0, 0) scale(1.20) rotate(-5deg);
     }
 
     /* Combo Tape Banner inside Board */
@@ -679,11 +811,11 @@
       left: 50%;
       transform: translate3d(-50%, -50%, 0) scale(0);
       background: var(--sticky-yellow);
-      border: 2px solid var(--thumbtack-red);
+      border: 2.5px solid var(--thumbtack-red);
       padding: 6px 16px;
       border-radius: 12px;
       font-size: 18px;
-      font-weight: 700;
+      font-weight: 800;
       color: var(--ink-brown);
       box-shadow: 0 6px 16px rgba(0,0,0,0.26);
       pointer-events: none;
@@ -693,6 +825,30 @@
     }
     #combo-banner.visible {
       transform: translate3d(-50%, -50%, 0) scale(1);
+    }
+    #combo-banner.visible.combo-2 {
+      background: #F27D3A;
+      color: #FFFDF7;
+      border-color: #FFFDF7;
+      transform: translate3d(-50%, -50%, 0) scale(1.05);
+    }
+    #combo-banner.visible.combo-3 {
+      background: #E63956;
+      color: #FFFDF7;
+      border-color: #FFE169;
+      transform: translate3d(-50%, -50%, 0) scale(1.10);
+    }
+    #combo-banner.visible.combo-4 {
+      background: #8A56AC;
+      color: #FFFDF7;
+      border-color: #FFE169;
+      transform: translate3d(-50%, -50%, 0) scale(1.14);
+    }
+    #combo-banner.visible.combo-5 {
+      background: #FF2A85;
+      color: #FFFDF7;
+      border-color: #FFE169;
+      transform: translate3d(-50%, -50%, 0) scale(1.18);
     }
 
     /* Bottom Booster Bar */
@@ -1290,6 +1446,7 @@
       <div id="board-wrapper">
         <div id="cardboard-lid">
           <div id="board-grid"></div>
+          <div id="cascade-stamp">DROP x2!</div>
           <div id="combo-banner">ORIGAMI COMBO!</div>
         </div>
       </div>
@@ -1653,27 +1810,44 @@
           osc.stop(start + 0.09);
         });
       }
-      playBounce(tileCount = 4) {
+      playBounce(tileCount = 4, combo = 1) {
         const ctx = this.ensureCtx();
         if (!ctx) return;
         const now = ctx.currentTime;
-        const hits = Math.max(2, Math.min(5, tileCount));
-        const dropNotes = [261.63, 293.66, 329.63, 392.00, 440.00];
+        const hits = Math.max(2, Math.min(6, tileCount));
+        const comboPitchMult = Math.pow(2, Math.min(Math.max(1, combo) - 1, 8) * 1.5 / 12);
+        const stepDelay = Math.max(0.018, 0.030 - Math.min(4, Math.max(0, combo - 1)) * 0.003);
+        const dropNotes = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25];
         for (let i = 0; i < hits; i++) {
-          const start = now + i * 0.030;
-          const f = dropNotes[i % dropNotes.length];
+          const start = now + i * stepDelay;
+          const f = dropNotes[i % dropNotes.length] * comboPitchMult;
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = 'sine';
-          osc.frequency.setValueAtTime(f * 0.90, start);
+          osc.frequency.setValueAtTime(f * 0.88, start);
           osc.frequency.exponentialRampToValueAtTime(f, start + 0.025);
           gain.gain.setValueAtTime(0.001, start);
-          gain.gain.linearRampToValueAtTime(0.20, start + 0.004);
-          gain.gain.exponentialRampToValueAtTime(0.001, start + 0.11);
+          gain.gain.linearRampToValueAtTime(0.22, start + 0.004);
+          gain.gain.exponentialRampToValueAtTime(0.001, start + 0.115);
           osc.connect(gain);
           gain.connect(this.dest());
           osc.start(start);
-          osc.stop(start + 0.115);
+          osc.stop(start + 0.12);
+
+          if (combo >= 2) {
+            const bell = ctx.createOscillator();
+            const bellGain = ctx.createGain();
+            bell.type = 'triangle';
+            bell.frequency.setValueAtTime(f * 2.0, start);
+            const bellPeak = Math.min(0.14, 0.05 + combo * 0.02);
+            bellGain.gain.setValueAtTime(0.001, start);
+            bellGain.gain.linearRampToValueAtTime(bellPeak, start + 0.003);
+            bellGain.gain.exponentialRampToValueAtTime(0.001, start + 0.085);
+            bell.connect(bellGain);
+            bellGain.connect(this.dest());
+            bell.start(start);
+            bell.stop(start + 0.09);
+          }
         }
       }
       playSnip() {
@@ -1902,6 +2076,9 @@
           const ringDiv = document.createElement('div');
           ringDiv.className = 'cell-ring';
 
+          const streakDiv = document.createElement('div');
+          streakDiv.className = 'tile-speed-streak';
+
           const pieceDiv = document.createElement('div');
           pieceDiv.className = 'tile-piece';
 
@@ -1923,6 +2100,7 @@
           lockOverlayDiv.appendChild(waxSealDiv);
 
           cell.appendChild(ringDiv);
+          cell.appendChild(streakDiv);
           cell.appendChild(pieceDiv);
           cell.appendChild(lockOverlayDiv);
           boardGridEl.appendChild(cell);
@@ -1930,6 +2108,7 @@
           cellPool[r][c] = {
             cell,
             ringDiv,
+            streakDiv,
             pieceDiv,
             pieceArtDiv,
             specialBadgeDiv,
@@ -1942,12 +2121,21 @@
     }
     initBoardDomPool();
 
-    function triggerCellRing(r, c, ringType) {
+    function getComboTierColor(comboTier) {
+      if (comboTier <= 1) return '#FFB703';
+      if (comboTier === 2) return '#F27D3A';
+      if (comboTier === 3) return '#E63956';
+      if (comboTier === 4) return '#8A56AC';
+      return '#FF2A85';
+    }
+
+    function triggerCellRing(r, c, ringType, comboTier = 1) {
       const slot = cellPool[r] && cellPool[r][c];
       if (!slot) return;
       slot.ringDiv.className = 'cell-ring';
       void slot.ringDiv.offsetWidth;
-      slot.ringDiv.className = `cell-ring ${ringType}`;
+      const tierClass = comboTier >= 2 ? ` combo-${Math.min(5, comboTier)}` : '';
+      slot.ringDiv.className = `cell-ring ${ringType}${tierClass}`;
     }
 
     /* Unified 60fps Master Animation & Depth-Layered Confetti Loop */
@@ -2087,6 +2275,7 @@
         dx: animSpec.dx || 0,
         dy: animSpec.dy || 0,
         arcSign: animSpec.arcSign || 1,
+        combo: animSpec.combo || 1,
         impactFired: false
       });
     }
@@ -2201,14 +2390,18 @@
           let rz = 0;
           let opacity = 1;
           let zClass = '';
+          let streakOpacity = 0;
+          let streakScaleY = 1;
+          let streakColor = '#FFB703';
 
           if (anim) {
             if (now < anim.startTime) {
               // Waiting for stagger delay on gravity drop
               if (anim.type === 'drop') {
+                const comboTier = Math.max(1, Math.min(5, anim.combo || 1));
                 ty = anim.dy * 106;
-                sx = 0.94;
-                sy = 1.06;
+                sx = 0.93 - (comboTier - 1) * 0.015;
+                sy = 1.07 + (comboTier - 1) * 0.025;
                 zClass = 'moving';
               }
             } else {
@@ -2236,28 +2429,36 @@
                   rz = sign * 6 * arcSin;
                   zClass = sign > 0 ? 'moving-top' : 'moving';
                 } else if (anim.type === 'drop') {
-                  // Smooth Gravity Glide + Cushioned Paper Landing Settle
-                  const fallSplit = 0.58;
+                  // Combo-Escalating Gravity Acceleration + Speed-Streak Wake + Multi-Bounce Elastic Slam
+                  const comboTier = Math.max(1, Math.min(5, anim.combo || 1));
+                  const comboBoost = 1 + (comboTier - 1) * 0.32;
+                  const fallSplit = Math.max(0.45, 0.56 - (comboTier - 1) * 0.022);
                   if (p < fallSplit) {
                     const fp = p / fallSplit;
-                    const grav = fp * fp * (0.38 + 0.62 * fp);
+                    const accelPower = 0.42 + (comboTier - 1) * 0.14;
+                    const grav = fp * fp * ((1 - accelPower) + accelPower * fp);
                     ty = anim.dy * 106 * (1 - grav);
-                    const vel = fp;
-                    sx = 1 - vel * 0.07;
-                    sy = 1 + vel * 0.10;
+                    const vel = Math.sin(fp * Math.PI * 0.85);
+                    sx = 1 - vel * (0.075 * comboBoost);
+                    sy = 1 + vel * (0.115 * comboBoost);
+                    streakColor = getComboTierColor(comboTier);
+                    streakOpacity = Math.min(0.95, vel * (0.38 + (comboTier - 1) * 0.15));
+                    streakScaleY = 0.75 + vel * (0.45 + Math.min(3, Math.abs(anim.dy)) * 0.22 + (comboTier - 1) * 0.25);
                   } else {
                     if (!anim.impactFired) {
                       anim.impactFired = true;
-                      triggerCellRing(r, c, 'impact-ring');
+                      triggerCellRing(r, c, 'impact-ring', comboTier);
                     }
                     const bp = (p - fallSplit) / (1 - fallSplit);
-                    const damp = Math.exp(-4.6 * bp);
-                    const bounceWave = Math.sin(bp * Math.PI * 1.5) * damp;
-                    ty = -Math.max(0, Math.sin(bp * Math.PI)) * 3.5 * damp;
-                    sx = 1 + bounceWave * 0.12;
-                    sy = 1 - bounceWave * 0.10;
+                    const damp = Math.exp((-4.4 + (comboTier - 1) * 0.22) * bp);
+                    const oscFreq = 1.65 + (comboTier - 1) * 0.25;
+                    const bounceWave = Math.sin(bp * Math.PI * oscFreq) * damp;
+                    const reboundHop = Math.max(0, Math.sin(bp * Math.PI * 1.25)) * (4.2 + (comboTier - 1) * 2.4) * damp;
+                    ty = -reboundHop;
+                    sx = 1 + bounceWave * (0.125 * comboBoost);
+                    sy = 1 - bounceWave * (0.110 * comboBoost);
                   }
-                  zClass = 'moving';
+                  zClass = comboTier >= 2 ? 'moving-top' : 'moving';
                 } else if (anim.type === 'crush') {
                   // Clean Planar Paper Pop
                   if (p < 0.34) {
@@ -2323,6 +2524,14 @@
           slot.cell.classList.toggle('moving', zClass === 'moving');
           slot.cell.classList.toggle('moving-top', zClass === 'moving-top');
 
+          if (streakOpacity > 0.01) {
+            slot.streakDiv.style.opacity = streakOpacity.toFixed(3);
+            slot.streakDiv.style.setProperty('--streak-color', streakColor);
+            slot.streakDiv.style.transform = `translate3d(0, ${ty.toFixed(2)}%, 0) scale3d(1, ${streakScaleY.toFixed(2)}, 1)`;
+          } else {
+            slot.streakDiv.style.opacity = '0';
+          }
+
           slot.pieceDiv.style.opacity = opacity.toFixed(3);
           slot.pieceDiv.style.transform =
             `translate3d(${tx.toFixed(2)}%, ${ty.toFixed(2)}%, 0) scale3d(${sx.toFixed(3)}, ${sy.toFixed(3)}, 1) rotateZ(${rz.toFixed(1)}deg)`;
@@ -2366,14 +2575,15 @@
     }, { passive: true });
     applyTiltLighting(0, 0);
 
-    function spawnFloatingPopup(r, c, text, isBig = false) {
+    function spawnFloatingPopup(r, c, text, isBig = false, combo = 1) {
       const el = document.createElement('div');
-      el.className = `floating-popup${isBig ? ' big' : ''}`;
+      const comboCls = combo >= 2 ? ` combo-${Math.min(5, combo)}` : '';
+      el.className = `floating-popup${isBig ? ' big' : ''}${comboCls}`;
       el.textContent = text;
       el.style.left = `${((c + 0.5) / BOARD_SIZE) * 100}%`;
       el.style.top = `${((r + 0.5) / BOARD_SIZE) * 100}%`;
       cardboardLidEl.appendChild(el);
-      setTimeout(() => el.remove(), 760);
+      setTimeout(() => el.remove(), 790);
     }
 
     const TOTAL_LEVELS = 50;
@@ -2831,12 +3041,17 @@
                 duration: 245
               });
             } else if (m.type === 'drop') {
-              const delayMs = c * 14 + r * 9;
-              const durMs = Math.min(340, Math.max(220, 195 + Math.abs(m.dy) * 26));
+              const comboTier = Math.max(1, Math.min(5, m.combo || 1));
+              const colStagger = Math.max(6, 14 - (comboTier - 1) * 2);
+              const rowStagger = Math.max(4, 9 - (comboTier - 1));
+              const delayMs = c * colStagger + r * rowStagger;
+              const speedFactor = Math.max(0.72, 1.0 - (comboTier - 1) * 0.065);
+              const durMs = Math.round(Math.min(340, Math.max(205, 195 + Math.abs(m.dy) * 26)) * speedFactor);
               startTileAnim(r, c, {
                 type: 'drop',
                 dx: 0,
                 dy: m.dy,
+                combo: comboTier,
                 delay: delayMs,
                 duration: durMs
               });
@@ -3026,15 +3241,40 @@
       return newlyFreed;
     }
 
-    function showComboBanner(text) {
+    let comboBannerTimer = null;
+    function showComboBanner(text, combo = 1) {
       const el = document.getElementById('combo-banner');
+      if (comboBannerTimer) clearTimeout(comboBannerTimer);
       if (!text) {
-        el.classList.remove('visible');
+        el.className = '';
         return;
       }
       el.textContent = text;
-      el.classList.add('visible');
-      setTimeout(() => el.classList.remove('visible'), 680);
+      const tierCls = combo >= 2 ? ` combo-${Math.min(5, combo)}` : '';
+      el.className = `visible${tierCls}`;
+      comboBannerTimer = setTimeout(() => {
+        el.className = '';
+      }, 720);
+    }
+
+    let cascadeStampTimer = null;
+    function updateCascadeStamp(combo = 0) {
+      const stampEl = document.getElementById('cascade-stamp');
+      if (cascadeStampTimer) clearTimeout(cascadeStampTimer);
+      cardboardLidEl.classList.remove('combo-heat-2', 'combo-heat-3', 'combo-heat-4', 'combo-heat-5');
+      if (combo < 2) {
+        stampEl.className = '';
+        return;
+      }
+      const clamped = Math.min(5, combo);
+      cardboardLidEl.classList.add(`combo-heat-${clamped}`);
+      const bangs = '!'.repeat(Math.min(4, combo - 1));
+      stampEl.textContent = `DROP x${combo}${bangs}`;
+      stampEl.className = `visible tier-${clamped}`;
+      cascadeStampTimer = setTimeout(() => {
+        stampEl.className = '';
+        cardboardLidEl.classList.remove('combo-heat-2', 'combo-heat-3', 'combo-heat-4', 'combo-heat-5');
+      }, 950);
     }
 
     const sleep = ms => new Promise(res => setTimeout(res, ms));
@@ -3042,7 +3282,10 @@
     async function crushAndCascade(initialSet, bonusPts = 55, preferredPivot = null) {
       state.busy = true;
       state.hintPair = null;
+      let combo = 0;
+
       if (initialSet && initialSet.size > 0) {
+        combo = 1;
         const { expanded, triggeredAny } = expandSpecialChain(initialSet);
         if (triggeredAny) audio.playSmash();
         punchBoard(triggeredAny ? 1.1 : 0.85);
@@ -3050,13 +3293,12 @@
         applyClearedSet(expanded, 1, bonusPts);
         renderBoard(expanded);
         await sleep(220);
-        const dropMotion = dropAndRefill(expanded, new Map());
-        audio.playBounce();
+        const dropMotion = dropAndRefill(expanded, new Map(), 1);
+        audio.playBounce(expanded.size, 1);
         renderAll(dropMotion);
-        await sleep(340);
+        await sleep(320);
       }
 
-      let combo = 0;
       let pivotToUse = preferredPivot;
       while (true) {
         const { matched, spawns, lineRip, colorStorm } = analyzeMatches(state.board, pivotToUse);
@@ -3064,6 +3306,9 @@
         if (matched.size === 0) break;
         combo++;
         audio.playChord(combo);
+        if (combo >= 2) {
+          updateCascadeStamp(combo);
+        }
 
         const { expanded, triggeredAny } = expandSpecialChain(matched);
         if (triggeredAny) audio.playSmash();
@@ -3078,30 +3323,35 @@
         const freedLocks = applyTapeDamage(expanded);
 
         const banner = colorStorm
-          ? '5-FOLD PINWHEEL CRAFTED! +1 BOOSTER'
+          ? (combo >= 2 ? `5-FOLD PINWHEEL x${combo}! +1 BOOSTER` : '5-FOLD PINWHEEL CRAFTED! +1 BOOSTER')
           : triggeredAny
-            ? 'SPECIAL PAPER CUTTER BLAST!'
+            ? (combo >= 2 ? `SPECIAL CUTTER BLAST x${combo}!` : 'SPECIAL PAPER CUTTER BLAST!')
             : lineRip
-              ? 'PAPER CUTTER CRAFTED!'
+              ? (combo >= 2 ? `PAPER CUTTER CRAFTED x${combo}!` : 'PAPER CUTTER CRAFTED!')
               : freedLocks > 0
-                ? 'TAPE SEAL RIPPED!'
-                : combo >= 3
-                  ? `ORIGAMI FEVER COMBO x${combo}!`
-                  : combo === 2
-                    ? 'DOUBLE FOLD x2!'
-                    : state.streak >= 3
-                      ? `HOT STREAK x${state.streak}!`
-                      : null;
-        if (banner) showComboBanner(banner);
+                ? (combo >= 2 ? `TAPE SEAL RIPPED x${combo}!` : 'TAPE SEAL RIPPED!')
+                : combo >= 5
+                  ? `SUPERNOVA DROP x${combo}!!!!`
+                  : combo === 4
+                    ? 'ULTRA CASCADE DROP x4!!!'
+                    : combo === 3
+                      ? 'MEGA CASCADE DROP x3!!'
+                      : combo === 2
+                        ? 'SUPER CASCADE DROP x2!'
+                        : state.streak >= 3
+                          ? `HOT STREAK x${state.streak}!`
+                          : null;
+        if (banner) showComboBanner(banner, combo);
 
-        punchBoard(colorStorm || triggeredAny ? 1.25 : lineRip || combo >= 2 ? 0.85 : 0.4);
+        punchBoard(colorStorm || triggeredAny ? 1.25 : lineRip || combo >= 2 ? Math.min(1.35, 0.75 + combo * 0.14) : 0.4);
         applyClearedSet(expanded, combo, colorStorm ? 65 : (lineRip || triggeredAny) ? 48 : 32);
         renderBoard(expanded);
-        await sleep(225);
-        const dropMotion = dropAndRefill(expanded, spawns);
-        audio.playBounce(expanded.size);
+        await sleep(Math.max(185, 225 - Math.min(3, combo - 1) * 12));
+        const nextDropCombo = Math.min(6, combo + 1);
+        const dropMotion = dropAndRefill(expanded, spawns, combo >= 2 ? combo : nextDropCombo);
+        audio.playBounce(expanded.size, combo);
         renderAll(dropMotion);
-        await sleep(340);
+        await sleep(Math.max(270, 335 - Math.min(4, combo - 1) * 15));
       }
 
       if (!findFirstValidMove()) {
@@ -3118,12 +3368,13 @@
     function applyClearedSet(set, combo, ptsPerTile) {
       let sumR = 0, sumC = 0;
       let goldBonus = 0;
+      const confettiCount = Math.min(28, 15 + Math.max(0, combo - 1) * 3);
       set.forEach(key => {
         const [r, c] = key.split(',').map(Number);
         sumR += r;
         sumC += c;
         const piece = state.board[r][c];
-        spawnConfettiAtCell(r, c, piece, 16);
+        spawnConfettiAtCell(r, c, piece, confettiCount);
         state.goals.forEach(g => {
           if (g.piece.id === piece.id) g.count++;
         });
@@ -3152,18 +3403,19 @@
       if (set.size > 0) {
         const avgR = sumR / set.size;
         const avgC = sumC / set.size;
+        const bangs = '!'.repeat(Math.min(4, Math.max(1, combo - 1)));
         const label = triggeredFever
-          ? `+${gained} FEVER 2x!`
+          ? (combo >= 2 ? `x${combo}${bangs} +${gained} FEVER!` : `+${gained} FEVER 2x!`)
           : isFever
-            ? `+${gained} (2x!)`
+            ? (combo >= 2 ? `x${combo}${bangs} +${gained} (2x!)` : `+${gained} (2x!)`)
             : combo >= 2
-              ? `+${gained} x${combo}!`
+              ? `x${combo}${bangs} +${gained}`
               : `+${gained}`;
-        spawnFloatingPopup(avgR, avgC, label, isFever || combo >= 2 || set.size >= 4);
+        spawnFloatingPopup(avgR, avgC, label, isFever || combo >= 2 || set.size >= 4, combo);
       }
     }
 
-    function dropAndRefill(removedSet, spawnsMap = new Map()) {
+    function dropAndRefill(removedSet, spawnsMap = new Map(), comboTier = 1) {
       const motionMap = new Map();
       const nextSpecials = {};
 
@@ -3185,7 +3437,8 @@
           motionMap.set(`${targetRow},${c}`, {
             dx: 0,
             dy: -(missingCount - i + 0.85 + i * 0.45),
-            type: 'drop'
+            type: 'drop',
+            combo: comboTier
           });
         }
         for (let i = 0; i < survivors.length; i++) {
@@ -3200,7 +3453,8 @@
             motionMap.set(`${targetRow},${c}`, {
               dx: 0,
               dy: -dropRows,
-              type: 'drop'
+              type: 'drop',
+              combo: comboTier
             });
           }
         }
