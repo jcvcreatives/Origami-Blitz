@@ -1916,6 +1916,8 @@
         this.isExcited = false;
         this.bgmTimer = null;
         this.bgmStep = 0;
+        this.activeVoices = 0;
+        this.maxVoices = 28;
         // Japanese Yo Pentatonic Scale (D, E, G, A, B) across octaves for unmistakable Origami identity
         this.yoScale = [
           293.66, 329.63, 392.00, 440.00, 493.88,
@@ -1925,19 +1927,13 @@
       }
       ensureCtx() {
         if (!this.enabled) return null;
-        if (!this.ctx) {
+        if (!this.ctx || this.ctx.state === 'closed') {
           const AC = window.AudioContext || window.webkitAudioContext;
           if (AC) {
             try {
               this.ctx = new AC();
-              const comp = this.ctx.createDynamicsCompressor();
-              comp.threshold.setValueAtTime(-14, this.ctx.currentTime);
-              comp.knee.setValueAtTime(18, this.ctx.currentTime);
-              comp.ratio.setValueAtTime(4, this.ctx.currentTime);
-              comp.attack.setValueAtTime(0.003, this.ctx.currentTime);
-              comp.release.setValueAtTime(0.15, this.ctx.currentTime);
-              comp.connect(this.ctx.destination);
-              this.master = comp;
+              this.activeVoices = 0;
+              this.rebuildMasterBus();
 
               // Pre-build 1.0s organic paper-fiber noise buffer for zero-alloc foley bursts
               const sr = this.ctx.sampleRate;
@@ -1952,7 +1948,7 @@
             } catch (_) {}
           }
         }
-        if (this.ctx && this.ctx.state === 'suspended') {
+        if (this.ctx && (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted')) {
           this.ctx.resume().catch(() => {});
         }
         if (this.enabled && !this.bgmTimer) {
@@ -1960,8 +1956,32 @@
         }
         return this.ctx;
       }
+      rebuildMasterBus() {
+        if (!this.ctx) return;
+        try {
+          if (this.master) {
+            try { this.master.disconnect(); } catch (_) {}
+          }
+          const comp = this.ctx.createDynamicsCompressor();
+          const now = this.ctx.currentTime;
+          comp.threshold.setValueAtTime(-14, now);
+          comp.knee.setValueAtTime(18, now);
+          comp.ratio.setValueAtTime(4, now);
+          comp.attack.setValueAtTime(0.003, now);
+          comp.release.setValueAtTime(0.15, now);
+          comp.connect(this.ctx.destination);
+          this.master = comp;
+        } catch (_) {
+          this.master = this.ctx.destination;
+        }
+      }
       dest() {
         return this.master || (this.ctx && this.ctx.destination);
+      }
+      canSpawnVoice(isBgm = false) {
+        if (this.activeVoices < 0) this.activeVoices = 0;
+        const limit = isBgm ? this.maxVoices - 4 : this.maxVoices;
+        return this.activeVoices < limit;
       }
       updateMood(stageNumber = 1, isExcited = false) {
         this.stageNumber = Math.max(1, Math.min(10, stageNumber));
@@ -1978,7 +1998,10 @@
             this.bgmTimer = null;
             return;
           }
-          if (this.ctx && this.ctx.state === 'running') {
+          if (this.ctx && (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted')) {
+            this.ctx.resume().catch(() => {});
+          }
+          if (this.ctx && this.ctx.state === 'running' && this.canSpawnVoice(true)) {
             const now = this.ctx.currentTime;
             const stgMod = this.stageNumber % 5;
             const semitones = stgMod === 1 ? 0 : stgMod === 2 ? 2 : stgMod === 3 ? -2 : stgMod === 4 ? 5 : 3;
@@ -1989,21 +2012,21 @@
             const chimeIdx = chimePattern[s];
 
             // 1. Plucked Silk Koto + Music-Box Kalimba Melody Note
-            this.triggerKotoPluck(melFreq, now, 0.052, 0.24, s % 4 === 0);
+            this.triggerKotoPluck(melFreq, now, 0.052, 0.22, s % 4 === 0, true);
 
             // 2. Warm Hollow Bamboo Bass Pluck
             if (bassIdx >= 0) {
-              this.triggerKotoPluck(this.yoScale[bassIdx] * shift * 0.5, now, 0.042, 0.28, false);
+              this.triggerKotoPluck(this.yoScale[bassIdx] * shift * 0.5, now, 0.042, 0.25, false, true);
             }
 
             // 3. Sparkling Furin Wind-Chime Counter-Melody during Fever / Cascades
             if (this.isExcited && chimeIdx >= 0) {
-              this.triggerKotoPluck(this.yoScale[chimeIdx] * shift, now + 0.12, 0.032, 0.18, false);
+              this.triggerKotoPluck(this.yoScale[chimeIdx] * shift, now + 0.12, 0.032, 0.16, false, true);
             }
 
             // 4. Soft Washi Paper-Brush Shaker on off-beats
             if (s % 2 === 1) {
-              this.triggerFoleyBurst(now, 0.045, 2400, 3.2, 0.022);
+              this.triggerFoleyBurst(now, 0.042, 2400, 3.2, 0.022, null, true);
             }
             this.bgmStep = (this.bgmStep + 1) % 16;
           }
@@ -2018,58 +2041,143 @@
           this.bgmTimer = null;
         }
       }
-      triggerFoleyBurst(startTime, duration, filterFreq, Q, peakGain, endFreq = null) {
-        if (!this.ctx || !this.noiseBuf) return;
-        const src = this.ctx.createBufferSource();
-        src.buffer = this.noiseBuf;
-        const filter = this.ctx.createBiquadFilter();
-        filter.type = 'bandpass';
-        filter.frequency.setValueAtTime(filterFreq, startTime);
-        if (endFreq) {
-          filter.frequency.exponentialRampToValueAtTime(endFreq, startTime + duration);
-        }
-        filter.Q.setValueAtTime(Q, startTime);
-        const gain = this.ctx.createGain();
-        gain.gain.setValueAtTime(0.001, startTime);
-        gain.gain.linearRampToValueAtTime(peakGain, startTime + Math.min(0.005, duration * 0.2));
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-        src.connect(filter);
-        filter.connect(gain);
-        gain.connect(this.dest());
-        const offset = Math.random() * Math.max(0.05, 0.9 - duration);
-        src.start(startTime, offset, duration + 0.01);
+      triggerFoleyBurst(startTime, duration, filterFreq, Q, peakGain, endFreq = null, isBgm = false) {
+        if (!this.ctx || !this.noiseBuf || !this.canSpawnVoice(isBgm)) return;
+        try {
+          const src = this.ctx.createBufferSource();
+          src.buffer = this.noiseBuf;
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.setValueAtTime(filterFreq, startTime);
+          if (endFreq) {
+            filter.frequency.exponentialRampToValueAtTime(endFreq, startTime + duration);
+          }
+          filter.Q.setValueAtTime(Q, startTime);
+          const gain = this.ctx.createGain();
+          const stopAt = startTime + duration;
+          gain.gain.setValueAtTime(0.0001, startTime);
+          gain.gain.linearRampToValueAtTime(peakGain, startTime + Math.min(0.005, duration * 0.2));
+          gain.gain.exponentialRampToValueAtTime(0.0001, stopAt);
+          gain.gain.setValueAtTime(0, stopAt + 0.002);
+          src.connect(filter);
+          filter.connect(gain);
+          gain.connect(this.dest());
+
+          this.activeVoices++;
+          let cleaned = false;
+          src.onended = () => {
+            if (cleaned) return;
+            cleaned = true;
+            this.activeVoices = Math.max(0, this.activeVoices - 1);
+            try { src.disconnect(); } catch (_) {}
+            try { filter.disconnect(); } catch (_) {}
+            try { gain.disconnect(); } catch (_) {}
+          };
+
+          const offset = Math.random() * Math.max(0.05, 0.9 - duration);
+          src.start(startTime, offset, duration + 0.006);
+        } catch (_) {}
       }
-      triggerKotoPluck(freq, startTime, peakGain = 0.16, duration = 0.22, graceBend = false) {
-        if (!this.ctx) return;
-        const osc1 = this.ctx.createOscillator();
-        const oscTine = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        const tineGain = this.ctx.createGain();
-        osc1.type = 'triangle';
-        oscTine.type = 'sine';
-        if (graceBend) {
-          osc1.frequency.setValueAtTime(freq * 1.022, startTime);
-          osc1.frequency.exponentialRampToValueAtTime(freq, startTime + 0.028);
-        } else {
-          osc1.frequency.setValueAtTime(freq, startTime);
-        }
-        // Kalimba / Music-box metallic tine overtone at 2.96x
-        oscTine.frequency.setValueAtTime(freq * 2.96, startTime);
-        tineGain.gain.setValueAtTime(peakGain * 0.35, startTime);
-        tineGain.gain.exponentialRampToValueAtTime(0.001, startTime + duration * 0.45);
+      triggerKotoPluck(freq, startTime, peakGain = 0.16, duration = 0.22, graceBend = false, isBgm = false) {
+        if (!this.ctx || !this.canSpawnVoice(isBgm)) return;
+        try {
+          const osc1 = this.ctx.createOscillator();
+          const oscTine = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const tineGain = this.ctx.createGain();
+          osc1.type = 'triangle';
+          oscTine.type = 'sine';
+          if (graceBend) {
+            osc1.frequency.setValueAtTime(freq * 1.022, startTime);
+            osc1.frequency.exponentialRampToValueAtTime(freq, startTime + 0.028);
+          } else {
+            osc1.frequency.setValueAtTime(freq, startTime);
+          }
+          const tineDur = duration * 0.45;
+          oscTine.frequency.setValueAtTime(freq * 2.96, startTime);
+          tineGain.gain.setValueAtTime(peakGain * 0.35, startTime);
+          tineGain.gain.exponentialRampToValueAtTime(0.0001, startTime + tineDur);
+          tineGain.gain.setValueAtTime(0, startTime + tineDur + 0.002);
 
-        gain.gain.setValueAtTime(0.001, startTime);
-        gain.gain.linearRampToValueAtTime(peakGain, startTime + 0.003);
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+          gain.gain.setValueAtTime(0.0001, startTime);
+          gain.gain.linearRampToValueAtTime(peakGain, startTime + 0.003);
+          gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+          gain.gain.setValueAtTime(0, startTime + duration + 0.002);
 
-        osc1.connect(gain);
-        oscTine.connect(tineGain);
-        tineGain.connect(this.dest());
-        gain.connect(this.dest());
-        osc1.start(startTime);
-        oscTine.start(startTime);
-        osc1.stop(startTime + duration + 0.01);
-        oscTine.stop(startTime + duration * 0.45 + 0.01);
+          osc1.connect(gain);
+          oscTine.connect(tineGain);
+          tineGain.connect(this.dest());
+          gain.connect(this.dest());
+
+          this.activeVoices++;
+          let cleanedMain = false;
+          osc1.onended = () => {
+            if (cleanedMain) return;
+            cleanedMain = true;
+            this.activeVoices = Math.max(0, this.activeVoices - 1);
+            try { osc1.disconnect(); } catch (_) {}
+            try { gain.disconnect(); } catch (_) {}
+          };
+          oscTine.onended = () => {
+            try { oscTine.disconnect(); } catch (_) {}
+            try { tineGain.disconnect(); } catch (_) {}
+          };
+
+          osc1.start(startTime);
+          oscTine.start(startTime);
+          osc1.stop(startTime + duration + 0.006);
+          oscTine.stop(startTime + tineDur + 0.006);
+        } catch (_) {}
+      }
+      triggerTonePair(startTime, duration, peakGain, type1, f1Start, f1End, type2 = null, f2Start = 0, f2Dur = 0) {
+        if (!this.ctx || !this.canSpawnVoice(false)) return;
+        try {
+          const osc1 = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc1.type = type1;
+          osc1.frequency.setValueAtTime(f1Start, startTime);
+          if (f1End && f1End !== f1Start) {
+            osc1.frequency.exponentialRampToValueAtTime(f1End, startTime + duration * 0.85);
+          }
+          gain.gain.setValueAtTime(0.0001, startTime);
+          gain.gain.linearRampToValueAtTime(peakGain, startTime + 0.003);
+          gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+          gain.gain.setValueAtTime(0, startTime + duration + 0.002);
+          osc1.connect(gain);
+
+          let osc2 = null;
+          if (type2 && f2Start > 0) {
+            osc2 = this.ctx.createOscillator();
+            osc2.type = type2;
+            osc2.frequency.setValueAtTime(f2Start, startTime);
+            osc2.connect(gain);
+            osc2.onended = () => {
+              try { osc2.disconnect(); } catch (_) {}
+            };
+          }
+
+          gain.connect(this.dest());
+          this.activeVoices++;
+          let cleaned = false;
+          osc1.onended = () => {
+            if (cleaned) return;
+            cleaned = true;
+            this.activeVoices = Math.max(0, this.activeVoices - 1);
+            try { osc1.disconnect(); } catch (_) {}
+            if (osc2) {
+              try { osc2.disconnect(); } catch (_) {}
+            }
+            try { gain.disconnect(); } catch (_) {}
+          };
+
+          osc1.start(startTime);
+          osc1.stop(startTime + duration + 0.006);
+          if (osc2) {
+            const d2 = f2Dur > 0 ? f2Dur : duration;
+            osc2.start(startTime);
+            osc2.stop(startTime + d2 + 0.006);
+          }
+        } catch (_) {}
       }
       playCrinkle(intensity = 1) {
         const ctx = this.ensureCtx();
@@ -2083,18 +2191,7 @@
         this.triggerFoleyBurst(now + 0.018, 0.038, 2600, 2.5, 0.13);
 
         // 2. Hollow Corrugated Box Wood-Cavity Knock (290Hz -> 175Hz)
-        const knock = ctx.createOscillator();
-        const kGain = ctx.createGain();
-        knock.type = 'sine';
-        knock.frequency.setValueAtTime(290, now);
-        knock.frequency.exponentialRampToValueAtTime(175, now + 0.038);
-        kGain.gain.setValueAtTime(0.001, now);
-        kGain.gain.linearRampToValueAtTime(0.14, now + 0.002);
-        kGain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
-        knock.connect(kGain);
-        kGain.connect(this.dest());
-        knock.start(now);
-        knock.stop(now + 0.05);
+        this.triggerTonePair(now, 0.045, 0.14, 'sine', 290, 175);
 
         // 3. Plucked Bamboo Kalimba Tine
         this.triggerKotoPluck(baseFreq, now, 0.20, 0.16, true);
@@ -2123,23 +2220,7 @@
           { delay: 0.095, freq: 293.66 }
         ].forEach(({ delay, freq }) => {
           const start = now + delay;
-          const osc = ctx.createOscillator();
-          const osc2 = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'triangle';
-          osc2.type = 'sine';
-          osc.frequency.setValueAtTime(freq, start);
-          osc2.frequency.setValueAtTime(freq * 2.42, start);
-          gain.gain.setValueAtTime(0.001, start);
-          gain.gain.linearRampToValueAtTime(0.20, start + 0.003);
-          gain.gain.exponentialRampToValueAtTime(0.001, start + 0.085);
-          osc.connect(gain);
-          osc2.connect(gain);
-          gain.connect(this.dest());
-          osc.start(start);
-          osc2.start(start);
-          osc.stop(start + 0.09);
-          osc2.stop(start + 0.09);
+          this.triggerTonePair(start, 0.085, 0.20, 'triangle', freq, freq, 'sine', freq * 2.42, 0.085);
         });
       }
       playBounce(tileCount = 4, combo = 1) {
@@ -2158,18 +2239,7 @@
           const f = dropNotes[i % dropNotes.length] * comboPitchMult;
 
           // 1. Hollow Corrugated Cardboard Box-Lid Thump (138Hz -> 64Hz)
-          const thump = ctx.createOscillator();
-          const tGain = ctx.createGain();
-          thump.type = 'sine';
-          thump.frequency.setValueAtTime(138 + comboBoost * 12, start);
-          thump.frequency.exponentialRampToValueAtTime(64, start + 0.048);
-          tGain.gain.setValueAtTime(0.001, start);
-          tGain.gain.linearRampToValueAtTime(0.16 + comboBoost * 0.015, start + 0.003);
-          tGain.gain.exponentialRampToValueAtTime(0.001, start + 0.065);
-          thump.connect(tGain);
-          tGain.connect(this.dest());
-          thump.start(start);
-          thump.stop(start + 0.07);
+          this.triggerTonePair(start, 0.065, 0.16 + comboBoost * 0.015, 'sine', 138 + comboBoost * 12, 64);
 
           // 2. Crisp Paper-Coaster Edge Slap Foley
           this.triggerFoleyBurst(start, 0.028, 1950 + comboBoost * 220, 2.0, 0.11 + comboBoost * 0.015);
@@ -2189,23 +2259,7 @@
         ].forEach(({ delay, f1, f2, noiseF }) => {
           const start = now + delay;
           this.triggerFoleyBurst(start, 0.065, noiseF, 3.0, 0.25, noiseF * 1.45);
-          const osc1 = ctx.createOscillator();
-          const osc2 = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc1.type = 'sine';
-          osc2.type = 'triangle';
-          osc1.frequency.setValueAtTime(f1, start);
-          osc2.frequency.setValueAtTime(f2, start);
-          gain.gain.setValueAtTime(0.001, start);
-          gain.gain.linearRampToValueAtTime(0.18, start + 0.002);
-          gain.gain.exponentialRampToValueAtTime(0.001, start + 0.13);
-          osc1.connect(gain);
-          osc2.connect(gain);
-          gain.connect(this.dest());
-          osc1.start(start);
-          osc2.start(start);
-          osc1.stop(start + 0.135);
-          osc2.stop(start + 0.135);
+          this.triggerTonePair(start, 0.13, 0.18, 'sine', f1, f1, 'triangle', f2, 0.13);
         });
       }
       playGlue() {
@@ -2213,19 +2267,7 @@
         if (!ctx) return;
         const now = ctx.currentTime;
         // Wet craft-glue uncapping squish glide (280Hz -> 820Hz) + sticky paper peel + Koto pluck
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(280.0, now);
-        osc.frequency.exponentialRampToValueAtTime(820.0, now + 0.14);
-        gain.gain.setValueAtTime(0.001, now);
-        gain.gain.linearRampToValueAtTime(0.24, now + 0.004);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
-        osc.connect(gain);
-        gain.connect(this.dest());
-        osc.start(now);
-        osc.stop(now + 0.165);
-
+        this.triggerTonePair(now, 0.16, 0.24, 'sine', 280.0, 820.0);
         this.triggerFoleyBurst(now + 0.09, 0.055, 2200, 2.2, 0.16);
         this.triggerKotoPluck(1174.66, now + 0.095, 0.20, 0.16, true);
       }
@@ -2234,24 +2276,7 @@
         if (!ctx) return;
         const now = ctx.currentTime;
         // 1. Deep Hollow Corrugated Box Lid Stomp (175Hz -> 48Hz) + Box Cavity (142Hz)
-        const kick = ctx.createOscillator();
-        const cavity = ctx.createOscillator();
-        const kickGain = ctx.createGain();
-        kick.type = 'sine';
-        cavity.type = 'triangle';
-        kick.frequency.setValueAtTime(175, now);
-        kick.frequency.exponentialRampToValueAtTime(48, now + 0.22);
-        cavity.frequency.setValueAtTime(142, now);
-        kickGain.gain.setValueAtTime(0.001, now);
-        kickGain.gain.linearRampToValueAtTime(0.36, now + 0.003);
-        kickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.30);
-        kick.connect(kickGain);
-        cavity.connect(kickGain);
-        kickGain.connect(this.dest());
-        kick.start(now);
-        cavity.start(now);
-        kick.stop(now + 0.31);
-        cavity.stop(now + 0.16);
+        this.triggerTonePair(now, 0.30, 0.36, 'sine', 175, 48, 'triangle', 142, 0.16);
 
         // 2. Bursting Kraft-Paper Rip Foley
         this.triggerFoleyBurst(now, 0.14, 1450, 1.5, 0.28, 2800);
@@ -4714,10 +4739,17 @@
       renderAll();
     });
 
-    // Unlock WebAudio & start Origami Workshop BGM on first user gesture
-    window.addEventListener('pointerdown', () => {
-      if (audio.enabled) audio.ensureCtx();
-    }, { once: true, passive: true });
+    // Keep WebAudio unlocked & active across all user gestures and tab visibility changes
+    ['pointerdown', 'touchstart', 'keydown'].forEach(evt => {
+      window.addEventListener(evt, () => {
+        if (audio.enabled) audio.ensureCtx();
+      }, { passive: true });
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && audio.enabled) {
+        audio.ensureCtx();
+      }
+    });
 
     document.getElementById('btn-open-map').addEventListener('click', openWorldMap);
     document.getElementById('header-tapes-group').addEventListener('click', openWorldMap);

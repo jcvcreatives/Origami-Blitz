@@ -7,12 +7,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.PI
 import kotlin.math.abs
-import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.pow
 import kotlin.math.sin
@@ -21,23 +23,36 @@ import kotlin.random.Random
 /**
  * Bespoke "Origami Craft-Table" Acoustic & Foley Synthesizer + Interactive BGM Engine.
  *
- * Replaces generic synth tones with authentic papercraft foley (torn washi paper fibers,
- * crisp origami crease snaps, corrugated cardboard box cavity resonance, steel scissor shears)
- * layered with traditional Japanese & craft-room acoustic instruments (Plucked Silk Koto,
- * Bamboo Marimba, Music-Box Kalimba tines, and Furin wind-chimes), plus a dynamic
- * stage-reactive Origami Workshop background music loop.
+ * Uses a SINGLE persistent streaming AudioTrack (MODE_STREAM) with a real-time software
+ * voice mixer so Android's AudioFlinger never exhausts native AudioTrack handles even after
+ * hours of continuous play and intense x2/x3/x4+ cascades.
  */
 class PaperSoundSynthesizer {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val sampleRate = 44100
 
+    private class ActiveVoice(
+        val samples: ShortArray,
+        val isBgm: Boolean = false,
+        var cursor: Int = 0
+    )
+
+    private val pendingVoices = ConcurrentLinkedQueue<ActiveVoice>()
+    private val queuedVoiceCount = AtomicInteger(0)
+
+    @Volatile
+    private var mixerRunning: Boolean = true
+
+    private var mixerJob: Job? = null
+
     var isEnabled: Boolean = true
         set(value) {
             field = value
-            if (value) {
-                startWorkshopMusicLoop()
+            if (!value) {
+                pendingVoices.clear()
+                queuedVoiceCount.set(0)
             } else {
-                stopWorkshopMusicLoop()
+                ensureMixerLoopRunning()
             }
         }
 
@@ -47,7 +62,8 @@ class PaperSoundSynthesizer {
     @Volatile
     private var feverIntensity: Int = 0
 
-    private var bgmJob: Job? = null
+    @Volatile
+    private var bgmEnabled: Boolean = true
 
     // Japanese Yo Pentatonic Scale (D, E, G, A, B) across octaves for unmistakable Origami identity
     private val yoPentatonic = doubleArrayOf(
@@ -69,7 +85,7 @@ class PaperSoundSynthesizer {
     private var tapCycleIndex = 0
 
     init {
-        startWorkshopMusicLoop()
+        ensureMixerLoopRunning()
     }
 
     /**
@@ -79,19 +95,89 @@ class PaperSoundSynthesizer {
     fun updateMusicalMood(stageNumber: Int, isFeverOrHighCombo: Boolean) {
         currentStageIndex = stageNumber.coerceIn(1, 10)
         feverIntensity = if (isFeverOrHighCombo) 1 else 0
-        if (isEnabled && (bgmJob == null || bgmJob?.isActive != true)) {
-            startWorkshopMusicLoop()
+        if (isEnabled) {
+            bgmEnabled = true
+            ensureMixerLoopRunning()
+        }
+    }
+
+    fun startWorkshopMusicLoop() {
+        bgmEnabled = true
+        if (isEnabled) {
+            ensureMixerLoopRunning()
+        }
+    }
+
+    fun stopWorkshopMusicLoop() {
+        bgmEnabled = false
+        pendingVoices.clear()
+        queuedVoiceCount.set(0)
+    }
+
+    fun shutdown() {
+        mixerRunning = false
+        bgmEnabled = false
+        pendingVoices.clear()
+        queuedVoiceCount.set(0)
+        mixerJob?.cancel()
+        scope.cancel()
+    }
+
+    private fun enqueueVoice(samples: ShortArray, isBgm: Boolean = false) {
+        if (!isEnabled || samples.isEmpty()) return
+        ensureMixerLoopRunning()
+        // Prevent unbounded queue growth if many sounds fire on the same frame
+        if (queuedVoiceCount.get() < 24) {
+            pendingVoices.offer(ActiveVoice(samples = samples, isBgm = isBgm))
+            queuedVoiceCount.incrementAndGet()
+        }
+    }
+
+    private fun createStreamingTrack(chunkBytes: Int): AudioTrack? {
+        return try {
+            val minBuf = AudioTrack.getMinBufferSize(
+                sampleRate,
+                AudioFormat.CHANNEL_OUT_MONO,
+                AudioFormat.ENCODING_PCM_16BIT
+            ).coerceAtLeast(chunkBytes * 2)
+
+            AudioTrack.Builder()
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_GAME)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setSampleRate(sampleRate)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .build()
+                )
+                .setBufferSizeInBytes(minBuf)
+                .setTransferMode(AudioTrack.MODE_STREAM)
+                .build()
+                .also { it.play() }
+        } catch (_: Throwable) {
+            null
         }
     }
 
     /**
-     * Starts the procedural "Origami Workshop" Background Music sequencer:
-     * Plucked Koto + Wooden Kalimba Music-Box + Washi Paper-Brush Shaker in Yo Pentatonic.
+     * Single persistent streaming AudioTrack mixer & sample-accurate BGM sequencer.
+     * Eliminates per-sound AudioTrack creation/destruction so sound never drops out over time.
      */
-    fun startWorkshopMusicLoop() {
-        if (!isEnabled) return
-        if (bgmJob?.isActive == true) return
-        bgmJob = scope.launch {
+    @Synchronized
+    private fun ensureMixerLoopRunning() {
+        if (mixerJob?.isActive == true) return
+        mixerRunning = true
+        mixerJob = scope.launch(Dispatchers.IO) {
+            val chunkSamples = 882 // 20ms at 44.1kHz
+            val mixFloat = FloatArray(chunkSamples)
+            val outPcm = ShortArray(chunkSamples)
+            val activeVoices = ArrayList<ActiveVoice>(16)
+
             // 16-step enchanting papercraft workshop melody indices into yoPentatonic
             val melodyPattern = intArrayOf(
                 5, 7, 8, 7,   9, 8, 7, 5,
@@ -105,46 +191,136 @@ class PaperSoundSynthesizer {
                 -1, 10, -1, 9,  -1, 11, -1, 10,
                 -1, 9, -1, 12,  -1, 10, -1, 8
             )
-            var step = 0
-            while (isActive && isEnabled) {
-                val stageShiftSemitones = when (currentStageIndex % 5) {
-                    1 -> 0   // D Yo Pentatonic (Warm Pine Woods)
-                    2 -> 2   // E Yo Pentatonic (Bright Boardwalk)
-                    3 -> -2  // C Yo Pentatonic (Golden Canyon)
-                    4 -> 5   // G Yo Pentatonic (Sky Harbor)
-                    else -> 3 // F Yo Pentatonic (Starlight Palace)
+
+            var bgmStep = 0
+            var samplesUntilNextBgmStep = 0
+            var track: AudioTrack? = createStreamingTrack(chunkSamples * 2)
+
+            try {
+                while (isActive && mixerRunning) {
+                    if (!isEnabled) {
+                        activeVoices.clear()
+                        pendingVoices.clear()
+                        queuedVoiceCount.set(0)
+                        delay(45L)
+                        continue
+                    }
+
+                    // Drain newly triggered SFX voices into active mixer list
+                    while (true) {
+                        val next = pendingVoices.poll() ?: break
+                        queuedVoiceCount.decrementAndGet()
+                        if (activeVoices.size >= 14) {
+                            // Drop oldest BGM voice or oldest nearly-finished voice to preserve headroom
+                            val bgmIdx = activeVoices.indexOfFirst { it.isBgm }
+                            if (bgmIdx >= 0) {
+                                activeVoices.removeAt(bgmIdx)
+                            } else {
+                                activeVoices.removeAt(0)
+                            }
+                        }
+                        activeVoices.add(next)
+                    }
+
+                    // Sample-accurate BGM step scheduling directly inside the mixer
+                    if (bgmEnabled) {
+                        samplesUntilNextBgmStep -= chunkSamples
+                        if (samplesUntilNextBgmStep <= 0) {
+                            val stageShiftSemitones = when (currentStageIndex % 5) {
+                                1 -> 0   // D Yo Pentatonic (Warm Pine Woods)
+                                2 -> 2   // E Yo Pentatonic (Bright Boardwalk)
+                                3 -> -2  // C Yo Pentatonic (Golden Canyon)
+                                4 -> 5   // G Yo Pentatonic (Sky Harbor)
+                                else -> 3 // F Yo Pentatonic (Starlight Palace)
+                            }
+                            val pitchShift = 2.0.pow(stageShiftSemitones / 12.0)
+                            val isExcited = feverIntensity > 0
+                            val stepDurationSec = if (isExcited) 0.24f else 0.28f
+                            samplesUntilNextBgmStep = (sampleRate * stepDurationSec * 0.96f).toInt()
+
+                            val melIdx = melodyPattern[bgmStep % melodyPattern.size]
+                            val bassIdx = bassPattern[bgmStep % bassPattern.size]
+                            val counterIdx = counterPattern[bgmStep % counterPattern.size]
+
+                            val melFreq = yoPentatonic[melIdx] * pitchShift
+                            val bassFreq = if (bassIdx >= 0) yoPentatonic[bassIdx] * pitchShift * 0.5 else 0.0
+                            val counterFreq = if (isExcited && counterIdx >= 0) yoPentatonic[counterIdx] * pitchShift else 0.0
+                            val hasPaperShaker = (bgmStep % 2 == 1)
+
+                            val bgmSamples = synthesizeBgmStep(
+                                durationSec = stepDurationSec,
+                                melodyFreq = melFreq,
+                                bassFreq = bassFreq,
+                                counterFreq = counterFreq,
+                                paperBrush = hasPaperShaker,
+                                accent = (bgmStep % 4 == 0)
+                            )
+                            activeVoices.add(ActiveVoice(samples = bgmSamples, isBgm = true))
+                            bgmStep = (bgmStep + 1) % 16
+                        }
+                    }
+
+                    if (activeVoices.isEmpty()) {
+                        // Write silence or sleep briefly when no voices are active
+                        delay(16L)
+                        continue
+                    }
+
+                    mixFloat.fill(0f)
+                    val invShortMax = 1f / Short.MAX_VALUE
+                    var vIdx = activeVoices.size - 1
+                    while (vIdx >= 0) {
+                        val voice = activeVoices[vIdx]
+                        val src = voice.samples
+                        var cur = voice.cursor
+                        val limit = minOf(chunkSamples, src.size - cur)
+                        for (i in 0 until limit) {
+                            mixFloat[i] += src[cur + i] * invShortMax
+                        }
+                        cur += limit
+                        voice.cursor = cur
+                        if (cur >= src.size) {
+                            activeVoices.removeAt(vIdx)
+                        }
+                        vIdx--
+                    }
+
+                    for (i in 0 until chunkSamples) {
+                        val clipped = softClip(mixFloat[i])
+                        outPcm[i] = (clipped * Short.MAX_VALUE * 0.92f).toInt().toShort()
+                    }
+
+                    if (track == null || track.state != AudioTrack.STATE_INITIALIZED) {
+                        try { track?.release() } catch (_: Throwable) {}
+                        track = createStreamingTrack(chunkSamples * 2)
+                    }
+
+                    val activeTrack = track
+                    if (activeTrack != null) {
+                        if (activeTrack.playState != AudioTrack.PLAYSTATE_PLAYING) {
+                            try { activeTrack.play() } catch (_: Throwable) {}
+                        }
+                        val written = try {
+                            activeTrack.write(outPcm, 0, chunkSamples)
+                        } catch (_: Throwable) {
+                            -1
+                        }
+                        if (written < 0) {
+                            // Self-heal if Android audio routing or track ever invalidates
+                            try { activeTrack.stop() } catch (_: Throwable) {}
+                            try { activeTrack.release() } catch (_: Throwable) {}
+                            track = createStreamingTrack(chunkSamples * 2)
+                            delay(20L)
+                        }
+                    } else {
+                        delay(20L)
+                    }
                 }
-                val pitchShift = 2.0.pow(stageShiftSemitones / 12.0)
-                val isExcited = feverIntensity > 0
-                val stepDurationSec = if (isExcited) 0.24f else 0.28f
-
-                val melIdx = melodyPattern[step % melodyPattern.size]
-                val bassIdx = bassPattern[step % bassPattern.size]
-                val counterIdx = counterPattern[step % counterPattern.size]
-
-                val melFreq = yoPentatonic[melIdx] * pitchShift
-                val bassFreq = if (bassIdx >= 0) yoPentatonic[bassIdx] * pitchShift * 0.5 else 0.0
-                val counterFreq = if (isExcited && counterIdx >= 0) yoPentatonic[counterIdx] * pitchShift else 0.0
-                val hasPaperShaker = (step % 2 == 1)
-
-                val phraseSamples = synthesizeBgmStep(
-                    durationSec = stepDurationSec,
-                    melodyFreq = melFreq,
-                    bassFreq = bassFreq,
-                    counterFreq = counterFreq,
-                    paperBrush = hasPaperShaker,
-                    accent = (step % 4 == 0)
-                )
-                playPcmBuffer(phraseSamples, stepDurationSec)
-                step = (step + 1) % 16
-                delay((stepDurationSec * 960L).toLong())
+            } finally {
+                try { track?.stop() } catch (_: Throwable) {}
+                try { track?.release() } catch (_: Throwable) {}
             }
         }
-    }
-
-    fun stopWorkshopMusicLoop() {
-        bgmJob?.cancel()
-        bgmJob = null
     }
 
     private fun synthesizeBgmStep(
@@ -165,14 +341,12 @@ class PaperSoundSynthesizer {
             val attack = (t / 0.005f).coerceIn(0f, 1f)
 
             // 1. Plucked Koto + Music-Box Kalimba Melody Voice
-            // Subtle koto pitch grace bend on accented beats
             val kotoBend = if (accent) 1.0 + 0.018 * exp(-35.0 * t) else 1.0
             val fMel = melodyFreq * kotoBend
             val melEnv = exp(-8.5 * t).toFloat()
             val harmEnv = exp(-22.0 * t).toFloat()
             val tineEnv = exp(-45.0 * t).toFloat()
 
-            // Koto string harmonics + Music-box inharmonic tine (2.98x)
             val kotoVoice = (
                 sin(2.0 * PI * fMel * t) * 0.55 * melEnv +
                 sin(2.0 * PI * (fMel * 2.0) * t) * 0.25 * harmEnv +
@@ -219,7 +393,6 @@ class PaperSoundSynthesizer {
 
     /**
      * Crisp Origami Crease Snap + Bamboo Kalimba Pluck for tapping/selecting paper tiles.
-     * Combines micro-impulse paper fiber folding foley with a resonant wood-cavity kalimba tine.
      */
     fun playPaperCrinkle(intensity: Int = 1) {
         if (!isEnabled) return
@@ -236,7 +409,6 @@ class PaperSoundSynthesizer {
                 val t = i.toFloat() / sampleRate
                 val attack = (t / 0.0025f).coerceIn(0f, 1f)
 
-                // 1. Tactile Origami Paper Fold Crease Foley (3 micro-crackle fiber impulses)
                 val raw = Random.nextFloat() * 2f - 1f
                 lpNoise = lpNoise * 0.72f + raw * 0.28f
                 val paperBand = lpNoise - prevLp
@@ -247,12 +419,10 @@ class PaperSoundSynthesizer {
                 val creaseBurst3 = if (t >= 0.032f) exp(-75.0 * (t - 0.032f)).toFloat() * 0.50f else 0f
                 val paperCreaseFoley = paperBand * (creaseBurst1 + creaseBurst2 + creaseBurst3) * 0.42f
 
-                // 2. Hollow Corrugated Box Wood-Cavity Knock (310Hz -> 185Hz)
                 val knockFreq = 185.0 + 125.0 * exp(-90.0 * t)
                 val knockEnv = exp(-48.0 * t).toFloat()
                 val woodKnock = sin(2.0 * PI * knockFreq * t).toFloat() * knockEnv * 0.28f
 
-                // 3. Plucked Bamboo Kalimba Tine (Fundamental + 2.92x Metallic Tine Partial)
                 val env1 = exp(-18.0 * t).toFloat()
                 val envTine = exp(-42.0 * t).toFloat()
                 val kalimba = (
@@ -264,7 +434,7 @@ class PaperSoundSynthesizer {
                 val sample = softClip((paperCreaseFoley + woodKnock + kalimba) * attack)
                 samples[i] = (sample * Short.MAX_VALUE * 0.66f).toInt().toShort()
             }
-            playPcmBuffer(samples, durationSec)
+            enqueueVoice(samples)
         }
     }
 
@@ -284,17 +454,14 @@ class PaperSoundSynthesizer {
                 val t = i.toFloat() / sampleRate
                 val attack = (t / 0.002f).coerceIn(0f, 1f)
 
-                // Twin scissor blade shears at t=0s and t=0.082s
                 val snip1Env = exp(-34.0 * t).toFloat()
                 val snip2Env = if (t >= 0.082f) exp(-30.0 * (t - 0.082f)).toFloat() else 0f
 
-                // High-frequency steel blade friction noise (bandpassed high)
                 val raw = Random.nextFloat() * 2f - 1f
                 lp1 = lp1 * 0.45f + raw * 0.55f
                 lp2 = lp2 * 0.82f + lp1 * 0.18f
                 val highSteelNoise = (lp1 - lp2) * (snip1Env + snip2Env * 1.1f) * 0.52f
 
-                // Metallic blade ring (inharmonic steel partials: 1480Hz + 3890Hz, then 1975Hz + 5120Hz)
                 val ring1 = (
                     sin(2.0 * PI * 1480.0 * t) * 0.45 +
                     sin(2.0 * PI * 3890.0 * t) * 0.30 +
@@ -310,7 +477,7 @@ class PaperSoundSynthesizer {
                 val sample = softClip((highSteelNoise + ring1 + ring2) * attack)
                 samples[i] = (sample * Short.MAX_VALUE * 0.65f).toInt().toShort()
             }
-            playPcmBuffer(samples, durationSec)
+            enqueueVoice(samples)
         }
     }
 
@@ -329,7 +496,6 @@ class PaperSoundSynthesizer {
                 val t = i.toFloat() / sampleRate
                 val attack = (t / 0.003f).coerceIn(0f, 1f)
 
-                // 1. Viscous glue-stick suction glide (280Hz -> 820Hz with formant modulation)
                 val glideFreq = 280.0 + 540.0 * (t / 0.14f).coerceIn(0f, 1f).pow(1.6f)
                 val squishEnv = exp(-12.0 * t).toFloat()
                 val squishMod = 1.0f + 0.35f * sin(2.0 * PI * 38.0 * t).toFloat()
@@ -338,7 +504,6 @@ class PaperSoundSynthesizer {
                     sin(2.0 * PI * (glideFreq * 1.85) * t) * 0.28
                 ).toFloat() * squishEnv * squishMod
 
-                // 2. Soft paper-press thud + sticky peel noise at t=0.095s
                 val raw = Random.nextFloat() * 2f - 1f
                 lpNoise = lpNoise * 0.78f + raw * 0.22f
                 val pop2 = if (t >= 0.095f) {
@@ -352,13 +517,12 @@ class PaperSoundSynthesizer {
                 val sample = softClip((glueSquish + pop2) * attack)
                 samples[i] = (sample * Short.MAX_VALUE * 0.65f).toInt().toShort()
             }
-            playPcmBuffer(samples, durationSec)
+            enqueueVoice(samples)
         }
     }
 
     /**
-     * Corrugated Cardboard Carton Stomp + Kraft-Paper Rip + Taiko/Koto Power Chord
-     * for the Wooden Mallet Smash and Special Paper Cutter Blasts.
+     * Corrugated Cardboard Carton Stomp + Kraft-Paper Rip + Taiko/Koto Power Chord.
      */
     fun playCardboardSmash() {
         if (!isEnabled) return
@@ -373,13 +537,11 @@ class PaperSoundSynthesizer {
                 val t = i.toFloat() / sampleRate
                 val attack = (t / 0.0025f).coerceIn(0f, 1f)
 
-                // 1. Deep Hollow Corrugated Box Lid Thud (175Hz -> 48Hz) + Box Cavity Resonance (142Hz)
                 val kickPhase = 2.0 * PI * (48.0 * t + (127.0 / 24.0) * (1.0 - exp(-24.0 * t)))
                 val kickEnv = exp(-10.5 * t).toFloat()
                 val boxCavity = sin(2.0 * PI * 142.0 * t).toFloat() * exp(-22.0 * t).toFloat() * 0.32f
                 val cardboardStomp = sin(kickPhase).toFloat() * kickEnv * 0.68f + boxCavity
 
-                // 2. Bursting Kraft-Paper Rip Foley (staggered tear impulses)
                 val raw = Random.nextFloat() * 2f - 1f
                 lpNoise = lpNoise * 0.70f + raw * 0.30f
                 val tearBand = lpNoise - prevLp
@@ -387,7 +549,6 @@ class PaperSoundSynthesizer {
                 val tearGate = (0.65f + 0.35f * sin(2.0 * PI * 95.0 * t).toFloat()) * exp(-14.0 * t).toFloat()
                 val paperRip = tearBand * tearGate * 0.42f
 
-                // 3. Resonant Japanese Yo Fifth + Octave Koto Chord (D5 + A5 + D6)
                 val chordEnv = exp(-10.0 * t).toFloat()
                 val kotoChord = (
                     sin(2.0 * PI * 587.33 * t) * 0.24 +
@@ -398,13 +559,13 @@ class PaperSoundSynthesizer {
                 val sample = softClip((cardboardStomp + paperRip + kotoChord) * attack)
                 samples[i] = (sample * Short.MAX_VALUE * 0.72f).toInt().toShort()
             }
-            playPcmBuffer(samples, durationSec)
+            enqueueVoice(samples)
         }
     }
 
     /**
      * Authentic Torn Washi Paper Rip Foley + Ascending Plucked Koto & Music-Box Arpeggio
-     * in the Japanese Yo Pentatonic scale. Escalates in pitch and shimmer with each cascade tier!
+     * in the Japanese Yo Pentatonic scale.
      */
     fun playComboChord(comboStep: Int) {
         if (!isEnabled) return
@@ -416,11 +577,9 @@ class PaperSoundSynthesizer {
             val numSamples = (sampleRate * durationSec).toInt()
             val samples = ShortArray(numSamples)
 
-            // Climb up the Yo scale with every cascade step (x1, x2, x3, x4, x5+)
             val semitoneShift = (comboStep - 1).coerceIn(0, 12) * 2
             val pitchMult = 2.0.pow(semitoneShift / 12.0)
 
-            // Yo Pentatonic Koto Arpeggio: D5, E5, G5, A5, B5, D6
             val notes = doubleArrayOf(
                 587.33 * pitchMult,
                 659.25 * pitchMult,
@@ -437,31 +596,26 @@ class PaperSoundSynthesizer {
                 val t = i.toFloat() / sampleRate
                 var mix = 0f
 
-                // 1. Tactile Torn Washi Paper Rip Foley during the first 120ms of the crush
                 if (t < 0.13f) {
                     val raw = Random.nextFloat() * 2f - 1f
                     lpNoise = lpNoise * 0.68f + raw * 0.32f
                     val ripBand = lpNoise - prevLp
                     prevLp = lpNoise * 0.85f
-                    // Rapid fiber-tearing grain modulation (140Hz grain)
                     val fiberGrain = (0.55f + 0.45f * sin(2.0 * PI * 145.0 * t).toFloat())
                     val ripEnv = sin((t / 0.13f) * PI).toFloat() * exp(-12.0 * t).toFloat()
                     mix += ripBand * fiberGrain * ripEnv * 0.36f
                 }
 
-                // 2. Strumming 6-String Silk Koto & Music-Box Tines
                 for (idx in notes.indices) {
                     val start = idx * 0.032f
                     if (t >= start) {
                         val lt = t - start
                         val noteAttack = (lt / 0.0025f).coerceIn(0f, 1f)
-                        // Subtle koto pluck pitch-transient
                         val freq = notes[idx] * (1.0 + 0.015 * exp(-65.0 * lt))
                         val envMain = exp(-7.5 * lt).toFloat()
                         val envHarm = exp(-17.0 * lt).toFloat()
                         val envTine = exp(-32.0 * lt).toFloat()
 
-                        // Plucked Koto string (1x, 2x, 3x) + Music-box metallic tine (2.96x)
                         val voice = (
                             sin(2.0 * PI * freq * lt) * 0.52 * envMain +
                             sin(2.0 * PI * (freq * 2.0) * lt) * 0.26 * envHarm +
@@ -476,7 +630,7 @@ class PaperSoundSynthesizer {
                 val sample = softClip(mix)
                 samples[i] = (sample * Short.MAX_VALUE * 0.68f).toInt().toShort()
             }
-            playPcmBuffer(samples, durationSec)
+            enqueueVoice(samples)
         }
     }
 
@@ -495,17 +649,15 @@ class PaperSoundSynthesizer {
                 val t = i.toFloat() / sampleRate
                 val isSecond = t >= 0.095f
                 val lt = if (isSecond) t - 0.095f else t
-                val freq = if (!isSecond) 392.00 else 293.66 // G4 -> D4 hollow bamboo tok
+                val freq = if (!isSecond) 392.00 else 293.66
                 val attack = (lt / 0.0025f).coerceIn(0f, 1f)
                 val env = exp(-28.0 * lt).toFloat()
                 val tineEnv = exp(-55.0 * lt).toFloat()
 
-                // Dry paper crinkle rustle
                 val raw = Random.nextFloat() * 2f - 1f
                 lpNoise = lpNoise * 0.74f + raw * 0.26f
                 val crinkle = (raw - lpNoise) * exp(-40.0 * lt).toFloat() * 0.22f
 
-                // Hollow bamboo woodblock (fundamental + 2.42x hollow cavity partial)
                 val woodblock = (
                     sin(2.0 * PI * freq * lt).toFloat() * env * 0.72f +
                     sin(2.0 * PI * (freq * 2.42) * lt).toFloat() * tineEnv * 0.28f
@@ -513,7 +665,7 @@ class PaperSoundSynthesizer {
 
                 samples[i] = (softClip(woodblock + crinkle) * Short.MAX_VALUE * 0.54f).toInt().toShort()
             }
-            playPcmBuffer(samples, durationSec)
+            enqueueVoice(samples)
         }
     }
 
@@ -535,20 +687,17 @@ class PaperSoundSynthesizer {
                 val norm = (t / durationSec).coerceIn(0f, 1f)
                 val attack = (t / 0.003f).coerceIn(0f, 1f)
 
-                // 1. Textured construction-paper coaster sliding friction + mid-arc fold snap
                 val raw = Random.nextFloat() * 2f - 1f
                 val filterCoeff = (0.86f - 0.28f * sin(PI * norm).toFloat()).coerceIn(0.45f, 0.90f)
                 lpNoise = lpNoise * filterCoeff + raw * (1f - filterCoeff)
                 val slideFriction = (lpNoise - prevLp) * sin(PI * norm).toFloat() * 0.38f
                 prevLp = lpNoise * 0.85f
 
-                // Crisp fold snap when the two coasters cross at mid-swap (t = 0.065s)
                 val foldSnap = if (abs(t - 0.065f) < 0.025f) {
                     val dt = abs(t - 0.065f)
                     (raw - lpNoise) * exp(-110.0 * dt).toFloat() * 0.28f
                 } else 0f
 
-                // 2. Two-note Bamboo & Koto fifth interval (D5 587.33Hz -> A5 880.0Hz)
                 val isSecondNote = t >= 0.065f
                 val noteT = if (isSecondNote) t - 0.065f else t
                 val noteFreq = if (isSecondNote) 880.00 else 587.33
@@ -561,14 +710,13 @@ class PaperSoundSynthesizer {
                 val sample = softClip((slideFriction + foldSnap + kotoPluck) * attack)
                 samples[i] = (sample * Short.MAX_VALUE * 0.58f).toInt().toShort()
             }
-            playPcmBuffer(samples, durationSec)
+            enqueueVoice(samples)
         }
     }
 
     /**
      * Corrugated Cardboard Box-Lid Landing Thumps + Paper-Edge Flutter + Ascending Bamboo Marimba
      * & Koto Plucks in the Japanese Yo Pentatonic Scale!
-     * Escalates in pitch, cardboard slam punch, and Furin wind-chime shimmer on x2, x3, x4+ cascades.
      */
     fun playDropBounce(tileCount: Int = 3, comboStep: Int = 1) {
         if (!isEnabled) return
@@ -577,7 +725,6 @@ class PaperSoundSynthesizer {
             val numSamples = (sampleRate * durationSec).toInt()
             val samples = ShortArray(numSamples)
             val hits = tileCount.coerceIn(2, 6)
-            // Yo Pentatonic Bamboo Marimba notes: D4, E4, G4, A4, B4, D5
             val dropNotes = doubleArrayOf(293.66, 329.63, 392.00, 440.00, 493.88, 587.33)
             val semitoneShift = (comboStep - 1).coerceIn(0, 10) * 2
             val pitchMult = 2.0.pow(semitoneShift / 12.0)
@@ -599,16 +746,13 @@ class PaperSoundSynthesizer {
                         val attack = (lt / 0.0025f).coerceIn(0f, 1f)
                         val baseNote = dropNotes[h % dropNotes.size] * pitchMult
 
-                        // 1. Hollow Corrugated Cardboard Box Cavity Thump (138Hz -> 64Hz)
                         val boxFreq = 64.0 + (74.0 + comboBoost * 12.0) * exp(-65.0 * lt)
                         val boxEnv = exp(-28.0 * lt).toFloat()
                         val cardboardThump = sin(2.0 * PI * boxFreq * lt).toFloat() * boxEnv * (0.38f + comboBoost * 0.04f)
 
-                        // 2. Crisp Paper-Coaster Edge Slap Transient
                         val slapEnv = exp(-75.0 * lt).toFloat()
                         val paperSlap = (raw - lpNoise) * slapEnv * (0.18f + comboBoost * 0.03f)
 
-                        // 3. Resonant Bamboo Marimba + Koto Tine (Fundamental + 2x + 2.95x Tine)
                         val marimbaEnv = exp(-19.0 * lt).toFloat()
                         val harmEnv = exp(-36.0 * lt).toFloat()
                         val furinSparkle = if (comboStep >= 2) {
@@ -629,7 +773,7 @@ class PaperSoundSynthesizer {
                 val value = softClip(acc)
                 samples[i] = (value * Short.MAX_VALUE * 0.68f).toInt().toShort()
             }
-            playPcmBuffer(samples, durationSec)
+            enqueueVoice(samples)
         }
     }
 
@@ -643,7 +787,6 @@ class PaperSoundSynthesizer {
             val durationSec = 0.72f
             val numSamples = (sampleRate * durationSec).toInt()
             val samples = ShortArray(numSamples)
-            // Yo Pentatonic Royal Koto Glissando: D5 - E5 - G5 - A5 - B5 - D6 - G6
             val notes = doubleArrayOf(587.33, 659.25, 783.99, 880.00, 987.77, 1174.66, 1567.98)
             var lpNoise = 0f
 
@@ -653,7 +796,6 @@ class PaperSoundSynthesizer {
                 lpNoise = lpNoise * 0.75f + raw * 0.25f
                 var mix = 0f
 
-                // Initial celebratory paper-popper confetti burst
                 if (t < 0.09f) {
                     val popEnv = exp(-35.0 * t).toFloat()
                     mix += (raw - lpNoise) * popEnv * 0.26f
@@ -681,7 +823,7 @@ class PaperSoundSynthesizer {
                 val sample = softClip(mix)
                 samples[i] = (sample * Short.MAX_VALUE * 0.68f).toInt().toShort()
             }
-            playPcmBuffer(samples, durationSec)
+            enqueueVoice(samples)
         }
     }
 
@@ -691,45 +833,5 @@ class PaperSoundSynthesizer {
     private fun softClip(x: Float): Float {
         val clamped = x.coerceIn(-1.5f, 1.5f)
         return (clamped - (clamped * clamped * clamped) / 6.75f).coerceIn(-1f, 1f)
-    }
-
-    private fun playPcmBuffer(samples: ShortArray, durationSec: Float) {
-        var track: AudioTrack? = null
-        try {
-            val byteSize = samples.size * 2
-            track = AudioTrack.Builder()
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_GAME)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
-                .setAudioFormat(
-                    AudioFormat.Builder()
-                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                        .setSampleRate(sampleRate)
-                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                        .build()
-                )
-                .setBufferSizeInBytes(byteSize.coerceAtLeast(2048))
-                .setTransferMode(AudioTrack.MODE_STATIC)
-                .build()
-
-            track.write(samples, 0, samples.size)
-            track.play()
-            scope.launch {
-                delay((durationSec * 1000L).toLong() + 80L)
-                try {
-                    track.stop()
-                } catch (_: Throwable) {}
-                try {
-                    track.release()
-                } catch (_: Throwable) {}
-            }
-        } catch (_: Throwable) {
-            try {
-                track?.release()
-            } catch (_: Throwable) {}
-        }
     }
 }

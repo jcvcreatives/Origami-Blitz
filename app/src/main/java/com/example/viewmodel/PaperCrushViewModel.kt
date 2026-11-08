@@ -2061,7 +2061,7 @@ class PaperCrushViewModel(
 
     override fun onCleared() {
         super.onCleared()
-        soundSynth.stopWorkshopMusicLoop()
+        soundSynth.shutdown()
     }
 
     companion object {
