@@ -16,6 +16,8 @@ import com.example.model.PaperGameState
 import com.example.model.PieceType
 import com.example.model.TOTAL_LEVELS
 import com.example.model.TileSpecial
+import com.example.model.TutorialPrompt
+import com.example.model.TutorialTargetType
 import com.example.model.computeDioramaLandingY
 import com.example.model.getLevelBlueprint
 import kotlinx.coroutines.Job
@@ -90,7 +92,27 @@ class PaperCrushViewModel(
         val clampedLevel = level.coerceIn(1, TOTAL_LEVELS)
         val bp = getLevelBlueprint(clampedLevel)
 
-        val initialBoard = generatePlayableBoard(bp.tapeLocks.keys)
+        val rawBoard = generatePlayableBoard(bp.tapeLocks.keys)
+        val initialBoard = seedTutorialBoardIfApplicable(rawBoard, clampedLevel)
+        val tutorialBoosters = if (clampedLevel <= 3) {
+            boosters.mapValues { (_, count) -> count.coerceAtLeast(2) }
+        } else {
+            boosters
+        }
+        val isTutorialLevel = clampedLevel in 1..3
+        val initialPrompt = if (isTutorialLevel) {
+            computeTutorialPrompt(
+                level = clampedLevel,
+                step = 1,
+                dismissed = false,
+                board = initialBoard,
+                goldCells = bp.goldCells,
+                tapeLocks = bp.tapeLocks,
+                activeBooster = null
+            )
+        } else {
+            null
+        }
         _uiState.value = PaperGameState(
             level = clampedLevel,
             highestUnlockedLevel = maxOf(highestUnlockedLevel, clampedLevel).coerceAtMost(TOTAL_LEVELS),
@@ -109,15 +131,93 @@ class PaperCrushViewModel(
             initialTapeCount = bp.tapeLocks.size,
             mechanicLabel = bp.mechanicLabel,
             board = initialBoard,
-            boosters = boosters,
+            boosters = tutorialBoosters,
             soundEnabled = soundEnabled,
-            status = GameStatus.PLAYING
+            status = GameStatus.PLAYING,
+            tutorialStep = 1,
+            tutorialDismissed = !isTutorialLevel,
+            tutorialPrompt = initialPrompt
         )
         persistProgress()
         val stageNum = ((clampedLevel - 1) / 5) + 1
         soundSynth.updateMusicalMood(stageNumber = stageNum, isFeverOrHighCombo = false)
         if (!showMap) {
             scheduleIdleHint()
+        }
+    }
+
+    fun dismissTutorial() {
+        soundSynth.playPaperCrinkle(1)
+        _uiState.update {
+            it.copy(
+                tutorialDismissed = true,
+                tutorialPrompt = null
+            )
+        }
+        scheduleIdleHint()
+    }
+
+    fun reopenTutorial() {
+        soundSynth.playPaperCrinkle(1)
+        _uiState.update { state ->
+            val ensuredBoard = if (state.level == 1 && !hasAnySpecialTile(state.board)) {
+                ensureSpecialTileAt(state.board, GridPos(1, 3), TileSpecial.ROW_CUTTER)
+            } else {
+                state.board
+            }
+            val prompt = computeTutorialPrompt(
+                level = state.level,
+                step = 1,
+                dismissed = false,
+                board = ensuredBoard,
+                goldCells = state.goldCells,
+                tapeLocks = state.tapeLocks,
+                activeBooster = state.activeBooster
+            )
+            state.copy(
+                board = ensuredBoard,
+                tutorialStep = 1,
+                tutorialDismissed = false,
+                tutorialPrompt = prompt
+            )
+        }
+    }
+
+    fun advanceTutorialStep() {
+        val current = _uiState.value
+        if (current.tutorialDismissed) return
+        soundSynth.playPaperCrinkle(2)
+        if (current.tutorialStep >= 2) {
+            dismissTutorial()
+            return
+        }
+        _uiState.update { state ->
+            val nextStep = 2
+            val updatedBoard = if (state.level == 1 && !hasAnySpecialTile(state.board)) {
+                ensureSpecialTileAt(state.board, GridPos(2, 3), TileSpecial.ROW_CUTTER)
+            } else {
+                state.board
+            }
+            val autoBooster = if (state.level == 3 && state.activeBooster == null) {
+                BoosterType.HAMMER
+            } else {
+                state.activeBooster
+            }
+            val nextPrompt = computeTutorialPrompt(
+                level = state.level,
+                step = nextStep,
+                dismissed = false,
+                board = updatedBoard,
+                goldCells = state.goldCells,
+                tapeLocks = state.tapeLocks,
+                activeBooster = autoBooster
+            )
+            state.copy(
+                board = updatedBoard,
+                activeBooster = autoBooster,
+                tutorialStep = nextStep,
+                tutorialPrompt = nextPrompt
+            )
         }
     }
 
@@ -223,20 +323,53 @@ class PaperCrushViewModel(
         idleHintJob?.cancel()
         val count = state.boosters[booster] ?: 0
         if (state.activeBooster == booster) {
-            _uiState.update {
-                it.copy(activeBooster = null, glueFirstPos = null, selectedPos = null, hintPair = null)
+            _uiState.update { st ->
+                val revertedStep = if (st.level == 3 && !st.tutorialDismissed) 1 else st.tutorialStep
+                val nextPrompt = computeTutorialPrompt(
+                    level = st.level,
+                    step = revertedStep,
+                    dismissed = st.tutorialDismissed,
+                    board = st.board,
+                    goldCells = st.goldCells,
+                    tapeLocks = st.tapeLocks,
+                    activeBooster = null
+                )
+                st.copy(
+                    activeBooster = null,
+                    glueFirstPos = null,
+                    selectedPos = null,
+                    hintPair = null,
+                    tutorialStep = revertedStep,
+                    tutorialPrompt = nextPrompt
+                )
             }
             scheduleIdleHint()
             return
         }
         if (count <= 0) return
         soundSynth.playPaperCrinkle(1)
-        _uiState.update {
-            it.copy(
+        _uiState.update { st ->
+            val nextStep = if (!st.tutorialDismissed && (st.level == 3 || st.tutorialPrompt?.targetType == TutorialTargetType.BOOSTER_BAR)) {
+                2
+            } else {
+                st.tutorialStep
+            }
+            val nextPrompt = computeTutorialPrompt(
+                level = st.level,
+                step = nextStep,
+                dismissed = st.tutorialDismissed,
+                board = st.board,
+                goldCells = st.goldCells,
+                tapeLocks = st.tapeLocks,
+                activeBooster = booster
+            )
+            st.copy(
                 activeBooster = booster,
                 glueFirstPos = null,
                 selectedPos = null,
-                hintPair = null
+                hintPair = null,
+                tutorialStep = nextStep,
+                tutorialPrompt = nextPrompt
             )
         }
     }
@@ -1072,6 +1205,31 @@ class PaperCrushViewModel(
             updatedHighestLevel = maxOf(updatedHighestLevel, (postState.level + 1).coerceAtMost(TOTAL_LEVELS))
         }
 
+        var nextTutorialStep = postState.tutorialStep
+        var nextTutorialDismissed = postState.tutorialDismissed
+        if (!postState.tutorialDismissed && nextStatus == GameStatus.PLAYING) {
+            if (postState.tutorialStep == 1) {
+                nextTutorialStep = 2
+                if (postState.level == 1 && !hasAnySpecialTile(currentBoard)) {
+                    currentBoard = ensureSpecialTileAt(currentBoard, GridPos(2, 3), TileSpecial.ROW_CUTTER)
+                }
+            } else {
+                nextTutorialDismissed = true
+            }
+        } else if (nextStatus != GameStatus.PLAYING) {
+            nextTutorialDismissed = true
+        }
+
+        val updatedTutorialPrompt = computeTutorialPrompt(
+            level = postState.level,
+            step = nextTutorialStep,
+            dismissed = nextTutorialDismissed,
+            board = currentBoard,
+            goldCells = postState.goldCells,
+            tapeLocks = postState.tapeLocks,
+            activeBooster = null
+        )
+
         _uiState.update {
             it.copy(
                 board = currentBoard,
@@ -1081,7 +1239,10 @@ class PaperCrushViewModel(
                 status = nextStatus,
                 lastEarnedStars = earnedStars,
                 levelStars = updatedStarsMap,
-                highestUnlockedLevel = updatedHighestLevel
+                highestUnlockedLevel = updatedHighestLevel,
+                tutorialStep = nextTutorialStep,
+                tutorialDismissed = nextTutorialDismissed,
+                tutorialPrompt = updatedTutorialPrompt
             )
         }
         val finalState = _uiState.value
@@ -1441,6 +1602,302 @@ class PaperCrushViewModel(
         lockedPositions: Set<GridPos> = emptySet()
     ): Boolean {
         return findFirstValidMove(board, lockedPositions) != null
+    }
+
+    private fun hasAnySpecialTile(board: List<List<BoardTile>>): Boolean {
+        return board.any { row -> row.any { it.special != TileSpecial.NONE } }
+    }
+
+    private fun ensureSpecialTileAt(
+        board: List<List<BoardTile>>,
+        pos: GridPos,
+        special: TileSpecial,
+        forcedType: PieceType? = null
+    ): List<List<BoardTile>> {
+        return board.mapIndexed { r, row ->
+            row.mapIndexed { c, tile ->
+                if (r == pos.row && c == pos.col) {
+                    tile.copy(
+                        type = forcedType ?: tile.type,
+                        special = special
+                    )
+                } else {
+                    tile
+                }
+            }
+        }
+    }
+
+    /**
+     * Seeds Levels 1, 2, and 3 with deterministic, crystal-clear interactive tutorial setups
+     * so players immediately learn how to make their first match and use special power-ups & boosters.
+     */
+    private fun seedTutorialBoardIfApplicable(
+        board: List<List<BoardTile>>,
+        level: Int
+    ): List<List<BoardTile>> {
+        if (level !in 1..3 || board.size != BOARD_SIZE) return board
+        val mutable = board.map { it.toMutableList() }.toMutableList()
+
+        fun setPiece(r: Int, c: Int, type: PieceType, special: TileSpecial = TileSpecial.NONE) {
+            val old = mutable[r][c]
+            mutable[r][c] = old.copy(type = type, special = special)
+        }
+
+        when (level) {
+            1 -> {
+                // Level 1:
+                // 1) Guaranteed horizontal 3-match in the center row: swapping (3, 1) <-> (3, 2)
+                //    lines up 3 ORIGAMI_FOX tiles at (3, 2), (3, 3), (3, 4)!
+                setPiece(3, 1, PieceType.ORIGAMI_FOX)
+                setPiece(3, 2, PieceType.PEPPERMINT)
+                setPiece(3, 3, PieceType.ORIGAMI_FOX)
+                setPiece(3, 4, PieceType.ORIGAMI_FOX)
+                // Prevent accidental pre-matches around (3,1..4)
+                setPiece(3, 0, PieceType.ORIGAMI_CRANE)
+                setPiece(3, 5, PieceType.CARDBOARD_STAR)
+                setPiece(2, 1, PieceType.CUPCAKE)
+                setPiece(4, 1, PieceType.WRAPPED_CANDY)
+                setPiece(2, 2, PieceType.CARDBOARD_STAR)
+                setPiece(4, 2, PieceType.ORIGAMI_CRANE)
+                setPiece(2, 3, PieceType.PEPPERMINT)
+                setPiece(4, 3, PieceType.CUPCAKE)
+                setPiece(2, 4, PieceType.WRAPPED_CANDY)
+                setPiece(4, 4, PieceType.CARDBOARD_STAR)
+
+                // 2) Pre-placed Row Cutter (↔) at (1, 3) for Step 2 Special Power-Up tutorial!
+                setPiece(1, 3, PieceType.ORIGAMI_FOX, TileSpecial.ROW_CUTTER)
+                setPiece(1, 2, PieceType.CUPCAKE)
+                setPiece(1, 4, PieceType.ORIGAMI_CRANE)
+            }
+            2 -> {
+                // Level 2:
+                // Pre-place a Rainbow Pinwheel (✹) at (3, 3) and a 3x3 Origami Bomb (✦) at (2, 2)
+                // right on the Gold Washi Stamp cells!
+                setPiece(3, 3, PieceType.PEPPERMINT, TileSpecial.PINWHEEL_RAINBOW)
+                setPiece(3, 4, PieceType.PEPPERMINT)
+                setPiece(2, 2, PieceType.ORIGAMI_FOX, TileSpecial.PAPER_BOMB)
+            }
+            3 -> {
+                // Level 3:
+                // Pre-place a 3x3 Origami Bomb (✦) at (3, 3) and a Column Cutter (↕) at (2, 3)
+                // inside the Gold Stamp Diamond so using a Craft Booster triggers an epic chain!
+                setPiece(3, 3, PieceType.CARDBOARD_STAR, TileSpecial.PAPER_BOMB)
+                setPiece(2, 3, PieceType.ORIGAMI_CRANE, TileSpecial.COL_CUTTER)
+            }
+        }
+        return mutable.map { it.toList() }
+    }
+
+    private fun computeTutorialPrompt(
+        level: Int,
+        step: Int,
+        dismissed: Boolean,
+        board: List<List<BoardTile>>,
+        goldCells: Set<GridPos>,
+        tapeLocks: Map<GridPos, Int>,
+        activeBooster: BoosterType?
+    ): TutorialPrompt? {
+        if (dismissed || board.size != BOARD_SIZE) return null
+
+        val bestMove = findFirstValidMove(board, tapeLocks.keys)
+        val specialTilePos: GridPos? = run {
+            for (r in 0 until BOARD_SIZE) {
+                for (c in 0 until BOARD_SIZE) {
+                    if (board[r][c].special != TileSpecial.NONE && (tapeLocks[GridPos(r, c)] ?: 0) == 0) {
+                        return@run GridPos(r, c)
+                    }
+                }
+            }
+            null
+        }
+
+        return when (level) {
+            1 -> {
+                if (step <= 1) {
+                    // Prefer our seeded center move (3, 1) -> (3, 2) if still intact, otherwise bestMove
+                    val seededValid = board[3][1].type == PieceType.ORIGAMI_FOX &&
+                        board[3][2].type != PieceType.ORIGAMI_FOX &&
+                        board[3][3].type == PieceType.ORIGAMI_FOX &&
+                        board[3][4].type == PieceType.ORIGAMI_FOX
+                    val fromPos = if (seededValid) GridPos(3, 1) else (bestMove?.first ?: GridPos(3, 1))
+                    val toPos = if (seededValid) GridPos(3, 2) else (bestMove?.second ?: GridPos(3, 2))
+                    val swappedPreview = swapPositions(board, fromPos, toPos)
+                    val matchedCells = findMatchedPositions(swappedPreview) + setOf(fromPos, toPos)
+
+                    TutorialPrompt(
+                        level = 1,
+                        stepIndex = 1,
+                        totalSteps = 2,
+                        badgeText = "LEVEL 1 TUTORIAL • STEP 1 OF 2",
+                        title = "Make Your First Origami Match!",
+                        instruction = "Swipe or tap the 2 glowing blocks to fold 3 matching pieces in a row!",
+                        powerUpTip = "✦ Match 4 crafts a Line Cutter (↔/↕) • Match 5 crafts a Rainbow Pinwheel (✹)!",
+                        targetType = TutorialTargetType.BOARD_SWAP,
+                        fromPos = fromPos,
+                        toPos = toPos,
+                        highlightCells = matchedCells
+                    )
+                } else {
+                    val spPos = specialTilePos ?: bestMove?.first ?: GridPos(2, 3)
+                    val neighborPos = GridPos(spPos.row, (spPos.col + 1).coerceAtMost(BOARD_SIZE - 1))
+                    val rowCells = (0 until BOARD_SIZE).map { GridPos(spPos.row, it) }.toSet()
+                    TutorialPrompt(
+                        level = 1,
+                        stepIndex = 2,
+                        totalSteps = 2,
+                        badgeText = "LEVEL 1 TUTORIAL • STEP 2 OF 2",
+                        title = "Use Special Line Cutter (↔)!",
+                        instruction = "Double-tap the glowing Line Cutter (↔) block—or swap it—to slice the entire row!",
+                        powerUpTip = "✦ Every 4-tile match crafts a Row (↔) or Column (↕) Cutter power-up!",
+                        targetType = TutorialTargetType.BOARD_SPECIAL_TILE,
+                        fromPos = spPos,
+                        toPos = neighborPos,
+                        highlightCells = rowCells
+                    )
+                }
+            }
+            2 -> {
+                if (step <= 1) {
+                    val rainbowPos = run {
+                        for (r in 0 until BOARD_SIZE) {
+                            for (c in 0 until BOARD_SIZE) {
+                                if (board[r][c].special == TileSpecial.PINWHEEL_RAINBOW) {
+                                    return@run GridPos(r, c)
+                                }
+                            }
+                        }
+                        specialTilePos ?: GridPos(3, 3)
+                    }
+                    val neighborPos = GridPos(rainbowPos.row, (rainbowPos.col + 1).coerceAtMost(BOARD_SIZE - 1))
+                    val bombPos = GridPos(2, 2)
+                    TutorialPrompt(
+                        level = 2,
+                        stepIndex = 1,
+                        totalSteps = 2,
+                        badgeText = "LEVEL 2 TUTORIAL • STEP 1 OF 2",
+                        title = "Rainbow Pinwheel (✹) & Bomb (✦)!",
+                        instruction = "Swap the Rainbow Pinwheel (✹) with ANY adjacent block to shred all blocks of that color!",
+                        powerUpTip = "✦ Also try double-tapping the 3x3 Origami Bomb (✦) at the top-left gold stamp!",
+                        targetType = TutorialTargetType.BOARD_SPECIAL_TILE,
+                        fromPos = rainbowPos,
+                        toPos = neighborPos,
+                        highlightCells = setOf(rainbowPos, neighborPos, bombPos)
+                    )
+                } else {
+                    val fromPos = specialTilePos ?: bestMove?.first ?: GridPos(2, 2)
+                    val toPos = bestMove?.second ?: GridPos(fromPos.row, (fromPos.col + 1).coerceAtMost(BOARD_SIZE - 1))
+                    TutorialPrompt(
+                        level = 2,
+                        stepIndex = 2,
+                        totalSteps = 2,
+                        badgeText = "LEVEL 2 TUTORIAL • STEP 2 OF 2",
+                        title = "Collect Gold Washi Stamps (★)!",
+                        instruction = "Match blocks over Gold Stamp cells (★) or blast them with Special Power-Ups to win!",
+                        powerUpTip = "✦ PRO TIP: Swap 2 Special Power-Ups together for a Mega Cross Slice!",
+                        targetType = TutorialTargetType.BOARD_SWAP,
+                        fromPos = fromPos,
+                        toPos = toPos,
+                        highlightCells = goldCells + setOf(fromPos, toPos)
+                    )
+                }
+            }
+            3 -> {
+                if (step <= 1 && activeBooster == null) {
+                    TutorialPrompt(
+                        level = 3,
+                        stepIndex = 1,
+                        totalSteps = 2,
+                        badgeText = "LEVEL 3 TUTORIAL • STEP 1 OF 2",
+                        title = "Arm a Craft Workshop Booster!",
+                        instruction = "Tap SCISSORS (Cut), GLUE (Swap), or HAMMER (Smash) in the Booster Bar below!",
+                        powerUpTip = "✦ Workshop Boosters NEVER cost a move and can detonate Special Tiles instantly!",
+                        targetType = TutorialTargetType.BOOSTER_BAR,
+                        fromPos = GridPos(3, 3),
+                        toPos = GridPos(3, 3),
+                        highlightCells = setOf(GridPos(3, 3)),
+                        recommendedBooster = BoosterType.HAMMER
+                    )
+                } else {
+                    val centerPos = specialTilePos ?: GridPos(3, 3)
+                    val secondPos = GridPos(centerPos.row, (centerPos.col + 1).coerceAtMost(BOARD_SIZE - 1))
+                    val targetCells = when (activeBooster) {
+                        BoosterType.HAMMER, null -> setOf(
+                            centerPos,
+                            GridPos((centerPos.row - 1).coerceAtLeast(0), centerPos.col),
+                            GridPos((centerPos.row + 1).coerceAtMost(BOARD_SIZE - 1), centerPos.col),
+                            GridPos(centerPos.row, (centerPos.col - 1).coerceAtLeast(0)),
+                            GridPos(centerPos.row, (centerPos.col + 1).coerceAtMost(BOARD_SIZE - 1))
+                        )
+                        BoosterType.GLUE -> setOf(centerPos, secondPos)
+                        BoosterType.SCISSORS -> setOf(centerPos)
+                    }
+                    TutorialPrompt(
+                        level = 3,
+                        stepIndex = 2,
+                        totalSteps = 2,
+                        badgeText = "LEVEL 3 TUTORIAL • STEP 2 OF 2",
+                        title = when (activeBooster) {
+                            BoosterType.SCISSORS -> "Snip the Origami Bomb (✦)!"
+                            BoosterType.GLUE -> "Tap Any 2 Blocks to Glue-Swap!"
+                            BoosterType.HAMMER -> "Smash 3x3 with Cardboard Hammer!"
+                            null -> "Tap the Glowing Center Block (✦)!"
+                        },
+                        instruction = when (activeBooster) {
+                            BoosterType.SCISSORS -> "Tap the glowing center block (✦) to snip it and chain-detonate the Origami Bomb!"
+                            BoosterType.GLUE -> "Tap any 2 blocks anywhere on the board to swap them & create a match!"
+                            BoosterType.HAMMER -> "Tap the glowing center block (✦) to smash a 3x3 crater & collect Gold Stamps!"
+                            null -> "Tap the glowing center block (✦) on the board to unleash your Workshop Booster!"
+                        },
+                        powerUpTip = "✦ Earn +2 free Boosters every time you complete a level!",
+                        targetType = TutorialTargetType.BOARD_BOOSTER_USE,
+                        fromPos = centerPos,
+                        toPos = if (activeBooster == BoosterType.GLUE) secondPos else centerPos,
+                        highlightCells = targetCells,
+                        recommendedBooster = activeBooster ?: BoosterType.HAMMER
+                    )
+                }
+            }
+            else -> {
+                // Interactive Guide when player taps "?" Help on Level 4+
+                if (step <= 1) {
+                    val fromPos = specialTilePos ?: bestMove?.first ?: GridPos(3, 3)
+                    val toPos = bestMove?.second ?: GridPos(fromPos.row, (fromPos.col + 1).coerceAtMost(BOARD_SIZE - 1))
+                    TutorialPrompt(
+                        level = level,
+                        stepIndex = 1,
+                        totalSteps = 2,
+                        badgeText = "LEVEL $level WORKSHOP GUIDE • 1/2",
+                        title = if (specialTilePos != null) "Activate Special Power-Up!" else "Recommended Origami Move!",
+                        instruction = if (specialTilePos != null) {
+                            "Double-tap or swap the glowing Special Tile (${board[fromPos.row][fromPos.col].special.badgeLabel}) for a chain blast!"
+                        } else {
+                            "Swipe the 2 glowing blocks to fold a match & charge your 2x Origami Fever Meter!"
+                        },
+                        powerUpTip = "✦ Match 4 = Line Cutter (↔/↕) • L/T Match = 3x3 Bomb (✦) • Match 5 = Rainbow Pinwheel (✹)",
+                        targetType = if (specialTilePos != null) TutorialTargetType.BOARD_SPECIAL_TILE else TutorialTargetType.BOARD_SWAP,
+                        fromPos = fromPos,
+                        toPos = toPos,
+                        highlightCells = setOf(fromPos, toPos) + goldCells + tapeLocks.keys
+                    )
+                } else {
+                    TutorialPrompt(
+                        level = level,
+                        stepIndex = 2,
+                        totalSteps = 2,
+                        badgeText = "LEVEL $level WORKSHOP GUIDE • 2/2",
+                        title = "Use Craft Boosters Anytime!",
+                        instruction = "Tap SCISSORS, GLUE, or HAMMER below to break Masking Tape (✕), Red Wax Seals, or Gold Stamps!",
+                        powerUpTip = "✦ Boosters never cost a move and immediately rip through Tape & Wax Seals!",
+                        targetType = TutorialTargetType.BOOSTER_BAR,
+                        fromPos = GridPos(3, 3),
+                        toPos = GridPos(3, 3),
+                        highlightCells = tapeLocks.keys + goldCells,
+                        recommendedBooster = BoosterType.HAMMER
+                    )
+                }
+            }
+        }
     }
 
     private fun spawnConfettiForTiles(

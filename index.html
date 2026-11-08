@@ -1349,6 +1349,166 @@
       box-shadow: 0 4px 8px rgba(0,0,0,0.22);
       white-space: nowrap;
     }
+
+    /* Interactive Tutorial Coach Card & On-Board Origami Hand Overlay (Levels 1-3) */
+    #tutorial-coach-card {
+      display: none;
+      position: relative;
+      background: var(--tape-cream);
+      border: 2px solid var(--thumbtack-red);
+      border-radius: 12px;
+      padding: 7px 10px 6px;
+      box-shadow: 0 6px 14px rgba(59, 35, 20, 0.24);
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 2px;
+      animation: tutCardIn 0.28s cubic-bezier(0.22, 1.35, 0.5, 1) forwards;
+    }
+    #tutorial-coach-card.visible {
+      display: flex;
+    }
+    @keyframes tutCardIn {
+      0% { opacity: 0; transform: scale(0.92) translateY(-4px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .tut-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .tut-badge-pill {
+      background: var(--thumbtack-red);
+      color: #fff;
+      font-size: 9.5px;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 99px;
+      letter-spacing: 0.3px;
+    }
+    .tut-dots {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .tut-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #E2C799;
+      border: 1px solid var(--ink-brown);
+    }
+    .tut-dot.active {
+      width: 8px;
+      height: 8px;
+      background: var(--fox-orange);
+    }
+    .tut-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .tut-btn-next {
+      background: var(--sticky-yellow);
+      color: var(--ink-brown);
+      border: 1.5px solid var(--ink-brown);
+      border-radius: 99px;
+      padding: 2px 9px;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 10.5px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .tut-btn-skip {
+      background: rgba(212, 163, 115, 0.35);
+      color: var(--ink-brown);
+      border: 1px solid var(--cardboard-dark);
+      border-radius: 99px;
+      padding: 2px 6px;
+      font-size: 10px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .tut-main-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tut-emblem {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: var(--fox-orange);
+      border: 1.5px solid var(--ink-brown);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.18);
+    }
+    .tut-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--ink-brown);
+      line-height: 1.15;
+    }
+    .tut-desc {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--ink-soft);
+      line-height: 1.25;
+    }
+    .tut-tip-strip {
+      background: rgba(255, 234, 121, 0.72);
+      border: 1px solid #E2B93B;
+      border-radius: 6px;
+      padding: 2px 7px;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--ink-brown);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #board-tutorial-overlay {
+      position: absolute;
+      inset: 5px;
+      pointer-events: none;
+      z-index: 22;
+      display: none;
+    }
+    #board-tutorial-overlay.visible {
+      display: block;
+    }
+    .board-cell.tut-spotlight {
+      box-shadow: 0 0 0 2.5px #FF3355, 0 0 12px rgba(255, 234, 121, 0.85) !important;
+      z-index: 8;
+    }
+    .booster-btn.tut-booster-glow {
+      background: var(--sticky-yellow) !important;
+      border-color: var(--thumbtack-red) !important;
+      transform: translateY(-4px);
+      box-shadow: 0 6px 14px rgba(255, 51, 85, 0.32) !important;
+    }
+    #tut-hand-group {
+      transition: transform 0.08s linear;
+    }
+    #tut-board-pill {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      background: var(--sticky-yellow);
+      border: 1.5px solid var(--thumbtack-red);
+      border-radius: 8px;
+      padding: 2px 8px;
+      font-size: 10.5px;
+      font-weight: 800;
+      color: var(--ink-brown);
+      white-space: nowrap;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.28);
+    }
   </style>
 </head>
 <body>
@@ -1419,9 +1579,14 @@
             <div id="stage-tape" class="tape-strip torn-tape">Stage 1</div>
             <div id="level-tape" class="tape-strip level-tape torn-tape">Torn Level 1</div>
           </div>
-          <button id="btn-retry" class="round-paper-btn" title="Retry Level" aria-label="Retry Level">
-            ↻
-          </button>
+          <div class="hud-left-btns">
+            <button id="btn-tutorial-help" class="round-paper-btn" title="Interactive Tutorial Guide" aria-label="Tutorial Guide" style="font-weight:900;font-size:17px;">
+              ?
+            </button>
+            <button id="btn-retry" class="round-paper-btn" title="Retry Level" aria-label="Retry Level">
+              ↻
+            </button>
+          </div>
         </div>
 
         <div class="hud-stats-row">
@@ -1446,6 +1611,31 @@
           <div id="fever-fill"></div>
           <div id="fever-label">FEVER METER • MATCH 4+ FOR LINE RIP!</div>
         </div>
+
+        <!-- Interactive Washi Coach Card for Levels 1-3 -->
+        <div id="tutorial-coach-card" class="torn-tape">
+          <div class="tut-top-row">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span id="tut-badge" class="tut-badge-pill">LEVEL 1 TUTORIAL • 1/2</span>
+              <div class="tut-dots">
+                <span id="tut-dot-1" class="tut-dot active"></span>
+                <span id="tut-dot-2" class="tut-dot"></span>
+              </div>
+            </div>
+            <div class="tut-actions">
+              <button id="btn-tut-next" class="tut-btn-next">Next Tip →</button>
+              <button id="btn-tut-skip" class="tut-btn-skip" title="Dismiss Guide">✕</button>
+            </div>
+          </div>
+          <div class="tut-main-row">
+            <div id="tut-emblem" class="tut-emblem">3x</div>
+            <div style="flex:1;min-width:0;">
+              <div id="tut-title" class="tut-title">Make Your First Origami Match!</div>
+              <div id="tut-desc" class="tut-desc">Swipe or tap the 2 glowing blocks to fold 3 matching pieces in a row!</div>
+            </div>
+          </div>
+          <div id="tut-tip" class="tut-tip-strip">✦ Match 4 crafts a Line Cutter (↔/↕) • Match 5 crafts a Rainbow Pinwheel (✹)!</div>
+        </div>
       </div>
 
       <!-- In landscape mode on wide screens, booster section sits under HUD in left-panel -->
@@ -1457,6 +1647,22 @@
       <div id="board-wrapper">
         <div id="cardboard-lid">
           <div id="board-grid"></div>
+          <div id="board-tutorial-overlay">
+            <svg id="tut-board-svg" viewBox="0 0 700 700" width="100%" height="100%" style="overflow:visible;">
+              <line id="tut-guide-line-bg" x1="0" y1="0" x2="0" y2="0" stroke="#3B2314" stroke-width="11" stroke-linecap="round" stroke-dasharray="18 12" />
+              <line id="tut-guide-line" x1="0" y1="0" x2="0" y2="0" stroke="#FFEA79" stroke-width="6" stroke-linecap="round" stroke-dasharray="18 12" />
+              <circle id="tut-ring-from" cx="0" cy="0" r="36" fill="none" stroke="#FFB703" stroke-width="5" />
+              <circle id="tut-ring-to" cx="0" cy="0" r="36" fill="none" stroke="#2EC4B6" stroke-width="5" />
+              <g id="tut-hand-group" transform="translate(350,350)">
+                <polygon points="4,6 -26,42 -4,34 10,56 24,48 10,26 32,22" fill="rgba(34,18,6,0.32)" />
+                <polygon points="0,0 -28,38 0,30" fill="#FFFDF9" stroke="#3B2314" stroke-width="3.2" stroke-linejoin="round" />
+                <polygon points="0,0 0,30 10,52 22,44 10,24 30,20" fill="#FFEA79" stroke="#3B2314" stroke-width="3.2" stroke-linejoin="round" />
+                <line x1="0" y1="0" x2="0" y2="30" stroke="#FF3355" stroke-width="2.5" />
+                <circle cx="0" cy="0" r="5" fill="#FF6B35" />
+              </g>
+            </svg>
+            <div id="tut-board-pill">✦ SWIPE BLOCKS ↔</div>
+          </div>
           <div id="cascade-stamp">DROP x2!</div>
           <div id="combo-banner">ORIGAMI COMBO!</div>
         </div>
@@ -3036,6 +3242,204 @@
       }
     }
 
+    function seedTutorialBoardIfNeeded(lvl) {
+      if (lvl < 1 || lvl > 3) return;
+      const byId = id => PIECES.find(p => p.id === id) || PIECES[0];
+      if (lvl === 1) {
+        state.board[3][1] = byId('ORIGAMI_FOX');
+        state.board[3][2] = byId('PEPPERMINT');
+        state.board[3][3] = byId('ORIGAMI_FOX');
+        state.board[3][4] = byId('ORIGAMI_FOX');
+        state.board[3][0] = byId('ORIGAMI_CRANE');
+        state.board[3][5] = byId('CARDBOARD_STAR');
+        state.board[2][1] = byId('CUPCAKE');
+        state.board[4][1] = byId('WRAPPED_CANDY');
+        state.board[2][2] = byId('CARDBOARD_STAR');
+        state.board[4][2] = byId('ORIGAMI_CRANE');
+        state.board[2][3] = byId('PEPPERMINT');
+        state.board[4][3] = byId('CUPCAKE');
+        state.board[2][4] = byId('WRAPPED_CANDY');
+        state.board[4][4] = byId('CARDBOARD_STAR');
+        state.board[1][3] = byId('ORIGAMI_FOX');
+        setSpecial(1, 3, 'ROW_CUTTER');
+      } else if (lvl === 2) {
+        state.board[3][3] = byId('PEPPERMINT');
+        setSpecial(3, 3, 'PINWHEEL_RAINBOW');
+        state.board[3][4] = byId('PEPPERMINT');
+        state.board[2][2] = byId('ORIGAMI_FOX');
+        setSpecial(2, 2, 'PAPER_BOMB');
+      } else if (lvl === 3) {
+        state.board[3][3] = byId('CARDBOARD_STAR');
+        setSpecial(3, 3, 'PAPER_BOMB');
+        state.board[2][3] = byId('ORIGAMI_CRANE');
+        setSpecial(2, 3, 'COL_CUTTER');
+      }
+    }
+
+    function getActiveTutorialPrompt() {
+      if (state.tutorialDismissed) return null;
+      const lvl = state.level;
+      const step = state.tutorialStep || 1;
+      const bestMove = findFirstValidMove();
+      let specialPos = null;
+      for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+          if (getSpecial(r, c) !== 'NONE' && !isCellLocked(r, c)) {
+            specialPos = { r, c };
+            break;
+          }
+        }
+        if (specialPos) break;
+      }
+
+      if (lvl === 1) {
+        if (step <= 1) {
+          const seededOk = state.board[3][1].id === 'ORIGAMI_FOX' &&
+            state.board[3][2].id !== 'ORIGAMI_FOX' &&
+            state.board[3][3].id === 'ORIGAMI_FOX' &&
+            state.board[3][4].id === 'ORIGAMI_FOX';
+          const fromPos = seededOk ? { r: 3, c: 1 } : (bestMove ? bestMove[0] : { r: 3, c: 1 });
+          const toPos = seededOk ? { r: 3, c: 2 } : (bestMove ? bestMove[1] : { r: 3, c: 2 });
+          const highlights = new Set([`${fromPos.r},${fromPos.c}`, `${toPos.r},${toPos.c}`]);
+          if (seededOk) {
+            highlights.add('3,3');
+            highlights.add('3,4');
+          }
+          return {
+            badge: 'LEVEL 1 TUTORIAL • STEP 1 OF 2',
+            step: 1,
+            emblem: '3x',
+            emblemBg: '#FF6B35',
+            title: 'Make Your First Origami Match!',
+            desc: 'Swipe or tap the 2 glowing blocks to fold 3 matching pieces in a row!',
+            tip: '✦ Match 4 crafts a Line Cutter (↔/↕) • Match 5 crafts a Rainbow Pinwheel (✹)!',
+            targetType: 'BOARD_SWAP',
+            fromPos,
+            toPos,
+            highlights,
+            pillText: '✦ SWIPE BLOCKS ↔'
+          };
+        } else {
+          const sp = specialPos || (bestMove ? bestMove[0] : { r: 1, c: 3 });
+          const toPos = { r: sp.r, c: Math.min(BOARD_SIZE - 1, sp.c + 1) };
+          const highlights = new Set();
+          for (let c = 0; c < BOARD_SIZE; c++) highlights.add(`${sp.r},${c}`);
+          return {
+            badge: 'LEVEL 1 TUTORIAL • STEP 2 OF 2',
+            step: 2,
+            emblem: '↔',
+            emblemBg: '#FF3355',
+            title: 'Use Special Line Cutter (↔)!',
+            desc: 'Double-tap the glowing Line Cutter (↔) block—or swap it—to slice the entire row!',
+            tip: '✦ Every 4-tile match crafts a Row (↔) or Column (↕) Cutter power-up!',
+            targetType: 'BOARD_SPECIAL',
+            fromPos: sp,
+            toPos,
+            highlights,
+            pillText: '✦ SWAP OR 2x TAP!'
+          };
+        }
+      } else if (lvl === 2) {
+        if (step <= 1) {
+          const sp = specialPos || { r: 3, c: 3 };
+          const toPos = { r: sp.r, c: Math.min(BOARD_SIZE - 1, sp.c + 1) };
+          return {
+            badge: 'LEVEL 2 TUTORIAL • STEP 1 OF 2',
+            step: 1,
+            emblem: '✹',
+            emblemBg: '#FF3355',
+            title: 'Rainbow Pinwheel (✹) & Bomb (✦)!',
+            desc: 'Swap the Rainbow Pinwheel (✹) with ANY adjacent block to shred all blocks of that color!',
+            tip: '✦ Also try double-tapping the 3x3 Origami Bomb (✦) at the top-left gold stamp!',
+            targetType: 'BOARD_SPECIAL',
+            fromPos: sp,
+            toPos,
+            highlights: new Set([`${sp.r},${sp.c}`, `${toPos.r},${toPos.c}`, '2,2']),
+            pillText: '✦ SWAP PINWHEEL ✹'
+          };
+        } else {
+          const fromPos = specialPos || (bestMove ? bestMove[0] : { r: 2, c: 2 });
+          const toPos = bestMove ? bestMove[1] : { r: fromPos.r, c: Math.min(BOARD_SIZE - 1, fromPos.c + 1) };
+          const highlights = new Set(state.goldCells);
+          highlights.add(`${fromPos.r},${fromPos.c}`);
+          highlights.add(`${toPos.r},${toPos.c}`);
+          return {
+            badge: 'LEVEL 2 TUTORIAL • STEP 2 OF 2',
+            step: 2,
+            emblem: '★',
+            emblemBg: '#FFB703',
+            title: 'Collect Gold Washi Stamps (★)!',
+            desc: 'Match blocks over Gold Stamp cells (★) or blast them with Special Power-Ups to win!',
+            tip: '✦ PRO TIP: Swap 2 Special Power-Ups together for a Mega Cross Slice!',
+            targetType: 'BOARD_SWAP',
+            fromPos,
+            toPos,
+            highlights,
+            pillText: '★ MATCH ON GOLD!'
+          };
+        }
+      } else if (lvl === 3) {
+        if (step <= 1 && !state.activeBooster) {
+          return {
+            badge: 'LEVEL 3 TUTORIAL • STEP 1 OF 2',
+            step: 1,
+            emblem: '🔨',
+            emblemBg: '#FFB703',
+            title: 'Arm a Craft Workshop Booster!',
+            desc: 'Tap SCISSORS (Cut), GLUE (Swap), or HAMMER (Smash) in the Booster Bar below!',
+            tip: '✦ Workshop Boosters NEVER cost a move and can detonate Special Tiles instantly!',
+            targetType: 'BOOSTER_BAR',
+            fromPos: { r: 3, c: 3 },
+            toPos: { r: 3, c: 3 },
+            highlights: new Set(['3,3']),
+            pillText: '▼ PICK A BOOSTER ▼'
+          };
+        } else {
+          const center = specialPos || { r: 3, c: 3 };
+          const toPos = state.activeBooster === 'GLUE'
+            ? { r: center.r, c: Math.min(BOARD_SIZE - 1, center.c + 1) }
+            : center;
+          return {
+            badge: 'LEVEL 3 TUTORIAL • STEP 2 OF 2',
+            step: 2,
+            emblem: state.activeBooster === 'SCISSORS' ? '✂' : state.activeBooster === 'GLUE' ? '✦' : '🔨',
+            emblemBg: '#FF3355',
+            title: state.activeBooster === 'SCISSORS'
+              ? 'Snip the Origami Bomb (✦)!'
+              : state.activeBooster === 'GLUE'
+                ? 'Tap Any 2 Blocks to Glue-Swap!'
+                : 'Smash 3x3 with Cardboard Hammer!',
+            desc: 'Tap the glowing center block (✦) on the board to unleash your Workshop Booster!',
+            tip: '✦ Earn +2 free Boosters every time you complete a level!',
+            targetType: 'BOARD_BOOSTER_USE',
+            fromPos: center,
+            toPos,
+            highlights: new Set(['3,3', '2,3', '4,3', '3,2', '3,4']),
+            pillText: '🔨 TAP TO UNLEASH!'
+          };
+        }
+      } else {
+        const fromPos = specialPos || (bestMove ? bestMove[0] : { r: 3, c: 3 });
+        const toPos = bestMove ? bestMove[1] : { r: fromPos.r, c: Math.min(BOARD_SIZE - 1, fromPos.c + 1) };
+        return {
+          badge: `LEVEL ${lvl} WORKSHOP GUIDE • ${step}/2`,
+          step,
+          emblem: specialPos ? '✹' : '3x',
+          emblemBg: '#FF6B35',
+          title: step <= 1 ? 'Recommended Origami Move!' : 'Use Craft Boosters Anytime!',
+          desc: step <= 1
+            ? 'Swipe the 2 glowing blocks or double-tap any Special Tile to trigger a chain!'
+            : 'Tap SCISSORS, GLUE, or HAMMER below to break Masking Tape & Wax Seals!',
+          tip: '✦ Match 4 = Line Cutter (↔/↕) • L/T Match = 3x3 Bomb (✦) • Match 5 = Rainbow Pinwheel (✹)',
+          targetType: step <= 1 ? 'BOARD_SWAP' : 'BOOSTER_BAR',
+          fromPos,
+          toPos,
+          highlights: new Set([`${fromPos.r},${fromPos.c}`, `${toPos.r},${toPos.c}`]),
+          pillText: '✦ SWIPE BLOCKS ↔'
+        };
+      }
+    }
+
     function startLevel(rawLvl) {
       const lvl = Math.max(1, Math.min(TOTAL_LEVELS, rawLvl));
       clearTimeout(hintTimer);
@@ -3063,7 +3467,15 @@
       state.feverCharge = 0;
       state.feverMoves = 0;
       state.busy = false;
+      state.tutorialStep = 1;
+      state.tutorialDismissed = lvl > 3;
+      if (lvl <= 3) {
+        state.boosters.SCISSORS = Math.max(2, state.boosters.SCISSORS || 0);
+        state.boosters.GLUE = Math.max(2, state.boosters.GLUE || 0);
+        state.boosters.HAMMER = Math.max(2, state.boosters.HAMMER || 0);
+      }
       state.board = generateBoard();
+      seedTutorialBoardIfNeeded(lvl);
       document.getElementById('status-modal').classList.remove('visible');
       document.getElementById('world-map-modal').classList.remove('visible');
       saveProgress();
@@ -3121,12 +3533,63 @@
       }
       goalsContainer.innerHTML = goalsHtml;
 
+      const tutPrompt = getActiveTutorialPrompt();
+      const tutCard = document.getElementById('tutorial-coach-card');
+      const tutOverlay = document.getElementById('board-tutorial-overlay');
+      if (tutPrompt) {
+        tutCard.classList.add('visible');
+        document.getElementById('tut-badge').textContent = tutPrompt.badge;
+        document.getElementById('tut-dot-1').classList.toggle('active', tutPrompt.step === 1);
+        document.getElementById('tut-dot-2').classList.toggle('active', tutPrompt.step >= 2);
+        const emb = document.getElementById('tut-emblem');
+        emb.textContent = tutPrompt.emblem;
+        emb.style.background = tutPrompt.emblemBg;
+        document.getElementById('tut-title').textContent = tutPrompt.title;
+        document.getElementById('tut-desc').textContent = tutPrompt.desc;
+        document.getElementById('tut-tip').textContent = tutPrompt.tip;
+        document.getElementById('btn-tut-next').textContent = tutPrompt.step < 2 ? 'Next Tip →' : 'Got It ✓';
+      } else {
+        tutCard.classList.remove('visible');
+      }
+
+      if (tutPrompt && !state.busy && tutPrompt.fromPos) {
+        tutOverlay.classList.add('visible');
+        const fx = (tutPrompt.fromPos.c + 0.5) * 100;
+        const fy = (tutPrompt.fromPos.r + 0.5) * 100;
+        const tx = (tutPrompt.toPos.c + 0.5) * 100;
+        const ty = (tutPrompt.toPos.r + 0.5) * 100;
+        ['tut-guide-line-bg', 'tut-guide-line'].forEach(id => {
+          const l = document.getElementById(id);
+          l.setAttribute('x1', fx);
+          l.setAttribute('y1', fy);
+          l.setAttribute('x2', tx);
+          l.setAttribute('y2', ty);
+        });
+        const rFrom = document.getElementById('tut-ring-from');
+        rFrom.setAttribute('cx', fx);
+        rFrom.setAttribute('cy', fy);
+        const rTo = document.getElementById('tut-ring-to');
+        rTo.setAttribute('cx', tx);
+        rTo.setAttribute('cy', ty);
+        const pill = document.getElementById('tut-board-pill');
+        pill.textContent = tutPrompt.pillText;
+        const avgC = (tutPrompt.fromPos.c + tutPrompt.toPos.c) * 0.5;
+        const minR = Math.min(tutPrompt.fromPos.r, tutPrompt.toPos.r);
+        const tagR = minR >= 1 ? minR - 0.42 : Math.max(tutPrompt.fromPos.r, tutPrompt.toPos.r) + 1.15;
+        pill.style.left = `${((avgC + 0.5) / BOARD_SIZE) * 100}%`;
+        pill.style.top = `${(tagR / BOARD_SIZE) * 100}%`;
+      } else {
+        tutOverlay.classList.remove('visible');
+      }
+
+      const isBoosterTut = Boolean(tutPrompt && tutPrompt.targetType === 'BOOSTER_BAR');
       ['SCISSORS', 'GLUE', 'HAMMER'].forEach(key => {
         const btn = document.getElementById(`booster-${key.toLowerCase()}`);
         const badge = document.getElementById(`badge-${key.toLowerCase()}`);
         const count = state.boosters[key] || 0;
         badge.textContent = count;
         btn.classList.toggle('active', state.activeBooster === key);
+        btn.classList.toggle('tut-booster-glow', isBoosterTut && !state.activeBooster);
         btn.classList.toggle('disabled', count <= 0 && state.activeBooster !== key);
       });
 
@@ -3141,6 +3604,9 @@
         hintEl.classList.add('active');
       } else if (state.activeBooster === 'HAMMER') {
         hintEl.textContent = 'Tap any tile to crush a 3x3 cardboard block!';
+        hintEl.classList.add('active');
+      } else if (isBoosterTut) {
+        hintEl.textContent = '▼ TAP ANY CRAFT BOOSTER BELOW! (FREE POWER-UP) ▼';
         hintEl.classList.add('active');
       } else {
         hintEl.classList.remove('active');
@@ -3194,8 +3660,11 @@
             (shakingPair[1].r === r && shakingPair[1].c === c)
           ));
 
+          const tutPrompt = getActiveTutorialPrompt();
+          const isTutCell = Boolean(tutPrompt && tutPrompt.highlights && tutPrompt.highlights.has(key));
           slot.cell.classList.toggle('selected', Boolean(isSel));
           slot.cell.classList.toggle('hinted', isHint);
+          slot.cell.classList.toggle('tut-spotlight', isTutCell && !state.busy);
           slot.cell.classList.toggle('invalid-cell', isShaking);
 
           if (crushingSet.has(key)) {
@@ -3530,6 +3999,17 @@
 
       if (!findFirstValidMove()) {
         generateBoard();
+      }
+
+      if (!state.tutorialDismissed) {
+        if ((state.tutorialStep || 1) <= 1) {
+          state.tutorialStep = 2;
+          if (state.level === 1 && Object.keys(state.specials).length === 0) {
+            setSpecial(2, 3, 'ROW_CUTTER');
+          }
+        } else {
+          state.tutorialDismissed = true;
+        }
       }
 
       const curStg = getStageInfo(state.level);
@@ -4174,14 +4654,52 @@
         if (state.activeBooster === type) {
           state.activeBooster = null;
           state.glueFirst = null;
+          if (!state.tutorialDismissed && state.level === 3) {
+            state.tutorialStep = 1;
+          }
         } else if ((state.boosters[type] || 0) > 0) {
           audio.playCrinkle(1);
           state.activeBooster = type;
           state.glueFirst = null;
           state.selected = null;
+          if (!state.tutorialDismissed && state.level === 3) {
+            state.tutorialStep = 2;
+          }
         }
         renderAll();
       });
+    });
+
+    document.getElementById('btn-tutorial-help').addEventListener('click', () => {
+      audio.playCrinkle(1);
+      state.tutorialDismissed = false;
+      state.tutorialStep = 1;
+      if (state.level === 1 && Object.keys(state.specials).length === 0) {
+        setSpecial(1, 3, 'ROW_CUTTER');
+      }
+      renderAll();
+    });
+
+    document.getElementById('btn-tut-next').addEventListener('click', () => {
+      audio.playCrinkle(2);
+      if ((state.tutorialStep || 1) < 2) {
+        state.tutorialStep = 2;
+        if (state.level === 1 && Object.keys(state.specials).length === 0) {
+          setSpecial(2, 3, 'ROW_CUTTER');
+        }
+        if (state.level === 3 && !state.activeBooster) {
+          state.activeBooster = 'HAMMER';
+        }
+      } else {
+        state.tutorialDismissed = true;
+      }
+      renderAll();
+    });
+
+    document.getElementById('btn-tut-skip').addEventListener('click', () => {
+      audio.playCrinkle(1);
+      state.tutorialDismissed = true;
+      renderAll();
     });
 
     document.getElementById('btn-sound').addEventListener('click', () => {
@@ -4208,6 +4726,21 @@
     document.getElementById('btn-retry').addEventListener('click', () => {
       if (!state.busy) startLevel(state.level);
     });
+
+    // Animate the Origami Pointer Hand in the 60fps loop when tutorial overlay is visible
+    setInterval(() => {
+      const tutPrompt = getActiveTutorialPrompt();
+      const handEl = document.getElementById('tut-hand-group');
+      if (!tutPrompt || !tutPrompt.fromPos || !handEl || state.busy) return;
+      const t = (Math.sin(performance.now() * 0.0042) + 1) * 0.5;
+      const fx = (tutPrompt.fromPos.c + 0.5) * 100;
+      const fy = (tutPrompt.fromPos.r + 0.5) * 100;
+      const tx = (tutPrompt.toPos.c + 0.5) * 100;
+      const ty = (tutPrompt.toPos.r + 0.5) * 100;
+      const hx = fx + (tx - fx) * t;
+      const hy = fy + (ty - fy) * t + 16;
+      handEl.setAttribute('transform', `translate(${hx.toFixed(1)}, ${hy.toFixed(1)})`);
+    }, 32);
 
     loadSaved();
     syncResponsiveLayout();

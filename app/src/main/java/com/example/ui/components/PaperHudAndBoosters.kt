@@ -51,8 +51,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.model.BoosterType
+import com.example.model.GameStatus
 import com.example.model.LevelGoal
 import com.example.model.PaperGameState
+import com.example.model.TutorialTargetType
 import com.example.ui.theme.CardboardDark
 import com.example.ui.theme.CardboardLight
 import com.example.ui.theme.CardboardMedium
@@ -76,6 +78,9 @@ fun PaperTopHud(
     onToggleSound: () -> Unit,
     onResetProgress: () -> Unit,
     onOpenWorldMap: () -> Unit = {},
+    onOpenTutorial: () -> Unit = {},
+    onNextTutorialStep: () -> Unit = {},
+    onDismissTutorial: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val animatedScore by animateIntAsState(
@@ -194,20 +199,55 @@ fun PaperTopHud(
                 }
             }
 
-            IconButton(
-                onClick = onResetProgress,
-                modifier = Modifier
-                    .minimumInteractiveComponentSize()
-                    .shadow(3.dp, CircleShape)
-                    .background(MaskingTapeCream, CircleShape)
-                    .border(1.5.dp, CardboardMedium, CircleShape)
-                    .testTag("reset_level_button")
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = stringResource(R.string.btn_retry_level),
-                    tint = InkBrown
-                )
+                // Interactive Tutorial Guide '?' Button
+                Box(
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .size(40.dp)
+                        .shadow(3.dp, CircleShape)
+                        .clip(CircleShape)
+                        .background(
+                            if (state.tutorialPrompt != null && !state.tutorialDismissed) StickyNoteYellow else MaskingTapeCream,
+                            CircleShape
+                        )
+                        .border(
+                            1.5.dp,
+                            if (state.tutorialPrompt != null && !state.tutorialDismissed) PeppermintRed else CardboardMedium,
+                            CircleShape
+                        )
+                        .clickable(onClick = onOpenTutorial)
+                        .testTag("open_tutorial_button"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "?",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Black
+                        ),
+                        color = if (state.tutorialPrompt != null && !state.tutorialDismissed) PeppermintRed else InkBrown
+                    )
+                }
+
+                IconButton(
+                    onClick = onResetProgress,
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .shadow(3.dp, CircleShape)
+                        .background(MaskingTapeCream, CircleShape)
+                        .border(1.5.dp, CardboardMedium, CircleShape)
+                        .testTag("reset_level_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = stringResource(R.string.btn_retry_level),
+                        tint = InkBrown
+                    )
+                }
             }
         }
 
@@ -243,6 +283,16 @@ fun PaperTopHud(
             feverMovesLeft = state.feverMovesLeft,
             streakCount = state.streakCount,
             mechanicLabel = state.mechanicLabel
+        )
+
+        PaperInteractiveTutorialCard(
+            prompt = state.tutorialPrompt,
+            visible = state.tutorialPrompt != null &&
+                !state.tutorialDismissed &&
+                state.status == GameStatus.PLAYING &&
+                !state.showWorldMap,
+            onNextStep = onNextTutorialStep,
+            onDismiss = onDismissTutorial
         )
     }
 }
@@ -524,6 +574,10 @@ fun PaperBoosterBar(
     onSelectBooster: (BoosterType) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isBoosterTutorialActive = state.tutorialPrompt != null &&
+        !state.tutorialDismissed &&
+        state.tutorialPrompt.targetType == TutorialTargetType.BOOSTER_BAR
+
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -553,6 +607,27 @@ fun PaperBoosterBar(
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp)
                 )
             }
+        } else if (isBoosterTutorialActive) {
+            val calloutShape = TornPaperShape(teethCount = 6, toothDepthPx = 6f)
+            Surface(
+                shape = calloutShape,
+                color = StickyNoteYellow,
+                shadowElevation = 6.dp,
+                modifier = Modifier
+                    .border(2.dp, PeppermintRed, calloutShape)
+                    .padding(horizontal = 8.dp)
+            ) {
+                Text(
+                    text = "▼ TAP ANY CRAFT BOOSTER BELOW! (FREE POWER-UP) ▼",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    ),
+                    color = PeppermintRed,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+            }
         }
 
         Row(
@@ -563,10 +638,12 @@ fun PaperBoosterBar(
             BoosterType.entries.forEach { booster ->
                 val count = state.boosters[booster] ?: 0
                 val isSelected = state.activeBooster == booster
+                val isTutorialSpotlight = isBoosterTutorialActive
                 PaperBoosterButton(
                     booster = booster,
                     count = count,
                     isSelected = isSelected,
+                    isTutorialSpotlight = isTutorialSpotlight,
                     onClick = { onSelectBooster(booster) },
                     modifier = Modifier.weight(1f)
                 )
@@ -580,25 +657,30 @@ private fun PaperBoosterButton(
     booster: BoosterType,
     count: Int,
     isSelected: Boolean,
+    isTutorialSpotlight: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val cutShape = TornPaperShape(teethCount = 5, toothDepthPx = 6f)
     val bgColor = when {
         isSelected -> StickyNoteYellow
+        isTutorialSpotlight -> StickyNoteYellow.copy(alpha = 0.92f)
         count > 0 -> MaskingTapeCream
         else -> CardboardLight.copy(alpha = 0.65f)
     }
-    val borderColor = if (isSelected) PeppermintRed else CardboardDark
+    val borderColor = when {
+        isSelected || isTutorialSpotlight -> PeppermintRed
+        else -> CardboardDark
+    }
 
     Box(
         modifier = modifier
             .minimumInteractiveComponentSize()
-            .offset(y = if (isSelected) (-4).dp else 0.dp)
-            .shadow(if (isSelected) 6.dp else 3.dp, cutShape)
+            .offset(y = if (isSelected || isTutorialSpotlight) (-4).dp else 0.dp)
+            .shadow(if (isSelected || isTutorialSpotlight) 7.dp else 3.dp, cutShape)
             .clip(cutShape)
             .background(bgColor, cutShape)
-            .border(if (isSelected) 2.5.dp else 1.5.dp, borderColor, cutShape)
+            .border(if (isSelected || isTutorialSpotlight) 2.5.dp else 1.5.dp, borderColor, cutShape)
             .clickable(enabled = count > 0 || isSelected, onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 6.dp)
             .testTag("booster_btn_${booster.name.lowercase()}")

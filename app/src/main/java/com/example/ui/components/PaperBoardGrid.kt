@@ -232,8 +232,14 @@ fun PaperCardboardBoard(
                                 it.first == pos || it.second == pos
                             } == true
 
-                            // Compute directional vector toward the hinted partner tile
-                            val hintPartnerDelta: Offset? = state.hintPair?.let { (first, second) ->
+                            // Compute directional vector toward the hinted or tutorial-highlighted partner tile
+                            val activeTutorialPair = state.tutorialPrompt?.let { prompt ->
+                                val f = prompt.fromPos
+                                val t = prompt.toPos
+                                if (f != null && t != null && f != t) f to t else null
+                            }
+                            val effectiveHintPair = activeTutorialPair ?: state.hintPair
+                            val hintPartnerDelta: Offset? = effectiveHintPair?.let { (first, second) ->
                                 when (pos) {
                                     first -> Offset(
                                         (second.col - first.col).toFloat(),
@@ -246,7 +252,8 @@ fun PaperCardboardBoard(
                                     else -> null
                                 }
                             }
-                            val isHinted = hintPartnerDelta != null
+                            val isHinted = hintPartnerDelta != null ||
+                                (state.tutorialPrompt?.fromPos == pos)
 
                             val tileHasMotion = tile != null && (
                                 abs(tile.slideFromColDelta) > 0.01f || abs(tile.slideFromRowDelta) > 0.01f || tile.isCrushing
@@ -289,6 +296,21 @@ fun PaperCardboardBoard(
                         }
                     }
                 }
+            }
+
+            // Interactive Visual Tutorial Overlay for Levels 1-3 (Spotlight frames, Scissor-cut path & Origami Hand)
+            val activeTutorialPrompt = state.tutorialPrompt
+            if (activeTutorialPrompt != null &&
+                !state.isAnimating &&
+                state.status == GameStatus.PLAYING &&
+                !state.showWorldMap
+            ) {
+                InteractiveBoardTutorialOverlay(
+                    prompt = activeTutorialPrompt,
+                    cellSize = cellSize,
+                    sharedWaveState = sharedWaveState,
+                    modifier = Modifier.zIndex(21f)
+                )
             }
 
             // Floating Score Popups right over matched cells

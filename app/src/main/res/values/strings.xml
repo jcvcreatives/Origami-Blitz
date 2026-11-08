@@ -28,4 +28,7 @@
     <string name="label_stage_level">Stage %1$d • Level %2$d</string>
     <string name="btn_play_level">Play Level %1$d</string>
     <string name="btn_back_to_game">Resume Game</string>
+    <string name="btn_tutorial_help">Tutorial Guide</string>
+    <string name="btn_tutorial_skip">Got It</string>
+    <string name="btn_tutorial_next">Next Tip</string>
 </resources>

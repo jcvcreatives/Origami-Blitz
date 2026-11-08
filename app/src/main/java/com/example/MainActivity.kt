@@ -141,7 +141,10 @@ fun PaperCraftCrushApp(
                             state = state,
                             onToggleSound = viewModel::toggleSound,
                             onResetProgress = viewModel::retryOrResetLevel,
-                            onOpenWorldMap = viewModel::openWorldMap
+                            onOpenWorldMap = viewModel::openWorldMap,
+                            onOpenTutorial = viewModel::reopenTutorial,
+                            onNextTutorialStep = viewModel::advanceTutorialStep,
+                            onDismissTutorial = viewModel::dismissTutorial
                         )
                         PaperBoosterBar(
                             state = state,
@@ -182,6 +185,9 @@ fun PaperCraftCrushApp(
                         onToggleSound = viewModel::toggleSound,
                         onResetProgress = viewModel::retryOrResetLevel,
                         onOpenWorldMap = viewModel::openWorldMap,
+                        onOpenTutorial = viewModel::reopenTutorial,
+                        onNextTutorialStep = viewModel::advanceTutorialStep,
+                        onDismissTutorial = viewModel::dismissTutorial,
                         modifier = hudParallaxModifier
                     )
 

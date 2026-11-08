@@ -506,6 +506,28 @@ fun buildGoalsForLevel(level: Int): Pair<LevelGoal, LevelGoal> {
 
 fun getMovesForLevel(level: Int): Int = getLevelBlueprint(level).moves
 
+enum class TutorialTargetType {
+    BOARD_SWAP,
+    BOARD_SPECIAL_TILE,
+    BOOSTER_BAR,
+    BOARD_BOOSTER_USE
+}
+
+data class TutorialPrompt(
+    val level: Int,
+    val stepIndex: Int,
+    val totalSteps: Int = 2,
+    val badgeText: String,
+    val title: String,
+    val instruction: String,
+    val powerUpTip: String,
+    val targetType: TutorialTargetType,
+    val fromPos: GridPos? = null,
+    val toPos: GridPos? = null,
+    val highlightCells: Set<GridPos> = emptySet(),
+    val recommendedBooster: BoosterType? = null
+)
+
 data class PaperGameState(
     val level: Int = 1,
     val highestUnlockedLevel: Int = 1,
@@ -544,7 +566,10 @@ data class PaperGameState(
     val comboBannerText: String? = null,
     val isAnimating: Boolean = false,
     val soundEnabled: Boolean = true,
-    val status: GameStatus = GameStatus.PLAYING
+    val status: GameStatus = GameStatus.PLAYING,
+    val tutorialStep: Int = 1,
+    val tutorialDismissed: Boolean = false,
+    val tutorialPrompt: TutorialPrompt? = null
 ) {
     val currentStage: PaperStageInfo
         get() = getStageInfoForLevel(level)
