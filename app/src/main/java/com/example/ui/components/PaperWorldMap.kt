@@ -60,24 +60,28 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.model.LEVELS_PER_STAGE
+import com.example.model.LevelBlueprint
 import com.example.model.PaperGameState
 import com.example.model.PaperStageInfo
 import com.example.model.PieceType
@@ -88,10 +92,12 @@ import com.example.ui.theme.CardboardDark
 import com.example.ui.theme.CardboardLight
 import com.example.ui.theme.CardboardMedium
 import com.example.ui.theme.CraftTableKraft
+import com.example.ui.theme.CupcakeFrostingPink
 import com.example.ui.theme.InkBrown
 import com.example.ui.theme.InkSoftBrown
 import com.example.ui.theme.MaskingTapeBorder
 import com.example.ui.theme.MaskingTapeCream
+import com.example.ui.theme.OrigamiCraneBlue
 import com.example.ui.theme.OrigamiFoxGreen
 import com.example.ui.theme.OrigamiFoxOrange
 import com.example.ui.theme.PeppermintRed
@@ -100,13 +106,14 @@ import com.example.ui.theme.SkyBluePaper
 import com.example.ui.theme.StarCardboardGold
 import com.example.ui.theme.StickyNoteShadow
 import com.example.ui.theme.StickyNoteYellow
-import com.example.ui.theme.ThumbtackRed
+import com.example.ui.theme.WrappedCandyPurple
 import kotlin.math.sin
 
 /**
- * Candy Crush-inspired winding Paper Craft Saga World Map showing all 10 Stages (50 Levels),
- * winding stitched-paper paths, 1-3 star badges per level, a bouncing Origami Fox
- * avatar on the player's current level, and an interactive level goal & mechanic inspector.
+ * Illustrated Pop-Up Origami Storybook World Map showing all 10 Stages (50 Levels),
+ * lush paper pine forests, woodland animals (Origami Foxes, Bears, Bunnies, Cranes),
+ * paper-cutout villagers & bakers holding frosted Cupcakes and Candy blocks,
+ * and live on-map Block Goal Previews showing what is inside every level's blocks.
  */
 @Composable
 fun PaperWorldMapOverlay(
@@ -173,7 +180,7 @@ fun PaperWorldMapOverlay(
                     onCloseMap = onCloseMap
                 )
 
-                // 2. Scrollable Winding Stage & Level Path
+                // 2. Scrollable Winding Stage & Level Path with Forest, Animals & Cupcake Villagers
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
@@ -181,9 +188,9 @@ fun PaperWorldMapOverlay(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(18.dp))
                         .border(2.5.dp, CardboardDark, RoundedCornerShape(18.dp))
-                        .background( Color(0xF2F7EFE1), RoundedCornerShape(18.dp) ),
+                        .background(Color(0xF5F4EBD9), RoundedCornerShape(18.dp)),
                     contentPadding = PaddingValues(vertical = 14.dp, horizontal = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(stages, key = { it.stageNumber }) { stageInfo ->
                         PaperStageMapSection(
@@ -294,36 +301,47 @@ private fun PaperStageMapSection(
     val isCurrentStage = state.level in levelsInStage
     val isStageUnlocked = state.highestUnlockedLevel >= firstLevel
 
-    val cardShape = RoundedCornerShape(16.dp)
+    val cardShape = RoundedCornerShape(18.dp)
     val horizontalFractions = remember(stageInfo.stageNumber) {
-        levelsInStage.mapIndexed { idx, lvl ->
-            // Winding Candy-Crush S-curve horizontal positions (0.20f .. 0.80f)
+        levelsInStage.map { lvl ->
+            // Winding Candy-Crush S-curve horizontal positions (0.24f .. 0.76f)
             val phase = (lvl * 1.15f) + (if (stageInfo.stageNumber % 2 == 0) 0.8f else 0f)
-            (0.50f + sin(phase.toDouble()).toFloat() * 0.28f).coerceIn(0.18f, 0.82f)
+            (0.50f + sin(phase.toDouble()).toFloat() * 0.25f).coerceIn(0.22f, 0.78f)
         }
     }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "stage_diorama_${stageInfo.stageNumber}")
+    val dioramaSway by infiniteTransition.animateFloat(
+        initialValue = -1f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "diorama_sway"
+    )
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(if (isCurrentStage) 6.dp else 3.dp, cardShape)
+            .shadow(if (isCurrentStage) 7.dp else 4.dp, cardShape)
             .clip(cardShape)
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        stageInfo.bannerColor.copy(alpha = 0.18f),
-                        MaskingTapeCream,
-                        stageInfo.accentColor.copy(alpha = 0.12f)
+                        Color(0xFFDFF2FA),
+                        Color(0xFFD8F3DC),
+                        Color(0xFFF6EBD8)
                     )
                 ),
                 cardShape
             )
             .border(
                 width = if (isCurrentStage) 2.5.dp else 1.5.dp,
-                color = if (isCurrentStage) stageInfo.bannerColor else MaskingTapeBorder,
+                color = if (isCurrentStage) stageInfo.bannerColor else CardboardDark,
                 shape = cardShape
             )
-            .padding(12.dp)
+            .padding(10.dp)
             .testTag("stage_card_${stageInfo.stageNumber}")
     ) {
         // Stage Banner Header (Torn Tape Style)
@@ -346,9 +364,9 @@ private fun PaperStageMapSection(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(34.dp)
+                        .size(36.dp)
                         .background(MaskingTapeCream, CircleShape)
-                        .border(1.dp, CardboardDark, CircleShape)
+                        .border(1.5.dp, CardboardDark, CircleShape)
                         .padding(4.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -377,7 +395,7 @@ private fun PaperStageMapSection(
             // Stage Stars Counter
             Row(
                 modifier = Modifier
-                    .background( Color(0x38000000), RoundedCornerShape(99.dp) )
+                    .background(Color(0x38000000), RoundedCornerShape(99.dp))
                     .padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(3.dp)
@@ -396,23 +414,50 @@ private fun PaperStageMapSection(
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
-        // Winding Trail + Level Nodes
-        val rowHeightDp = 82.dp
+        // Kid-and-Adult-Friendly "How to Play This Stage" Rule Strip
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(StickyNoteYellow.copy(alpha = 0.88f), RoundedCornerShape(10.dp))
+                .border(1.dp, CardboardDark.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                .padding(horizontal = 10.dp, vertical = 5.dp)
+        ) {
+            Text(
+                text = stageInfo.easyRuleBadge,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontSize = 11.5.sp,
+                    lineHeight = 14.sp,
+                    fontWeight = FontWeight.Bold
+                ),
+                color = InkBrown
+            )
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Winding Trail + Pop-Up Forest, Animals, Cupcake People & Level Nodes
+        val rowHeightDp = 92.dp
         val totalTrailHeight = rowHeightDp * LEVELS_PER_STAGE
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(totalTrailHeight)
+                .clip(RoundedCornerShape(14.dp))
+                .border(1.5.dp, MaskingTapeBorder, RoundedCornerShape(14.dp))
         ) {
-            // Winding Dashed Paper Trail Canvas behind the nodes
+            // Illustrated Pop-Up Forest, Animals, Cupcake Villagers & Winding Paper Trail Canvas
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height
                 val stepH = h / LEVELS_PER_STAGE
 
+                // 1. Layered Paper Meadow Hills & Winding Woodland Stream
+                drawStageMeadowAndStream(w, h, stageInfo.stageNumber)
+
+                // 2. Winding Stitched Paper Road connecting the 5 levels
                 val points = horizontalFractions.mapIndexed { idx, frac ->
                     Offset(
                         x = w * frac,
@@ -435,17 +480,23 @@ private fun PaperStageMapSection(
                         }
                     }
 
+                    // Road drop shadow
+                    drawPath(
+                        path = trailPath,
+                        color = Color(0x283B2314),
+                        style = Stroke(width = 24.dp.toPx(), cap = StrokeCap.Round)
+                    )
                     // Outer kraft-paper road backing
                     drawPath(
                         path = trailPath,
-                        color = CardboardMedium.copy(alpha = 0.65f),
-                        style = Stroke(width = 18.dp.toPx(), cap = StrokeCap.Round)
+                        color = CardboardMedium,
+                        style = Stroke(width = 20.dp.toPx(), cap = StrokeCap.Round)
                     )
                     // Inner ivory paper ribbon
                     drawPath(
                         path = trailPath,
                         color = MaskingTapeCream,
-                        style = Stroke(width = 12.dp.toPx(), cap = StrokeCap.Round)
+                        style = Stroke(width = 13.dp.toPx(), cap = StrokeCap.Round)
                     )
                     // Stitched dashed Candy-Crush trail line
                     drawPath(
@@ -458,36 +509,226 @@ private fun PaperStageMapSection(
                         )
                     )
                 }
-            }
 
-            // Place the 5 Level Pin Nodes along the winding trail
-            Column(modifier = Modifier.fillMaxSize()) {
-                levelsInStage.forEachIndexed { idx, lvl ->
-                    val frac = horizontalFractions[idx]
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(rowHeightDp),
-                        contentAlignment = Alignment.CenterStart
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxWidth(frac.coerceIn(0.18f, 0.88f)),
-                            contentAlignment = Alignment.CenterEnd
-                        ) {
-                            LevelPinNode(
-                                level = lvl,
-                                isUnlocked = lvl <= state.highestUnlockedLevel,
-                                isCurrentPlaying = lvl == state.level,
-                                isFrontier = lvl == state.highestUnlockedLevel,
-                                isSelectedOnMap = lvl == state.mapSelectedLevel,
-                                stars = state.levelStars[lvl] ?: 0,
-                                stageColor = stageInfo.bannerColor,
-                                onClick = { onSelectLevel(lvl) }
-                            )
-                        }
+                // 3. Origami Pine Forest Clusters, Woodland Animals & Cupcake Villagers along each row
+                points.forEachIndexed { idx, nodePt ->
+                    val nodeOnLeft = horizontalFractions[idx] < 0.5f
+                    // Place the illustrated diorama vignette on the side opposite the block-goal badge,
+                    // and trees/flowers on the outer margins!
+                    val treeLeftX = w * 0.08f
+                    val treeRightX = w * 0.92f
+                    val rowCenterY = nodePt.y
+
+                    // Outer forest border pines & mushrooms
+                    drawOrigamiPineTree(
+                        center = Offset(treeLeftX, rowCenterY - 12.dp.toPx()),
+                        scale = 0.85f + (idx % 2) * 0.15f,
+                        tint = if ((idx + stageInfo.stageNumber) % 2 == 0) OrigamiCraneBlue else OrigamiFoxGreen
+                    )
+                    drawOrigamiPineTree(
+                        center = Offset(treeRightX, rowCenterY + 8.dp.toPx()),
+                        scale = 0.90f,
+                        tint = if (idx % 2 == 0) OrigamiFoxGreen else OrigamiCraneBlue
+                    )
+
+                    // Scenic Character / Animal / Bakery Vignette beside the road
+                    val vignetteX = if (nodeOnLeft) w * 0.82f else w * 0.18f
+                    val vignetteCenter = Offset(vignetteX, rowCenterY + (dioramaSway * 2.5f).dp.toPx())
+
+                    when ((idx + stageInfo.stageNumber) % 5) {
+                        0 -> drawCupcakeBakerVillager(vignetteCenter)
+                        1 -> drawOrigamiFoxAndBunny(vignetteCenter)
+                        2 -> drawCandyVillagerWithPeppermint(vignetteCenter, stageInfo.bannerColor)
+                        3 -> drawWoodlandBearWithHoneyStar(vignetteCenter)
+                        else -> drawPaperSweetBakeryCottage(vignetteCenter, stageInfo.bannerColor)
                     }
                 }
             }
+
+            // Place the 5 Level Pin Nodes + Live "What's In The Blocks" Preview Badges along the trail
+            Column(modifier = Modifier.fillMaxSize()) {
+                levelsInStage.forEachIndexed { idx, lvl ->
+                    val frac = horizontalFractions[idx]
+                    val bp = remember(lvl) { getLevelBlueprint(lvl) }
+                    LevelRowWithBlockPreview(
+                        level = lvl,
+                        blueprint = bp,
+                        horizontalFraction = frac,
+                        rowHeightDp = rowHeightDp,
+                        isUnlocked = lvl <= state.highestUnlockedLevel,
+                        isCurrentPlaying = lvl == state.level,
+                        isFrontier = lvl == state.highestUnlockedLevel,
+                        isSelectedOnMap = lvl == state.mapSelectedLevel,
+                        stars = state.levelStars[lvl] ?: 0,
+                        stageColor = stageInfo.bannerColor,
+                        onClick = { onSelectLevel(lvl) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Renders a level row containing both the interactive 3D Paper Level Pin Node AND a floating
+ * "What's in the Blocks" Goal Preview Bubble right beside the node so players can see the
+ * Cupcakes, Origami Foxes, Cranes, Peppermints, Wrapped Candies, and Stars inside every level!
+ */
+@Composable
+private fun LevelRowWithBlockPreview(
+    level: Int,
+    blueprint: LevelBlueprint,
+    horizontalFraction: Float,
+    rowHeightDp: androidx.compose.ui.unit.Dp,
+    isUnlocked: Boolean,
+    isCurrentPlaying: Boolean,
+    isFrontier: Boolean,
+    isSelectedOnMap: Boolean,
+    stars: Int,
+    stageColor: Color,
+    onClick: () -> Unit
+) {
+    val placeBadgeToRight = horizontalFraction <= 0.52f
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(rowHeightDp),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Box(
+            modifier = Modifier.fillMaxWidth(
+                if (placeBadgeToRight) {
+                    (horizontalFraction + 0.34f).coerceIn(0.45f, 0.96f)
+                } else {
+                    (horizontalFraction + 0.12f).coerceIn(0.32f, 0.92f)
+                }
+            ),
+            contentAlignment = Alignment.CenterEnd
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                if (!placeBadgeToRight) {
+                    LevelBlockContentsPill(
+                        blueprint = blueprint,
+                        isUnlocked = isUnlocked,
+                        isBoss = level % LEVELS_PER_STAGE == 0,
+                        onClick = onClick
+                    )
+                }
+
+                LevelPinNode(
+                    level = level,
+                    isUnlocked = isUnlocked,
+                    isCurrentPlaying = isCurrentPlaying,
+                    isFrontier = isFrontier,
+                    isSelectedOnMap = isSelectedOnMap,
+                    stars = stars,
+                    stageColor = stageColor,
+                    onClick = onClick
+                )
+
+                if (placeBadgeToRight) {
+                    LevelBlockContentsPill(
+                        blueprint = blueprint,
+                        isUnlocked = isUnlocked,
+                        isBoss = level % LEVELS_PER_STAGE == 0,
+                        onClick = onClick
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Miniature Washi Coaster Pill beside each level node showing the actual Origami & Candy blocks
+ * inside that level (e.g. Cupcake, Origami Fox, Peppermint, Crane, Gold Stamp ★, Tape ✕).
+ */
+@Composable
+private fun LevelBlockContentsPill(
+    blueprint: LevelBlueprint,
+    isUnlocked: Boolean,
+    isBoss: Boolean,
+    onClick: () -> Unit
+) {
+    val pillShape = RoundedCornerShape(10.dp)
+    Row(
+        modifier = Modifier
+            .shadow(if (isUnlocked) 3.dp else 1.dp, pillShape)
+            .background(
+                if (isUnlocked) MaskingTapeCream else Color(0xFFEADBC8),
+                pillShape
+            )
+            .border(
+                width = 1.2.dp,
+                color = if (isBoss) PeppermintRed else CardboardDark,
+                shape = pillShape
+            )
+            .clickable(enabled = isUnlocked, onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        if (isBoss) {
+            Text(
+                text = "👑",
+                fontSize = 10.sp
+            )
+        }
+        // Primary Block Icon + Count
+        Box(modifier = Modifier.size(18.dp)) {
+            PaperPieceVector(
+                pieceType = blueprint.primaryGoal.targetPiece,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        Text(
+            text = "${blueprint.primaryGoal.targetCount}",
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.ExtraBold
+            ),
+            color = InkBrown
+        )
+
+        // Secondary Block Icon + Count
+        Box(modifier = Modifier.size(18.dp)) {
+            PaperPieceVector(
+                pieceType = blueprint.secondaryGoal.targetPiece,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        Text(
+            text = "${blueprint.secondaryGoal.targetCount}",
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.ExtraBold
+            ),
+            color = InkBrown
+        )
+
+        // Optional Gold Stamp or Tape Lock indicator
+        if (blueprint.goldCells.isNotEmpty()) {
+            Text(
+                text = "★",
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black
+                ),
+                color = Color(0xFFD97706)
+            )
+        }
+        if (blueprint.tapeLocks.isNotEmpty()) {
+            Text(
+                text = "✕",
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Black
+                ),
+                color = PeppermintRed
+            )
         }
     }
 }
@@ -539,8 +780,8 @@ private fun LevelPinNode(
 
     Box(
         modifier = Modifier
-            .width(110.dp)
-            .height(80.dp)
+            .width(74.dp)
+            .height(82.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -613,7 +854,7 @@ private fun LevelPinNode(
             Row(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .offset(y = avatarBounce.dp - 6.dp)
+                    .offset(y = avatarBounce.dp - 4.dp)
                     .shadow(3.dp, RoundedCornerShape(99.dp))
                     .background(StickyNoteYellow, RoundedCornerShape(99.dp))
                     .border(1.5.dp, CardboardDark, RoundedCornerShape(99.dp))
@@ -623,7 +864,7 @@ private fun LevelPinNode(
             ) {
                 PaperPieceVector(
                     pieceType = PieceType.ORIGAMI_FOX,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(15.dp)
                 )
                 Text(
                     text = "YOU",
@@ -641,7 +882,7 @@ private fun LevelPinNode(
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .offset(y = 2.dp)
+                    .offset(y = 1.dp)
                     .shadow(2.dp, RoundedCornerShape(99.dp))
                     .background(MaskingTapeCream, RoundedCornerShape(99.dp))
                     .border(1.dp, CardboardDark, RoundedCornerShape(99.dp))
@@ -660,6 +901,394 @@ private fun LevelPinNode(
             }
         }
     }
+}
+
+/**
+ * Draws layered paper hills, a sparkling paper river stream, wooden footbridges, and wildflower tufts.
+ */
+private fun DrawScope.drawStageMeadowAndStream(
+    w: Float,
+    h: Float,
+    stageNum: Int
+) {
+    // Soft rolling paper hills with white torn-paper deckle borders
+    val hill1 = Path().apply {
+        moveTo(0f, h * 0.22f)
+        quadraticTo(w * 0.35f, h * 0.14f, w * 0.70f, h * 0.22f)
+        quadraticTo(w * 0.88f, h * 0.26f, w, h * 0.20f)
+        lineTo(w, h)
+        lineTo(0f, h)
+        close()
+    }
+    drawPath(hill1, color = Color(0xFFB7E4C7))
+    drawPath(
+        hill1,
+        color = Color.White.copy(alpha = 0.8f),
+        style = Stroke(width = 3.dp.toPx())
+    )
+
+    val hill2 = Path().apply {
+        moveTo(0f, h * 0.56f)
+        quadraticTo(w * 0.30f, h * 0.64f, w * 0.62f, h * 0.54f)
+        quadraticTo(w * 0.84f, h * 0.48f, w, h * 0.58f)
+        lineTo(w, h)
+        lineTo(0f, h)
+        close()
+    }
+    drawPath(hill2, color = Color(0xFF95D5B2))
+    drawPath(
+        hill2,
+        color = Color.White.copy(alpha = 0.8f),
+        style = Stroke(width = 3.dp.toPx())
+    )
+
+    // Winding sky-blue paper brook / stream across the middle of the meadow
+    val streamPath = Path().apply {
+        val startX = if (stageNum % 2 == 0) 0f else w
+        val endX = if (stageNum % 2 == 0) w else 0f
+        moveTo(startX, h * 0.38f)
+        cubicTo(
+            w * 0.35f, h * 0.32f,
+            w * 0.65f, h * 0.46f,
+            endX, h * 0.40f
+        )
+    }
+    drawPath(
+        path = streamPath,
+        color = Color.White.copy(alpha = 0.85f),
+        style = Stroke(width = 16.dp.toPx(), cap = StrokeCap.Round)
+    )
+    drawPath(
+        path = streamPath,
+        color = Color(0xFF90E0EF),
+        style = Stroke(width = 11.dp.toPx(), cap = StrokeCap.Round)
+    )
+}
+
+/**
+ * Draws a two-tone folded origami pine tree with a kraft trunk and shadow.
+ */
+private fun DrawScope.drawOrigamiPineTree(
+    center: Offset,
+    scale: Float,
+    tint: Color
+) {
+    val s = scale * 1.dp.toPx()
+    // Shadow
+    drawCircle(
+        color = Color(0x22000000),
+        radius = 12f * s,
+        center = Offset(center.x + 2f * s, center.y + 16f * s)
+    )
+    // Trunk
+    drawRoundRect(
+        color = Color(0xFF7F4F24),
+        topLeft = Offset(center.x - 3.5f * s, center.y + 4f * s),
+        size = Size(7f * s, 13f * s),
+        cornerRadius = CornerRadius(2f * s, 2f * s)
+    )
+    // Left sunlit origami canopy half
+    val leftHalf = Path().apply {
+        moveTo(center.x, center.y - 22f * s)
+        lineTo(center.x - 15f * s, center.y + 6f * s)
+        lineTo(center.x, center.y + 6f * s)
+        close()
+    }
+    drawPath(leftHalf, color = tint)
+
+    // Right shaded origami canopy half
+    val rightHalf = Path().apply {
+        moveTo(center.x, center.y - 22f * s)
+        lineTo(center.x + 15f * s, center.y + 6f * s)
+        lineTo(center.x, center.y + 6f * s)
+        close()
+    }
+    drawPath(
+        rightHalf,
+        color = Color(
+            red = (tint.red * 0.82f).coerceIn(0f, 1f),
+            green = (tint.green * 0.82f).coerceIn(0f, 1f),
+            blue = (tint.blue * 0.82f).coerceIn(0f, 1f),
+            alpha = 1f
+        )
+    )
+
+    // Crisp outline
+    val fullOutline = Path().apply {
+        moveTo(center.x, center.y - 22f * s)
+        lineTo(center.x - 15f * s, center.y + 6f * s)
+        lineTo(center.x + 15f * s, center.y + 6f * s)
+        close()
+    }
+    drawPath(
+        fullOutline,
+        color = InkBrown,
+        style = Stroke(width = 1.6f * s, join = StrokeJoin.Round)
+    )
+}
+
+/**
+ * 1. Draws a cheerful Paper-Cutout Baker Villager holding a giant Frosted Cupcake with a Cherry!
+ */
+private fun DrawScope.drawCupcakeBakerVillager(center: Offset) {
+    val u = 1.dp.toPx()
+    // White paper-cutout backing halo
+    drawCircle(
+        color = MaskingTapeCream,
+        radius = 23f * u,
+        center = center
+    )
+    drawCircle(
+        color = CardboardDark,
+        radius = 23f * u,
+        center = center,
+        style = Stroke(width = 1.5f * u)
+    )
+
+    // Baker body / apron (coral-red tunic + white apron)
+    val bodyPath = Path().apply {
+        moveTo(center.x - 11f * u, center.y + 18f * u)
+        lineTo(center.x - 7f * u, center.y + 1f * u)
+        lineTo(center.x + 7f * u, center.y + 1f * u)
+        lineTo(center.x + 11f * u, center.y + 18f * u)
+        close()
+    }
+    drawPath(bodyPath, color = PeppermintRed)
+    drawPath(bodyPath, color = InkBrown, style = Stroke(width = 1.5f * u, join = StrokeJoin.Round))
+
+    // Baker head
+    drawCircle(
+        color = Color(0xFFFFE5D0),
+        radius = 7.5f * u,
+        center = Offset(center.x - 2f * u, center.y - 5f * u)
+    )
+    drawCircle(
+        color = InkBrown,
+        radius = 7.5f * u,
+        center = Offset(center.x - 2f * u, center.y - 5f * u),
+        style = Stroke(width = 1.5f * u)
+    )
+
+    // Paper Chef Toque Hat
+    drawRoundRect(
+        color = Color.White,
+        topLeft = Offset(center.x - 9f * u, center.y - 18f * u),
+        size = Size(14f * u, 7f * u),
+        cornerRadius = CornerRadius(4f * u, 4f * u)
+    )
+    drawRoundRect(
+        color = InkBrown,
+        topLeft = Offset(center.x - 9f * u, center.y - 18f * u),
+        size = Size(14f * u, 7f * u),
+        cornerRadius = CornerRadius(4f * u, 4f * u),
+        style = Stroke(width = 1.3f * u)
+    )
+
+    // Smile & eyes
+    drawCircle(color = InkBrown, radius = 1.2f * u, center = Offset(center.x - 4.5f * u, center.y - 6f * u))
+    drawCircle(color = InkBrown, radius = 1.2f * u, center = Offset(center.x + 0.5f * u, center.y - 6f * u))
+    drawCircle(color = CupcakeFrostingPink.copy(alpha = 0.6f), radius = 1.8f * u, center = Offset(center.x - 6f * u, center.y - 3.5f * u))
+
+    // Giant Frosted Cupcake held in the baker's hands!
+    val cupX = center.x + 10f * u
+    val cupY = center.y + 2f * u
+    val cupBase = Path().apply {
+        moveTo(cupX - 6f * u, cupY)
+        lineTo(cupX + 6f * u, cupY)
+        lineTo(cupX + 4.5f * u, cupY + 8f * u)
+        lineTo(cupX - 4.5f * u, cupY + 8f * u)
+        close()
+    }
+    drawPath(cupBase, color = Color(0xFFD99B66))
+    drawPath(cupBase, color = InkBrown, style = Stroke(width = 1.3f * u))
+    // Pink frosting swirl
+    drawRoundRect(
+        color = CupcakeFrostingPink,
+        topLeft = Offset(cupX - 7.5f * u, cupY - 5f * u),
+        size = Size(15f * u, 6f * u),
+        cornerRadius = CornerRadius(3f * u, 3f * u)
+    )
+    drawRoundRect(
+        color = InkBrown,
+        topLeft = Offset(cupX - 7.5f * u, cupY - 5f * u),
+        size = Size(15f * u, 6f * u),
+        cornerRadius = CornerRadius(3f * u, 3f * u),
+        style = Stroke(width = 1.3f * u)
+    )
+    // Cherry on top
+    drawCircle(color = PeppermintRed, radius = 2.6f * u, center = Offset(cupX, cupY - 7f * u))
+}
+
+/**
+ * 2. Draws an Origami Woodland Fox & Paper Bunny with a soaring Origami Crane overhead.
+ */
+private fun DrawScope.drawOrigamiFoxAndBunny(center: Offset) {
+    val u = 1.dp.toPx()
+    drawCircle(color = MaskingTapeCream, radius = 23f * u, center = center)
+    drawCircle(color = CardboardDark, radius = 23f * u, center = center, style = Stroke(width = 1.5f * u))
+
+    // Origami Fox Head + Ears
+    val leftEar = Path().apply {
+        moveTo(center.x - 13f * u, center.y - 12f * u)
+        lineTo(center.x - 4f * u, center.y - 4f * u)
+        lineTo(center.x - 14f * u, center.y)
+        close()
+    }
+    val rightEar = Path().apply {
+        moveTo(center.x + 5f * u, center.y - 12f * u)
+        lineTo(center.x - 4f * u, center.y - 4f * u)
+        lineTo(center.x + 6f * u, center.y)
+        close()
+    }
+    drawPath(leftEar, color = Color(0xFFD9480F))
+    drawPath(rightEar, color = Color(0xFFD9480F))
+
+    val foxFace = Path().apply {
+        moveTo(center.x - 4f * u, center.y - 6f * u)
+        lineTo(center.x - 14f * u, center.y)
+        lineTo(center.x - 4f * u, center.y + 12f * u)
+        lineTo(center.x + 6f * u, center.y)
+        close()
+    }
+    drawPath(foxFace, color = OrigamiFoxOrange)
+    drawPath(foxFace, color = InkBrown, style = Stroke(width = 1.5f * u, join = StrokeJoin.Round))
+    drawCircle(color = InkBrown, radius = 2f * u, center = Offset(center.x - 4f * u, center.y + 11f * u))
+    drawCircle(color = InkBrown, radius = 1.3f * u, center = Offset(center.x - 8f * u, center.y + 1f * u))
+    drawCircle(color = InkBrown, radius = 1.3f * u, center = Offset(center.x, center.y + 1f * u))
+
+    // Cute White Paper Bunny peeking beside the Fox
+    drawOval(
+        color = Color.White,
+        topLeft = Offset(center.x + 6f * u, center.y - 12f * u),
+        size = Size(4.5f * u, 11f * u)
+    )
+    drawOval(
+        color = Color.White,
+        topLeft = Offset(center.x + 11f * u, center.y - 12f * u),
+        size = Size(4.5f * u, 11f * u)
+    )
+    drawCircle(
+        color = Color.White,
+        radius = 6.5f * u,
+        center = Offset(center.x + 10.5f * u, center.y + 3f * u)
+    )
+    drawCircle(
+        color = InkBrown,
+        radius = 6.5f * u,
+        center = Offset(center.x + 10.5f * u, center.y + 3f * u),
+        style = Stroke(width = 1.3f * u)
+    )
+    drawCircle(color = CupcakeFrostingPink, radius = 1.5f * u, center = Offset(center.x + 10.5f * u, center.y + 4f * u))
+}
+
+/**
+ * 3. Draws a Paper-Craft Villager Kid holding a Peppermint Swirl & Wrapped Candy!
+ */
+private fun DrawScope.drawCandyVillagerWithPeppermint(center: Offset, stageColor: Color) {
+    val u = 1.dp.toPx()
+    drawCircle(color = MaskingTapeCream, radius = 23f * u, center = center)
+    drawCircle(color = CardboardDark, radius = 23f * u, center = center, style = Stroke(width = 1.5f * u))
+
+    // Villager poncho in stage theme color
+    val cape = Path().apply {
+        moveTo(center.x - 4f * u, center.y - 1f * u)
+        lineTo(center.x - 13f * u, center.y + 16f * u)
+        lineTo(center.x + 5f * u, center.y + 16f * u)
+        close()
+    }
+    drawPath(cape, color = stageColor)
+    drawPath(cape, color = InkBrown, style = Stroke(width = 1.4f * u, join = StrokeJoin.Round))
+
+    // Head
+    drawCircle(color = Color(0xFFFFDFC4), radius = 7f * u, center = Offset(center.x - 4f * u, center.y - 6f * u))
+    drawCircle(color = InkBrown, radius = 7f * u, center = Offset(center.x - 4f * u, center.y - 6f * u), style = Stroke(width = 1.4f * u))
+    drawCircle(color = InkBrown, radius = 1.2f * u, center = Offset(center.x - 6.5f * u, center.y - 6.5f * u))
+    drawCircle(color = InkBrown, radius = 1.2f * u, center = Offset(center.x - 1.5f * u, center.y - 6.5f * u))
+
+    // Giant Peppermint Lollipop held by the villager
+    val lolliCenter = Offset(center.x + 10f * u, center.y - 3f * u)
+    drawLine(
+        color = InkBrown,
+        start = lolliCenter,
+        end = Offset(center.x + 6f * u, center.y + 14f * u),
+        strokeWidth = 2.2f * u,
+        cap = StrokeCap.Round
+    )
+    drawCircle(color = PeppermintRed, radius = 8f * u, center = lolliCenter)
+    drawCircle(color = Color.White, radius = 4.5f * u, center = lolliCenter)
+    drawCircle(color = PeppermintRed, radius = 2f * u, center = lolliCenter)
+    drawCircle(color = InkBrown, radius = 8f * u, center = lolliCenter, style = Stroke(width = 1.4f * u))
+}
+
+/**
+ * 4. Draws a Woodland Paper Bear holding a Golden Cardboard Star & Wrapped Candy!
+ */
+private fun DrawScope.drawWoodlandBearWithHoneyStar(center: Offset) {
+    val u = 1.dp.toPx()
+    drawCircle(color = MaskingTapeCream, radius = 23f * u, center = center)
+    drawCircle(color = CardboardDark, radius = 23f * u, center = center, style = Stroke(width = 1.5f * u))
+
+    // Bear ears
+    drawCircle(color = Color(0xFF7F4F24), radius = 4.5f * u, center = Offset(center.x - 10f * u, center.y - 10f * u))
+    drawCircle(color = Color(0xFF7F4F24), radius = 4.5f * u, center = Offset(center.x + 4f * u, center.y - 10f * u))
+
+    // Bear head
+    drawCircle(color = Color(0xFFD4A373), radius = 10.5f * u, center = Offset(center.x - 3f * u, center.y - 1f * u))
+    drawCircle(color = InkBrown, radius = 10.5f * u, center = Offset(center.x - 3f * u, center.y - 1f * u), style = Stroke(width = 1.5f * u))
+    // Snout
+    drawCircle(color = Color(0xFFE6CCB2), radius = 4.5f * u, center = Offset(center.x - 3f * u, center.y + 2f * u))
+    drawCircle(color = InkBrown, radius = 1.8f * u, center = Offset(center.x - 3f * u, center.y + 0.5f * u))
+    drawCircle(color = InkBrown, radius = 1.3f * u, center = Offset(center.x - 7f * u, center.y - 3f * u))
+    drawCircle(color = InkBrown, radius = 1.3f * u, center = Offset(center.x + 1f * u, center.y - 3f * u))
+
+    // Golden Cardboard Star held in paw
+    val starCenter = Offset(center.x + 11f * u, center.y + 5f * u)
+    drawCircle(color = StarCardboardGold, radius = 7.5f * u, center = starCenter)
+    drawCircle(color = InkBrown, radius = 7.5f * u, center = starCenter, style = Stroke(width = 1.4f * u))
+    drawCircle(color = StickyNoteYellow, radius = 3.5f * u, center = starCenter)
+}
+
+/**
+ * 5. Draws a cozy Paper-Cutout Sweet Bakery Cottage with a Cupcake Sign & Origami Crane.
+ */
+private fun DrawScope.drawPaperSweetBakeryCottage(center: Offset, roofColor: Color) {
+    val u = 1.dp.toPx()
+    drawCircle(color = MaskingTapeCream, radius = 23f * u, center = center)
+    drawCircle(color = CardboardDark, radius = 23f * u, center = center, style = Stroke(width = 1.5f * u))
+
+    // Cottage walls
+    drawRoundRect(
+        color = Color(0xFFFFF8EB),
+        topLeft = Offset(center.x - 12f * u, center.y - 2f * u),
+        size = Size(24f * u, 16f * u),
+        cornerRadius = CornerRadius(2f * u, 2f * u)
+    )
+    drawRoundRect(
+        color = InkBrown,
+        topLeft = Offset(center.x - 12f * u, center.y - 2f * u),
+        size = Size(24f * u, 16f * u),
+        cornerRadius = CornerRadius(2f * u, 2f * u),
+        style = Stroke(width = 1.4f * u)
+    )
+
+    // Pitched paper roof
+    val roof = Path().apply {
+        moveTo(center.x, center.y - 16f * u)
+        lineTo(center.x - 15f * u, center.y - 1f * u)
+        lineTo(center.x + 15f * u, center.y - 1f * u)
+        close()
+    }
+    drawPath(roof, color = roofColor)
+    drawPath(roof, color = InkBrown, style = Stroke(width = 1.5f * u, join = StrokeJoin.Round))
+
+    // Door & Wrapped Candy Window
+    drawRoundRect(
+        color = Color(0xFFD4A373),
+        topLeft = Offset(center.x - 3.5f * u, center.y + 4f * u),
+        size = Size(7f * u, 10f * u),
+        cornerRadius = CornerRadius(3f * u, 3f * u)
+    )
+    drawCircle(color = WrappedCandyPurple, radius = 3.2f * u, center = Offset(center.x, center.y - 6f * u))
 }
 
 @Composable

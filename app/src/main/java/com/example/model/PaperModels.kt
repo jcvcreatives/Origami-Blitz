@@ -181,6 +181,7 @@ data class PaperStageInfo(
     val stageNumber: Int,
     val title: String,
     val subtitle: String,
+    val easyRuleBadge: String,
     val bannerColor: Color,
     val accentColor: Color,
     val mascotPiece: PieceType
@@ -192,7 +193,8 @@ fun getStageInfoForLevel(level: Int): PaperStageInfo {
         0 -> PaperStageInfo(
             stageNumber = stageNum,
             title = "Whispering Pine Woods",
-            subtitle = "Woodland Origami & Gold Stamps",
+            subtitle = "Easy Match-3 & ★ Gold Squares",
+            easyRuleBadge = "HOW TO PLAY: Swap 2 blocks to match 3 of the same picture! Match on ★ Gold Squares to collect them.",
             bannerColor = Color(0xFF52B788),
             accentColor = OrigamiFoxOrange,
             mascotPiece = PieceType.ORIGAMI_FOX
@@ -200,7 +202,8 @@ fun getStageInfoForLevel(level: Int): PaperStageInfo {
         1 -> PaperStageInfo(
             stageNumber = stageNum,
             title = "Peppermint Boardwalk",
-            subtitle = "Masking Tape Pinwheel Pier",
+            subtitle = "Snip ✕ Paper Tape Next to Matches",
+            easyRuleBadge = "STAGE RULE: Blocks under ✕ Paper Tape can't move yet! Match right next to ✕ Tape to snip it open.",
             bannerColor = PeppermintRed,
             accentColor = CupcakeFrostingPink,
             mascotPiece = PieceType.PEPPERMINT
@@ -208,7 +211,8 @@ fun getStageInfoForLevel(level: Int): PaperStageInfo {
         2 -> PaperStageInfo(
             stageNumber = stageNum,
             title = "Golden Cardboard Canyon",
-            subtitle = "Red Wax Seal Mesa Ridge",
+            subtitle = "Collect ★ Gold Squares with Line Cutters",
+            easyRuleBadge = "STAGE RULE: Match blocks on top of ★ Gold Squares! Every level starts with a free ↔ Line Cutter on the board.",
             bannerColor = StarCardboardGold,
             accentColor = OrigamiFoxOrange,
             mascotPiece = PieceType.CARDBOARD_STAR
@@ -216,15 +220,17 @@ fun getStageInfoForLevel(level: Int): PaperStageInfo {
         3 -> PaperStageInfo(
             stageNumber = stageNum,
             title = "Starlight Origami Summit",
-            subtitle = "Foil Stamps & Tape Peaks",
+            subtitle = "Pop 🔴 Red Wax Seals (2 Matches Nearby)",
+            easyRuleBadge = "STAGE RULE: 🔴 Red Wax Seals take 2 hits! Match next to a Wax Seal once to crack the wax, then once more to free it.",
             bannerColor = WrappedCandyPurple,
             accentColor = OrigamiCraneCyan,
             mascotPiece = PieceType.ORIGAMI_CRANE
         )
         4 -> PaperStageInfo(
             stageNumber = stageNum,
-            title = "Sakura Washi Garden",
-            subtitle = "Folded Petal Pavilion",
+            title = "Sakura Cupcake Garden",
+            subtitle = "Sweet Cupcakes & Free ✦ 3x3 Paper Bomb",
+            easyRuleBadge = "STAGE RULE: Double-tap or swap the ✦ Paper Bomb on the board to blast a big 3x3 square of blocks & ★ Gold!",
             bannerColor = CupcakeFrostingPink,
             accentColor = PeppermintRed,
             mascotPiece = PieceType.CUPCAKE
@@ -232,39 +238,44 @@ fun getStageInfoForLevel(level: Int): PaperStageInfo {
         5 -> PaperStageInfo(
             stageNumber = stageNum,
             title = "Origami Lantern Harbor",
-            subtitle = "Paper Boat & Crane Quay",
+            subtitle = "Open ✕ Tape Bridges to Reach ★ Gold",
+            easyRuleBadge = "STAGE RULE: Match next to the ✕ Paper Tape in the middle to open the bridge and collect ★ Gold Squares!",
             bannerColor = OrigamiCraneBlue,
             accentColor = StarCardboardGold,
             mascotPiece = PieceType.ORIGAMI_CRANE
         )
         6 -> PaperStageInfo(
             stageNumber = stageNum,
-            title = "Berry Confectionery Box",
-            subtitle = "Wax-Sealed Sweet Studio",
+            title = "Berry Sweet Bakery",
+            subtitle = "✹ Rainbow Pinwheel Clears All of 1 Color",
+            easyRuleBadge = "STAGE RULE: Swap the ✹ Rainbow Pinwheel with ANY block next to it to collect every block of that picture!",
             bannerColor = Color(0xFFD9480F),
             accentColor = CupcakeFrostingPink,
             mascotPiece = PieceType.CUPCAKE
         )
         7 -> PaperStageInfo(
             stageNumber = stageNum,
-            title = "Lavender Ribbon Atelier",
-            subtitle = "Bookbinder's Press Hall",
+            title = "Lavender Candy Workshop",
+            subtitle = "Use Scissors, Glue & Hammer Anytime",
+            easyRuleBadge = "STAGE RULE: Tap Scissors, Glue, or Hammer at the bottom anytime—they cost 0 moves and break any lock!",
             bannerColor = Color(0xFF7048E8),
             accentColor = WrappedCandyOrange,
             mascotPiece = PieceType.WRAPPED_CANDY
         )
         8 -> PaperStageInfo(
             stageNumber = stageNum,
-            title = "Amber Sunburst Glasshouse",
-            subtitle = "Stained-Paper Conservatory",
+            title = "Sunny Star Conservatory",
+            subtitle = "Big Cascade Combos & 2x Fever Score",
+            easyRuleBadge = "STAGE RULE: Match 4 or 5 blocks to fill the Fever Bar for 2x Score & automatic chain cascades!",
             bannerColor = Color(0xFFE67700),
             accentColor = StarCardboardGold,
             mascotPiece = PieceType.CARDBOARD_STAR
         )
         else -> PaperStageInfo(
             stageNumber = stageNum,
-            title = "Grand Origami Citadel",
-            subtitle = "Royal Paper Crown Finale",
+            title = "Royal Origami Castle",
+            subtitle = "Swap 2 Power-Ups Together for Mega Blast!",
+            easyRuleBadge = "STAGE RULE: Swap 2 glowing Power-Up blocks together to unleash a Mega Blast across the board!",
             bannerColor = Color(0xFFC92A2A),
             accentColor = StarCardboardGold,
             mascotPiece = PieceType.PEPPERMINT
@@ -273,11 +284,12 @@ fun getStageInfoForLevel(level: Int): PaperStageInfo {
 }
 
 /**
- * Complete blueprint for each of the 50 campaign levels, including:
- * - Primary & Secondary piece collection goals
- * - Gold Washi Stamp cells (collect by matching on top)
- * - Masking Tape (1 HP) & Red Wax Seal (2 HP) locked cells (free by matching or adjacent match)
- * - Descriptive mechanic label shown in the HUD and World Map
+ * Complete blueprint for each of the 50 campaign levels, designed so kids and adults
+ * can immediately understand the stage goal and enjoy smooth, rewarding progression:
+ * - Primary & Secondary piece collection goals (friendly, achievable counts)
+ * - Gold Washi Stamp cells (★: match on top or blast to collect)
+ * - Masking Tape (1 HP) & Red Wax Seal (2 HP) locked cells (✕: match next to or blast to free)
+ * - Plain-English, easy-to-read mechanic label shown in the HUD and World Map
  */
 data class LevelBlueprint(
     val level: Int,
@@ -285,7 +297,7 @@ data class LevelBlueprint(
     val primaryGoal: LevelGoal,
     val secondaryGoal: LevelGoal,
     val goldCells: Set<GridPos>,
-    val tapeLocks: Map<GridPos, Int>, // 1 = Masking Tape Strap, 2 = Red Wax Seal + Tape
+    val tapeLocks: Map<GridPos, Int>, // 1 = Masking Tape Strap (1 hit), 2 = Red Wax Seal (2 hits)
     val mechanicLabel: String
 )
 
@@ -295,196 +307,159 @@ fun getLevelBlueprint(level: Int): LevelBlueprint {
     val primaryType = pieces[(lvl - 1) % pieces.size]
     val secondaryType = pieces[(lvl + 2) % pieces.size]
 
-    val primaryCount = (10 + (lvl * 3) / 2).coerceIn(12, 34)
-    val secondaryCount = (8 + (lvl * 5) / 4).coerceIn(10, 28)
-    val moves = (23 + (lvl % 4) + (if (lvl % 5 == 0) 3 else 0)).coerceIn(22, 32)
+    // Kid-and-adult-friendly target counts & generous move limits
+    val primaryCount = (10 + (lvl * 2) / 5).coerceIn(10, 22)
+    val secondaryCount = (8 + (lvl * 2) / 6).coerceIn(8, 18)
+    val moves = (27 + (lvl % 4) + (if (lvl % 5 == 0) 3 else 0)).coerceIn(27, 34)
 
     val gold = mutableSetOf<GridPos>()
     val tape = mutableMapOf<GridPos, Int>()
-
-    fun addDiamondGold(radius: Int) {
-        for (r in 0 until BOARD_SIZE) {
-            for (c in 0 until BOARD_SIZE) {
-                if (abs(r - 3) + abs(c - 3) <= radius) {
-                    gold.add(GridPos(r, c))
-                }
-            }
-        }
-    }
-
-    fun addRingGold(radius: Int) {
-        for (r in 0 until BOARD_SIZE) {
-            for (c in 0 until BOARD_SIZE) {
-                if (maxOf(abs(r - 3), abs(c - 3)) == radius) {
-                    gold.add(GridPos(r, c))
-                }
-            }
-        }
-    }
-
-    fun addCrossTape(hp: Int, span: Int) {
-        for (i in (3 - span)..(3 + span)) {
-            if (i in 0 until BOARD_SIZE) {
-                tape[GridPos(3, i)] = hp
-                tape[GridPos(i, 3)] = hp
-            }
-        }
-    }
-
-    fun addCornersTape(hp: Int) {
-        val coords = listOf(1 to 1, 1 to 5, 5 to 1, 5 to 5, 2 to 2, 2 to 4, 4 to 2, 4 to 4)
-        coords.take(4 + (lvl % 5)).forEach { (r, c) -> tape[GridPos(r, c)] = hp }
-    }
 
     val stageIndex = ((lvl - 1) / LEVELS_PER_STAGE) % 10
     val stepInStage = (lvl - 1) % LEVELS_PER_STAGE // 0..4
 
     val mechanicLabel = when (stageIndex) {
         0 -> {
-            // Stage 1 (Levels 1-5): Introduces Classic Match & Washi Gold Stamps
+            // Stage 1 (Levels 1-5): Easy Match-3 & ★ Gold Squares
             when (stepInStage) {
-                0 -> "Classic Paper Fold • Match 4 for Line Cutter!"
-                1 -> {
-                    listOf(2 to 2, 2 to 4, 3 to 3, 4 to 2, 4 to 4).forEach { gold.add(GridPos(it.first, it.second)) }
-                    "Gold Washi Stamps • Match on Gold Cells!"
-                }
+                0 -> "Match 3 Same Blocks • Match 4 for ↔ Line Cutter!"
+                1 -> "Swap ✹ Rainbow Pinwheel with Any Block!"
                 2 -> {
-                    addDiamondGold(1)
-                    "Gold Stamp Diamond • Collect 5 Foil Stamps"
+                    listOf(3 to 2, 3 to 3, 3 to 4).forEach { gold.add(GridPos(it.first, it.second)) }
+                    "★ Gold Squares • Match ON Gold Squares (3)"
                 }
                 3 -> {
-                    for (c in 1..5) gold.add(GridPos(3, c))
-                    for (r in 1..5) gold.add(GridPos(r, 3))
-                    "Woodland Gold Cross • Collect 9 Foil Stamps"
+                    listOf(2 to 3, 3 to 2, 3 to 3, 3 to 4, 4 to 3).forEach { gold.add(GridPos(it.first, it.second)) }
+                    "★ Gold Plus • Match ON Gold Squares (5)"
                 }
                 else -> {
-                    addDiamondGold(2)
-                    "Stage 1 Finale • Golden Pine Crest"
+                    listOf(2 to 2, 2 to 4, 3 to 3, 4 to 2, 4 to 4).forEach { gold.add(GridPos(it.first, it.second)) }
+                    "Stage 1 Boss • Collect 5 ★ Gold Squares!"
                 }
             }
         }
         1 -> {
-            // Stage 2 (Levels 6-10): Introduces Masking Tape Straps (1 HP)
+            // Stage 2 (Levels 6-10): Snip ✕ Paper Tape (1 Hit Next to Tape)
             when (stepInStage) {
                 0 -> {
-                    listOf(2 to 3, 3 to 2, 3 to 4, 4 to 3).forEach { tape[GridPos(it.first, it.second)] = 1 }
-                    "Masking Tape Straps • Match Adjacent to Free!"
+                    listOf(3 to 2, 3 to 4).forEach { tape[GridPos(it.first, it.second)] = 1 }
+                    "✕ Paper Tape • Match NEXT TO Tape to Snip It (2)"
                 }
                 1 -> {
-                    for (c in 1..5) tape[GridPos(3, c)] = 1
-                    "Boardwalk Tape Line • Rip Through 5 Straps"
+                    listOf(3 to 2, 3 to 3, 3 to 4).forEach { tape[GridPos(it.first, it.second)] = 1 }
+                    "✕ Paper Tape Row • Match Next to Tape to Free (3)"
                 }
                 2 -> {
-                    addCornersTape(1)
-                    "Pinwheel Tape Corners • Free Locked Tiles"
+                    listOf(2 to 3, 3 to 2, 3 to 4, 4 to 3).forEach { tape[GridPos(it.first, it.second)] = 1 }
+                    "✕ Tape Diamond • Match Next to Tape to Free (4)"
                 }
                 3 -> {
-                    addCrossTape(1, 2)
-                    "Criss-Cross Masking Tape • 9 Taped Tiles"
+                    listOf(2 to 2, 2 to 4, 4 to 2, 4 to 4).forEach { tape[GridPos(it.first, it.second)] = 1 }
+                    "✕ Tape Corners • Match Next to Tape or Use Scissors!"
                 }
                 else -> {
-                    addCrossTape(1, 2)
-                    addDiamondGold(1)
-                    "Stage 2 Finale • Tape & Gold Foil Pier"
+                    listOf(3 to 2, 3 to 4).forEach { tape[GridPos(it.first, it.second)] = 1 }
+                    listOf(2 to 3, 3 to 3, 4 to 3).forEach { gold.add(GridPos(it.first, it.second)) }
+                    "Stage 2 Boss • Snip 2 ✕ Tape & Collect 3 ★ Gold!"
                 }
             }
         }
         2 -> {
-            // Stage 3 (Levels 11-15): Introduces Red Wax Seals (2 HP)
+            // Stage 3 (Levels 11-15): ★ Gold Squares + Free Line Cutter
             when (stepInStage) {
                 0 -> {
-                    listOf(2 to 2, 2 to 4, 4 to 2, 4 to 4).forEach { tape[GridPos(it.first, it.second)] = 2 }
-                    "Red Wax Seals (2-Hit) • Crack Seal then Rip Tape!"
+                    listOf(3 to 1, 3 to 2, 3 to 4, 3 to 5).forEach { gold.add(GridPos(it.first, it.second)) }
+                    "Free ↔ Line Cutter! • Match ON 4 ★ Gold Squares"
                 }
                 1 -> {
-                    tape[GridPos(3, 3)] = 2
-                    listOf(2 to 3, 3 to 2, 3 to 4, 4 to 3).forEach { tape[GridPos(it.first, it.second)] = 1 }
-                    "Canyon Seal Core • Wax Seal + Tape Guard"
+                    listOf(2 to 2, 2 to 3, 2 to 4, 4 to 2, 4 to 4).forEach { gold.add(GridPos(it.first, it.second)) }
+                    "Golden Smile • Match ON 5 ★ Gold Squares"
                 }
                 2 -> {
-                    for (c in 1..5 step 2) {
-                        tape[GridPos(2, c)] = 2
-                        tape[GridPos(4, c)] = 2
-                    }
-                    "Mesa Wax Pillars • 6 Double-Layer Seals"
+                    listOf(1 to 3, 2 to 3, 3 to 3, 4 to 3, 5 to 3).forEach { gold.add(GridPos(it.first, it.second)) }
+                    "Golden Tower • Slice or Match 5 ★ Gold Squares"
                 }
                 3 -> {
-                    addDiamondGold(2)
-                    listOf(2 to 3, 3 to 2, 3 to 4, 4 to 3).forEach { tape[GridPos(it.first, it.second)] = 2 }
-                    "Sealed Gold Vault • Unlock the Gold Stamps"
+                    listOf(2 to 2, 2 to 4, 3 to 2, 3 to 4, 4 to 2, 4 to 4).forEach { gold.add(GridPos(it.first, it.second)) }
+                    "Golden Bridge • Match ON 6 ★ Gold Squares"
                 }
                 else -> {
-                    addCrossTape(2, 1)
-                    addRingGold(2)
-                    "Stage 3 Finale • Golden Canyon Fortress"
+                    listOf(2 to 3, 3 to 2, 3 to 3, 3 to 4, 4 to 3).forEach { gold.add(GridPos(it.first, it.second)) }
+                    listOf(2 to 2, 4 to 4).forEach { tape[GridPos(it.first, it.second)] = 1 }
+                    "Stage 3 Boss • 5 ★ Gold Squares & 2 ✕ Tape!"
                 }
             }
         }
         3 -> {
-            // Stage 4 (Levels 16-20): Starlight Summit (Gold Stamps + Tape + Wax)
-            addDiamondGold(if (stepInStage >= 3) 2 else 1)
-            addCornersTape(if (stepInStage >= 2) 2 else 1)
-            if (stepInStage == 4) tape[GridPos(3, 3)] = 2
-            "Starlight Summit • Foil Stamps & Wax Locks"
+            // Stage 4 (Levels 16-20): Pop 🔴 Red Wax Seals (2 Hits Nearby)
+            when (stepInStage) {
+                0 -> {
+                    listOf(3 to 2, 3 to 4).forEach { tape[GridPos(it.first, it.second)] = 2 }
+                    "🔴 Red Wax Seal • Match Next to Seal 2 Times! (2)"
+                }
+                1 -> {
+                    tape[GridPos(3, 3)] = 2
+                    listOf(3 to 2, 3 to 4).forEach { tape[GridPos(it.first, it.second)] = 1 }
+                    "🔴 Wax Seal Center • Match Nearby or Use Hammer!"
+                }
+                2 -> {
+                    listOf(2 to 2, 2 to 4, 4 to 3).forEach { tape[GridPos(it.first, it.second)] = 2 }
+                    "🔴 3 Wax Seals • Match Twice Nearby to Pop Open!"
+                }
+                3 -> {
+                    listOf(2 to 3, 4 to 3).forEach { tape[GridPos(it.first, it.second)] = 2 }
+                    listOf(3 to 2, 3 to 3, 3 to 4).forEach { gold.add(GridPos(it.first, it.second)) }
+                    "Pop 2 🔴 Wax Seals & Collect 3 ★ Gold Squares!"
+                }
+                else -> {
+                    listOf(2 to 2, 2 to 4, 4 to 2, 4 to 4).forEach { tape[GridPos(it.first, it.second)] = 2 }
+                    listOf(3 to 2, 3 to 3, 3 to 4).forEach { gold.add(GridPos(it.first, it.second)) }
+                    "Stage 4 Boss • 4 🔴 Wax Seals & 3 ★ Gold Squares!"
+                }
+            }
         }
         4 -> {
-            // Stage 5 (Levels 21-25): Sakura Washi Garden
-            addRingGold(1)
-            if (stepInStage >= 1) {
-                listOf(1 to 3, 3 to 1, 3 to 5, 5 to 3).forEach {
-                    gold.add(GridPos(it.first, it.second))
-                    tape[GridPos(it.first, it.second)] = if (stepInStage >= 3) 2 else 1
-                }
+            // Stage 5 (Levels 21-25): Sakura Cupcake Garden (Free ✦ 3x3 Paper Bomb)
+            listOf(2 to 3, 3 to 2, 3 to 4, 4 to 3).forEach { gold.add(GridPos(it.first, it.second)) }
+            if (stepInStage >= 2) {
+                listOf(2 to 2, 4 to 4).forEach { tape[GridPos(it.first, it.second)] = 1 }
             }
-            if (stepInStage >= 2) tape[GridPos(3, 3)] = 2
-            "Sakura Washi Blossom • Petal Stamps & Seals"
+            "Free ✦ 3x3 Paper Bomb! • Double-Tap It to Blast ★ Gold!"
         }
         5 -> {
-            // Stage 6 (Levels 26-30): Origami Lantern Harbor
-            for (r in 1..5) {
-                gold.add(GridPos(r, 1))
-                gold.add(GridPos(r, 5))
-            }
-            for (c in 2..4) {
-                tape[GridPos(2 + (stepInStage % 2), c)] = if (c == 3 || stepInStage >= 3) 2 else 1
-                gold.add(GridPos(3, c))
-            }
-            "Lantern Harbor • Twin Gold Quays & Tape Bridges"
+            // Stage 6 (Levels 26-30): Origami Lantern Harbor (Tape Bridges + Gold)
+            listOf(2 to 1, 3 to 1, 2 to 5, 3 to 5).forEach { gold.add(GridPos(it.first, it.second)) }
+            listOf(3 to 2, 3 to 4).forEach { tape[GridPos(it.first, it.second)] = if (stepInStage == 4) 2 else 1 }
+            "Open 2 ✕ Tape Bridges & Collect 4 ★ Gold Squares!"
         }
         6 -> {
-            // Stage 7 (Levels 31-35): Berry Confectionery Box
-            for (r in 1..5) {
-                for (c in 1..5) {
-                    if ((r + c) % 2 == 0) gold.add(GridPos(r, c))
-                }
+            // Stage 7 (Levels 31-35): Berry Sweet Bakery (Free ✹ Rainbow Pinwheel)
+            listOf(2 to 2, 2 to 4, 3 to 3, 4 to 2, 4 to 4).forEach { gold.add(GridPos(it.first, it.second)) }
+            if (stepInStage >= 2) {
+                listOf(2 to 3, 4 to 3).forEach { tape[GridPos(it.first, it.second)] = 1 }
             }
-            addCrossTape(if (stepInStage >= 2) 2 else 1, 1)
-            "Confectionery Checkerboard • Gold Foil & Seals"
+            "Free ✹ Rainbow Pinwheel! • Swap It with Any Block!"
         }
         7 -> {
-            // Stage 8 (Levels 36-40): Lavender Ribbon Atelier
-            addRingGold(2)
-            addCrossTape(1, 2)
-            listOf(2 to 2, 2 to 4, 4 to 2, 4 to 4).forEach { tape[GridPos(it.first, it.second)] = 2 }
-            "Bookbinder's Press • Stitched Ribbon Frame"
+            // Stage 8 (Levels 36-40): Lavender Candy Workshop
+            listOf(2 to 3, 3 to 2, 3 to 4, 4 to 3).forEach { gold.add(GridPos(it.first, it.second)) }
+            listOf(2 to 2, 2 to 4).forEach { tape[GridPos(it.first, it.second)] = 2 }
+            "Pop 2 🔴 Wax Seals & Collect 4 ★ Gold (Use Boosters!)"
         }
         8 -> {
-            // Stage 9 (Levels 41-45): Amber Sunburst Glasshouse
-            addDiamondGold(2)
-            for (i in 1..5) {
-                tape[GridPos(i, i)] = if (i == 3 || stepInStage >= 2) 2 else 1
-                tape[GridPos(i, 6 - i)] = if (i == 3 || stepInStage >= 3) 2 else 1
-            }
-            "Sunburst Conservatory • Diagonal Seal Rays"
+            // Stage 9 (Levels 41-45): Sunny Star Conservatory
+            listOf(2 to 2, 2 to 3, 2 to 4, 4 to 2, 4 to 3, 4 to 4).forEach { gold.add(GridPos(it.first, it.second)) }
+            listOf(3 to 2, 3 to 4).forEach { tape[GridPos(it.first, it.second)] = 1 }
+            "Match 4+ for 2x Fever Score! • 6 ★ Gold & 2 ✕ Tape"
         }
         else -> {
-            // Stage 10 (Levels 46-50): Grand Origami Citadel
-            addDiamondGold(2)
-            addRingGold(2)
-            addCrossTape(2, 2)
-            listOf(1 to 1, 1 to 5, 5 to 1, 5 to 5).forEach { tape[GridPos(it.first, it.second)] = 1 }
-            if (lvl == 50) "LEVEL 50 GRAND FINALE • Royal Origami Crown!"
-            else "Grand Origami Citadel • Master Paper Trial"
+            // Stage 10 (Levels 46-50): Royal Origami Castle
+            listOf(2 to 2, 2 to 3, 2 to 4, 3 to 2, 3 to 4, 4 to 2, 4 to 3, 4 to 4).take(5 + (stepInStage % 2)).forEach {
+                gold.add(GridPos(it.first, it.second))
+            }
+            listOf(3 to 2, 3 to 4).forEach { tape[GridPos(it.first, it.second)] = 2 }
+            if (lvl == 50) "LEVEL 50 FINALE • Swap 2 Power-Ups for Royal Crown!"
+            else "Royal Castle • Use Power-Ups to Clear ★ Gold & Seals!"
         }
     }
 

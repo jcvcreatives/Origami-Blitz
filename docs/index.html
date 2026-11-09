@@ -1169,7 +1169,7 @@
       box-shadow: inset 0 3px 10px rgba(0,0,0,0.12);
     }
     .stage-card {
-      background: var(--tape-cream);
+      background: linear-gradient(180deg, #E8F5E9 0%, #FFF8EC 48%, #DCEDC8 100%);
       border: 2px solid var(--tape-border);
       border-radius: 16px;
       padding: 10px;
@@ -1206,8 +1206,11 @@
     .stage-trail-box {
       position: relative;
       width: 100%;
-      height: 390px;
+      height: 430px;
       margin-top: 8px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1.5px solid rgba(92, 58, 33, 0.22);
     }
     .stage-trail-svg {
       position: absolute;
@@ -1220,11 +1223,65 @@
     .map-node-wrap {
       position: absolute;
       transform: translate(-50%, -50%);
-      width: 96px;
+      width: 64px;
       height: 78px;
       display: flex;
       align-items: center;
       justify-content: center;
+      z-index: 3;
+    }
+    .map-node-blocks-pill {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: #FFFDF7;
+      border: 1.5px solid #C89F78;
+      border-radius: 10px;
+      padding: 3px 6px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      box-shadow: 0 3px 6px rgba(59, 35, 20, 0.2);
+      white-space: nowrap;
+      cursor: pointer;
+      z-index: 4;
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+    .map-node-blocks-pill:hover {
+      transform: translateY(-50%) scale(1.05);
+    }
+    .map-node-blocks-pill.selected-pill {
+      background: #FFF9DB;
+      border: 2px solid var(--thumbtack-red);
+    }
+    .map-node-blocks-pill.locked-pill {
+      background: #EFE4D6;
+      opacity: 0.78;
+      cursor: not-allowed;
+    }
+    .map-pill-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--ink-dark);
+    }
+    .map-pill-icon {
+      width: 17px;
+      height: 17px;
+      border-radius: 4px;
+      background: #FFF5E4;
+      border: 1px solid rgba(92, 58, 33, 0.28);
+      padding: 1px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .map-pill-icon svg {
+      width: 100%;
+      height: 100%;
     }
     .map-node-btn {
       width: 48px;
@@ -2994,16 +3051,76 @@
     const LEVELS_PER_STAGE = 5;
     const TOTAL_STAGES = 10;
     const STAGE_THEMES = [
-      { title: 'Whispering Pine Woods', subtitle: 'Classic Paper Fold & Washi Stamps', color: '#40916C', pieceIdx: 4 },
-      { title: 'Peppermint Boardwalk', subtitle: 'Masking Tape Pier Challenges', color: '#E05368', pieceIdx: 0 },
-      { title: 'Golden Cardboard Canyon', subtitle: 'Wax-Sealed Mesa Cartons', color: '#E09F26', pieceIdx: 3 },
-      { title: 'Starlight Origami Summit', subtitle: 'Foil Stamps & Tape Peaks', color: '#7C5CE6', pieceIdx: 5 },
-      { title: 'Sakura Washi Garden', subtitle: 'Folded Petal Pavilion', color: '#D95D76', pieceIdx: 0 },
-      { title: 'Origami Lantern Harbor', subtitle: 'Paper Boat & Crane Quay', color: '#2E8BC0', pieceIdx: 2 },
-      { title: 'Berry Confectionery Box', subtitle: 'Wax-Sealed Sweet Studio', color: '#8A56AC', pieceIdx: 5 },
-      { title: 'Lavender Ribbon Atelier', subtitle: 'Bookbinder’s Press Hall', color: '#5A7D9A', pieceIdx: 1 },
-      { title: 'Amber Sunburst Glasshouse', subtitle: 'Stained-Paper Conservatory', color: '#D97724', pieceIdx: 3 },
-      { title: 'Grand Origami Citadel', subtitle: 'Royal Paper Crown Finale', color: '#C84B31', pieceIdx: 4 }
+      {
+        title: 'Whispering Pine Woods',
+        subtitle: 'Easy Match-3 & ★ Gold Squares',
+        ruleBadge: 'HOW TO PLAY: Swap 2 blocks to match 3 of the same picture! Match on ★ Gold Squares to collect them.',
+        color: '#40916C',
+        pieceIdx: 4
+      },
+      {
+        title: 'Peppermint Boardwalk',
+        subtitle: 'Snip ✕ Paper Tape Next to Matches',
+        ruleBadge: 'STAGE RULE: Blocks under ✕ Paper Tape can’t move yet! Match right next to ✕ Tape to snip it open.',
+        color: '#E05368',
+        pieceIdx: 0
+      },
+      {
+        title: 'Golden Cardboard Canyon',
+        subtitle: 'Collect ★ Gold Squares with Line Cutters',
+        ruleBadge: 'STAGE RULE: Match blocks on top of ★ Gold Squares! Every level starts with a free ↔ Line Cutter on the board.',
+        color: '#E09F26',
+        pieceIdx: 3
+      },
+      {
+        title: 'Starlight Origami Summit',
+        subtitle: 'Pop 🔴 Red Wax Seals (2 Matches Nearby)',
+        ruleBadge: 'STAGE RULE: 🔴 Red Wax Seals take 2 hits! Match next to a Wax Seal once to crack the wax, then once more to free it.',
+        color: '#7C5CE6',
+        pieceIdx: 5
+      },
+      {
+        title: 'Sakura Cupcake Garden',
+        subtitle: 'Sweet Cupcakes & Free ✦ 3x3 Paper Bomb',
+        ruleBadge: 'STAGE RULE: Double-tap or swap the ✦ Paper Bomb on the board to blast a big 3x3 square of blocks & ★ Gold!',
+        color: '#D95D76',
+        pieceIdx: 1
+      },
+      {
+        title: 'Origami Lantern Harbor',
+        subtitle: 'Open ✕ Tape Bridges to Reach ★ Gold',
+        ruleBadge: 'STAGE RULE: Match next to the ✕ Paper Tape in the middle to open the bridge and collect ★ Gold Squares!',
+        color: '#2E8BC0',
+        pieceIdx: 5
+      },
+      {
+        title: 'Berry Sweet Bakery',
+        subtitle: '✹ Rainbow Pinwheel Clears All of 1 Color',
+        ruleBadge: 'STAGE RULE: Swap the ✹ Rainbow Pinwheel with ANY block next to it to collect every block of that picture!',
+        color: '#8A56AC',
+        pieceIdx: 1
+      },
+      {
+        title: 'Lavender Candy Workshop',
+        subtitle: 'Use Scissors, Glue & Hammer Anytime',
+        ruleBadge: 'STAGE RULE: Tap Scissors, Glue, or Hammer at the bottom anytime—they cost 0 moves and break any lock!',
+        color: '#5A7D9A',
+        pieceIdx: 2
+      },
+      {
+        title: 'Sunny Star Conservatory',
+        subtitle: 'Big Cascade Combos & 2x Fever Score',
+        ruleBadge: 'STAGE RULE: Match 4 or 5 blocks to fill the Fever Bar for 2x Score & automatic chain cascades!',
+        color: '#D97724',
+        pieceIdx: 3
+      },
+      {
+        title: 'Royal Origami Castle',
+        subtitle: 'Swap 2 Power-Ups Together for Mega Blast!',
+        ruleBadge: 'STAGE RULE: Swap 2 glowing Power-Up blocks together to unleash a Mega Blast across the board!',
+        color: '#C84B31',
+        pieceIdx: 0
+      }
     ];
 
     const SPECIAL_META = {
@@ -3022,6 +3139,7 @@
         stageNumber,
         title: theme.title,
         subtitle: theme.subtitle,
+        ruleBadge: theme.ruleBadge,
         color: theme.color,
         mascot: PIECES[theme.pieceIdx]
       };
@@ -3029,89 +3147,126 @@
 
     function getLevelBlueprint(rawLvl) {
       const lvl = Math.max(1, Math.min(TOTAL_LEVELS, rawLvl));
-      const stage = Math.floor((lvl - 1) / LEVELS_PER_STAGE) + 1;
-      const posInStage = (lvl - 1) % LEVELS_PER_STAGE; // 0..4
-      const isBoss = posInStage === 4;
+      const stageIndex = Math.floor((lvl - 1) / LEVELS_PER_STAGE) % 10;
+      const stepInStage = (lvl - 1) % LEVELS_PER_STAGE; // 0..4
+      const isBoss = stepInStage === 4;
 
       const p1 = PIECES[(lvl - 1) % PIECES.length];
       const p2 = PIECES[(lvl + 2) % PIECES.length];
-      const p3 = PIECES[(lvl + 4) % PIECES.length];
 
-      const moves = Math.max(17, Math.min(28, 22 + Math.floor(stage / 2) + (isBoss ? 2 : 0) - Math.floor(posInStage / 2)));
+      // Kid-and-adult-friendly target counts & generous move limits
+      const baseTarget1 = Math.min(22, 10 + Math.floor((lvl * 2) / 5));
+      const baseTarget2 = Math.min(18, 8 + Math.floor((lvl * 2) / 6));
+      const moves = Math.min(34, 27 + (lvl % 4) + (isBoss ? 3 : 0));
 
-      const baseTarget1 = 10 + Math.floor(lvl * 0.45);
-      const baseTarget2 = 9 + Math.floor(lvl * 0.4);
       const goals = [
         { piece: p1, target: baseTarget1, count: 0 },
         { piece: p2, target: baseTarget2, count: 0 }
       ];
-      if (lvl >= 18 && (isBoss || lvl % 3 === 0)) {
-        goals.push({ piece: p3, target: 8 + Math.floor(lvl * 0.25), count: 0 });
-      }
 
       const goldCells = new Set();
-      if (lvl >= 2) {
-        if (stage === 1 || stage === 4 || stage === 5 || stage === 6 || stage === 9 || stage === 10 || lvl % 2 === 0) {
-          const pattern = lvl % 5;
-          if (pattern === 0) {
-            for (let r = 2; r <= 4; r++) {
-              for (let c = 2; c <= 4; c++) goldCells.add(`${r},${c}`);
-            }
-          } else if (pattern === 1) {
-            for (let i = 1; i <= 5; i++) {
-              goldCells.add(`3,${i}`);
-              goldCells.add(`${i},3`);
-            }
-          } else if (pattern === 2) {
-            for (let r = 1; r <= 5; r++) {
-              for (let c = 1; c <= 5; c++) {
-                if (Math.abs(r - 3) + Math.abs(c - 3) <= 2) goldCells.add(`${r},${c}`);
-              }
-            }
-          } else if (pattern === 3) {
-            [1, 2, 4, 5].forEach(r => {
-              [1, 2, 4, 5].forEach(c => goldCells.add(`${r},${c}`));
-            });
-          } else {
-            for (let c = 1; c <= 5; c++) {
-              goldCells.add(`2,${c}`);
-              goldCells.add(`4,${c}`);
-            }
-          }
-        }
-      }
-
       const tapeLocks = new Map();
-      if (lvl >= 6) {
-        const useWaxSeals = lvl >= 11;
-        const lockCoords = [];
-        const pat = (lvl + stage) % 5;
-        if (pat === 0) {
-          lockCoords.push([1, 1], [1, 5], [5, 1], [5, 5], [3, 2], [3, 4], [2, 3], [4, 3]);
-        } else if (pat === 1) {
-          lockCoords.push([2, 1], [2, 3], [2, 5], [4, 1], [4, 3], [4, 5]);
-        } else if (pat === 2) {
-          lockCoords.push([1, 3], [2, 2], [2, 4], [3, 1], [3, 5], [4, 2], [4, 4], [5, 3]);
-        } else if (pat === 3) {
-          lockCoords.push([1, 2], [1, 4], [3, 1], [3, 3], [3, 5], [5, 2], [5, 4]);
-        } else {
-          lockCoords.push([2, 2], [2, 3], [2, 4], [4, 2], [4, 3], [4, 4]);
-        }
-        const maxLocks = Math.min(lockCoords.length, 4 + Math.floor(lvl / 7) + (isBoss ? 2 : 0));
-        lockCoords.slice(0, maxLocks).forEach(([r, c], idx) => {
-          const hp = (useWaxSeals && (isBoss || idx % 2 === 0)) ? 2 : 1;
-          tapeLocks.set(`${r},${c}`, hp);
-        });
-      }
+      let mechanicLabel = '';
 
-      const hasWax = Array.from(tapeLocks.values()).some(v => v >= 2);
-      const mechanicLabel = (goldCells.size > 0 && tapeLocks.size > 0)
-        ? (hasWax ? 'Gold Stamps & Wax Seals' : 'Gold Stamps & Masking Tape')
-        : tapeLocks.size > 0
-          ? (hasWax ? 'Break Red Wax Seals (2 Hits)' : 'Rip Masking Tape Straps')
-          : goldCells.size > 0
-            ? 'Collect Gold Washi Stamps'
-            : 'Match 4+ to Craft Paper Cutters';
+      const addGoldList = arr => arr.forEach(([r, c]) => goldCells.add(`${r},${c}`));
+      const addTapeList = (arr, hp) => arr.forEach(([r, c]) => tapeLocks.set(`${r},${c}`, hp));
+
+      if (stageIndex === 0) {
+        if (stepInStage === 0) mechanicLabel = 'Match 3 Same Blocks • Match 4 for ↔ Line Cutter!';
+        else if (stepInStage === 1) mechanicLabel = 'Swap ✹ Rainbow Pinwheel with Any Block!';
+        else if (stepInStage === 2) {
+          addGoldList([[3, 2], [3, 3], [3, 4]]);
+          mechanicLabel = '★ Gold Squares • Match ON Gold Squares (3)';
+        } else if (stepInStage === 3) {
+          addGoldList([[2, 3], [3, 2], [3, 3], [3, 4], [4, 3]]);
+          mechanicLabel = '★ Gold Plus • Match ON Gold Squares (5)';
+        } else {
+          addGoldList([[2, 2], [2, 4], [3, 3], [4, 2], [4, 4]]);
+          mechanicLabel = 'Stage 1 Boss • Collect 5 ★ Gold Squares!';
+        }
+      } else if (stageIndex === 1) {
+        if (stepInStage === 0) {
+          addTapeList([[3, 2], [3, 4]], 1);
+          mechanicLabel = '✕ Paper Tape • Match NEXT TO Tape to Snip It (2)';
+        } else if (stepInStage === 1) {
+          addTapeList([[3, 2], [3, 3], [3, 4]], 1);
+          mechanicLabel = '✕ Paper Tape Row • Match Next to Tape to Free (3)';
+        } else if (stepInStage === 2) {
+          addTapeList([[2, 3], [3, 2], [3, 4], [4, 3]], 1);
+          mechanicLabel = '✕ Tape Diamond • Match Next to Tape to Free (4)';
+        } else if (stepInStage === 3) {
+          addTapeList([[2, 2], [2, 4], [4, 2], [4, 4]], 1);
+          mechanicLabel = '✕ Tape Corners • Match Next to Tape or Use Scissors!';
+        } else {
+          addTapeList([[3, 2], [3, 4]], 1);
+          addGoldList([[2, 3], [3, 3], [4, 3]]);
+          mechanicLabel = 'Stage 2 Boss • Snip 2 ✕ Tape & Collect 3 ★ Gold!';
+        }
+      } else if (stageIndex === 2) {
+        if (stepInStage === 0) {
+          addGoldList([[3, 1], [3, 2], [3, 4], [3, 5]]);
+          mechanicLabel = 'Free ↔ Line Cutter! • Match ON 4 ★ Gold Squares';
+        } else if (stepInStage === 1) {
+          addGoldList([[2, 2], [2, 3], [2, 4], [4, 2], [4, 4]]);
+          mechanicLabel = 'Golden Smile • Match ON 5 ★ Gold Squares';
+        } else if (stepInStage === 2) {
+          addGoldList([[1, 3], [2, 3], [3, 3], [4, 3], [5, 3]]);
+          mechanicLabel = 'Golden Tower • Slice or Match 5 ★ Gold Squares';
+        } else if (stepInStage === 3) {
+          addGoldList([[2, 2], [2, 4], [3, 2], [3, 4], [4, 2], [4, 4]]);
+          mechanicLabel = 'Golden Bridge • Match ON 6 ★ Gold Squares';
+        } else {
+          addGoldList([[2, 3], [3, 2], [3, 3], [3, 4], [4, 3]]);
+          addTapeList([[2, 2], [4, 4]], 1);
+          mechanicLabel = 'Stage 3 Boss • 5 ★ Gold Squares & 2 ✕ Tape!';
+        }
+      } else if (stageIndex === 3) {
+        if (stepInStage === 0) {
+          addTapeList([[3, 2], [3, 4]], 2);
+          mechanicLabel = '🔴 Red Wax Seal • Match Next to Seal 2 Times! (2)';
+        } else if (stepInStage === 1) {
+          tapeLocks.set('3,3', 2);
+          addTapeList([[3, 2], [3, 4]], 1);
+          mechanicLabel = '🔴 Wax Seal Center • Match Nearby or Use Hammer!';
+        } else if (stepInStage === 2) {
+          addTapeList([[2, 2], [2, 4], [4, 3]], 2);
+          mechanicLabel = '🔴 3 Wax Seals • Match Twice Nearby to Pop Open!';
+        } else if (stepInStage === 3) {
+          addTapeList([[2, 3], [4, 3]], 2);
+          addGoldList([[3, 2], [3, 3], [3, 4]]);
+          mechanicLabel = 'Pop 2 🔴 Wax Seals & Collect 3 ★ Gold Squares!';
+        } else {
+          addTapeList([[2, 2], [2, 4], [4, 2], [4, 4]], 2);
+          addGoldList([[3, 2], [3, 3], [3, 4]]);
+          mechanicLabel = 'Stage 4 Boss • 4 🔴 Wax Seals & 3 ★ Gold Squares!';
+        }
+      } else if (stageIndex === 4) {
+        addGoldList([[2, 3], [3, 2], [3, 4], [4, 3]]);
+        if (stepInStage >= 2) addTapeList([[2, 2], [4, 4]], 1);
+        mechanicLabel = 'Free ✦ 3x3 Paper Bomb! • Double-Tap It to Blast ★ Gold!';
+      } else if (stageIndex === 5) {
+        addGoldList([[2, 1], [3, 1], [2, 5], [3, 5]]);
+        addTapeList([[3, 2], [3, 4]], isBoss ? 2 : 1);
+        mechanicLabel = 'Open 2 ✕ Tape Bridges & Collect 4 ★ Gold Squares!';
+      } else if (stageIndex === 6) {
+        addGoldList([[2, 2], [2, 4], [3, 3], [4, 2], [4, 4]]);
+        if (stepInStage >= 2) addTapeList([[2, 3], [4, 3]], 1);
+        mechanicLabel = 'Free ✹ Rainbow Pinwheel! • Swap It with Any Block!';
+      } else if (stageIndex === 7) {
+        addGoldList([[2, 3], [3, 2], [3, 4], [4, 3]]);
+        addTapeList([[2, 2], [2, 4]], 2);
+        mechanicLabel = 'Pop 2 🔴 Wax Seals & Collect 4 ★ Gold (Use Boosters!)';
+      } else if (stageIndex === 8) {
+        addGoldList([[2, 2], [2, 3], [2, 4], [4, 2], [4, 3], [4, 4]]);
+        addTapeList([[3, 2], [3, 4]], 1);
+        mechanicLabel = 'Match 4+ for 2x Fever Score! • 6 ★ Gold & 2 ✕ Tape';
+      } else {
+        addGoldList([[2, 2], [2, 3], [2, 4], [4, 2], [4, 3], [4, 4]].slice(0, 5 + (stepInStage % 2)));
+        addTapeList([[3, 2], [3, 4]], 2);
+        mechanicLabel = lvl === 50
+          ? 'LEVEL 50 FINALE • Swap 2 Power-Ups for Royal Crown!'
+          : 'Royal Castle • Use Power-Ups to Clear ★ Gold & Seals!';
+      }
 
       return {
         level: lvl,
@@ -3268,7 +3423,6 @@
     }
 
     function seedTutorialBoardIfNeeded(lvl) {
-      if (lvl < 1 || lvl > 3) return;
       const byId = id => PIECES.find(p => p.id === id) || PIECES[0];
       if (lvl === 1) {
         state.board[3][1] = byId('ORIGAMI_FOX');
@@ -3298,6 +3452,20 @@
         setSpecial(3, 3, 'PAPER_BOMB');
         state.board[2][3] = byId('ORIGAMI_CRANE');
         setSpecial(2, 3, 'COL_CUTTER');
+      } else {
+        // Levels 4..50: Gift a helpful stage-themed Special Power-Up on an unlocked cell!
+        const stageIdx = Math.floor((lvl - 1) / 5) % 10;
+        const candidates = [[3, 3], [1, 3], [2, 3], [4, 3], [1, 2]];
+        const giftPos = candidates.find(([r, c]) => !isCellLocked(r, c)) || [1, 3];
+        let giftSpec = (lvl % 2 === 0) ? 'ROW_CUTTER' : 'PAPER_BOMB';
+        if (stageIdx === 2) giftSpec = 'ROW_CUTTER';
+        else if (stageIdx === 4) giftSpec = 'PAPER_BOMB';
+        else if (stageIdx === 6) giftSpec = 'PINWHEEL_RAINBOW';
+        else if (stageIdx === 9) giftSpec = 'PAPER_BOMB';
+        setSpecial(giftPos[0], giftPos[1], giftSpec);
+        if (stageIdx === 9 && giftPos[1] + 1 < BOARD_SIZE && !isCellLocked(giftPos[0], giftPos[1] + 1)) {
+          setSpecial(giftPos[0], giftPos[1] + 1, 'ROW_CUTTER');
+        }
       }
     }
 
@@ -3331,13 +3499,13 @@
             highlights.add('3,4');
           }
           return {
-            badge: 'LEVEL 1 TUTORIAL • STEP 1 OF 2',
+            badge: 'STAGE 1 EASY GUIDE • STEP 1 OF 2',
             step: 1,
             emblem: '3x',
             emblemBg: '#FF6B35',
-            title: 'Make Your First Origami Match!',
-            desc: 'Swipe or tap the 2 glowing blocks to fold 3 matching pieces in a row!',
-            tip: '✦ Match 4 crafts a Line Cutter (↔/↕) • Match 5 crafts a Rainbow Pinwheel (✹)!',
+            title: 'Match 3 Same Pictures!',
+            desc: 'Swipe or tap the 2 glowing blocks to line up 3 matching Foxes in a row!',
+            tip: '✦ Match 4 makes a Line Cutter (↔) • Match 5 makes a Rainbow Pinwheel (✹)!',
             targetType: 'BOARD_SWAP',
             fromPos,
             toPos,
@@ -3350,13 +3518,13 @@
           const highlights = new Set();
           for (let c = 0; c < BOARD_SIZE; c++) highlights.add(`${sp.r},${c}`);
           return {
-            badge: 'LEVEL 1 TUTORIAL • STEP 2 OF 2',
+            badge: 'STAGE 1 EASY GUIDE • STEP 2 OF 2',
             step: 2,
             emblem: '↔',
             emblemBg: '#FF3355',
-            title: 'Use Special Line Cutter (↔)!',
-            desc: 'Double-tap the glowing Line Cutter (↔) block—or swap it—to slice the entire row!',
-            tip: '✦ Every 4-tile match crafts a Row (↔) or Column (↕) Cutter power-up!',
+            title: 'Use Your Line Cutter (↔)!',
+            desc: 'Double-tap the glowing Line Cutter (↔) block—or swap it—to clear the whole row!',
+            tip: '✦ Match 4 blocks anytime to craft a Row (↔) or Column (↕) Cutter!',
             targetType: 'BOARD_SPECIAL',
             fromPos: sp,
             toPos,
@@ -3369,13 +3537,13 @@
           const sp = specialPos || { r: 3, c: 3 };
           const toPos = { r: sp.r, c: Math.min(BOARD_SIZE - 1, sp.c + 1) };
           return {
-            badge: 'LEVEL 2 TUTORIAL • STEP 1 OF 2',
+            badge: 'LEVEL 2 EASY GUIDE • STEP 1 OF 2',
             step: 1,
             emblem: '✹',
             emblemBg: '#FF3355',
-            title: 'Rainbow Pinwheel (✹) & Bomb (✦)!',
-            desc: 'Swap the Rainbow Pinwheel (✹) with ANY adjacent block to shred all blocks of that color!',
-            tip: '✦ Also try double-tapping the 3x3 Origami Bomb (✦) at the top-left gold stamp!',
+            title: 'Rainbow Pinwheel (✹) Clears 1 Color!',
+            desc: 'Swap the Rainbow Pinwheel (✹) with ANY block next to it to clear all blocks of that picture!',
+            tip: '✦ Also try double-tapping the 3x3 Paper Bomb (✦) at the top-left!',
             targetType: 'BOARD_SPECIAL',
             fromPos: sp,
             toPos,
@@ -3389,34 +3557,34 @@
           highlights.add(`${fromPos.r},${fromPos.c}`);
           highlights.add(`${toPos.r},${toPos.c}`);
           return {
-            badge: 'LEVEL 2 TUTORIAL • STEP 2 OF 2',
+            badge: 'LEVEL 2 EASY GUIDE • STEP 2 OF 2',
             step: 2,
-            emblem: '★',
+            emblem: '✦',
             emblemBg: '#FFB703',
-            title: 'Collect Gold Washi Stamps (★)!',
-            desc: 'Match blocks over Gold Stamp cells (★) or blast them with Special Power-Ups to win!',
-            tip: '✦ PRO TIP: Swap 2 Special Power-Ups together for a Mega Cross Slice!',
+            title: 'Double-Tap the 3x3 Paper Bomb (✦)!',
+            desc: 'Double-tap or swap any glowing Special Block to blast a big area at once!',
+            tip: '✦ TIP: Swap 2 Special Power-Ups together for a Mega Board Blast!',
             targetType: 'BOARD_SWAP',
             fromPos,
             toPos,
             highlights,
-            pillText: '★ MATCH ON GOLD!'
+            pillText: '✦ 2x TAP BOMB!'
           };
         }
       } else if (lvl === 3) {
         if (step <= 1 && !state.activeBooster) {
           return {
-            badge: 'LEVEL 3 TUTORIAL • STEP 1 OF 2',
+            badge: 'LEVEL 3 EASY GUIDE • STEP 1 OF 2',
             step: 1,
             emblem: '🔨',
             emblemBg: '#FFB703',
-            title: 'Arm a Craft Workshop Booster!',
-            desc: 'Tap SCISSORS (Cut), GLUE (Swap), or HAMMER (Smash) in the Booster Bar below!',
-            tip: '✦ Workshop Boosters NEVER cost a move and can detonate Special Tiles instantly!',
+            title: 'Collect ★ Gold & Use Free Boosters!',
+            desc: 'Match on ★ Gold Squares to collect them—or tap SCISSORS, GLUE, or HAMMER below!',
+            tip: '✦ Boosters at the bottom NEVER use a move and work anywhere on the board!',
             targetType: 'BOOSTER_BAR',
             fromPos: { r: 3, c: 3 },
             toPos: { r: 3, c: 3 },
-            highlights: new Set(['3,3']),
+            highlights: new Set([...state.goldCells, '3,3']),
             pillText: '▼ PICK A BOOSTER ▼'
           };
         } else {
@@ -3425,17 +3593,17 @@
             ? { r: center.r, c: Math.min(BOARD_SIZE - 1, center.c + 1) }
             : center;
           return {
-            badge: 'LEVEL 3 TUTORIAL • STEP 2 OF 2',
+            badge: 'LEVEL 3 EASY GUIDE • STEP 2 OF 2',
             step: 2,
             emblem: state.activeBooster === 'SCISSORS' ? '✂' : state.activeBooster === 'GLUE' ? '✦' : '🔨',
             emblemBg: '#FF3355',
             title: state.activeBooster === 'SCISSORS'
-              ? 'Snip the Origami Bomb (✦)!'
+              ? 'Tap a Block to Snip It!'
               : state.activeBooster === 'GLUE'
-                ? 'Tap Any 2 Blocks to Glue-Swap!'
-                : 'Smash 3x3 with Cardboard Hammer!',
-            desc: 'Tap the glowing center block (✦) on the board to unleash your Workshop Booster!',
-            tip: '✦ Earn +2 free Boosters every time you complete a level!',
+                ? 'Tap Any 2 Blocks to Swap!'
+                : 'Tap the Center to Smash 3x3!',
+            desc: 'Tap the glowing center block (✦) on the board to blast ★ Gold Squares!',
+            tip: '✦ You win +2 free Boosters every time you beat a level!',
             targetType: 'BOARD_BOOSTER_USE',
             fromPos: center,
             toPos,
@@ -3444,23 +3612,51 @@
           };
         }
       } else {
+        const stageNum = Math.floor((lvl - 1) / 5) + 1;
+        const hasWax = Array.from(state.tapeLocks.values()).some(v => v >= 2);
+        const hasTape = state.tapeLocks.size > 0;
+        const hasGold = state.goldCells.size > 0;
         const fromPos = specialPos || (bestMove ? bestMove[0] : { r: 3, c: 3 });
         const toPos = bestMove ? bestMove[1] : { r: fromPos.r, c: Math.min(BOARD_SIZE - 1, fromPos.c + 1) };
+
+        let ruleTitle = `Stage ${stageNum} Rule: Match & Use Power-Ups!`;
+        let ruleDesc = 'Swipe the glowing blocks to match 3+, or double-tap the glowing Power-Up tile on the board!';
+        if (hasWax) {
+          ruleTitle = `Stage ${stageNum} Rule: Pop 🔴 Red Wax Seals!`;
+          ruleDesc = 'Match blocks right NEXT TO a 🔴 Red Wax Seal 2 times (or use Hammer/Scissors) to pop it open!';
+        } else if (hasTape && hasGold) {
+          ruleTitle = `Stage ${stageNum} Rule: ✕ Tape & ★ Gold!`;
+          ruleDesc = 'Match NEXT TO ✕ Paper Tape to snip it free, and match ON ★ Gold Squares to collect them!';
+        } else if (hasTape) {
+          ruleTitle = `Stage ${stageNum} Rule: Snip ✕ Paper Tape!`;
+          ruleDesc = 'Blocks under ✕ Paper Tape can’t move yet—just match blocks right NEXT TO ✕ Tape to snip it open!';
+        } else if (hasGold) {
+          ruleTitle = `Stage ${stageNum} Rule: Collect ★ Gold Squares!`;
+          ruleDesc = 'Match blocks on top of ★ Gold Squares (or double-tap your free Power-Up!) to collect them!';
+        }
+
+        const allHighlights = new Set([
+          `${fromPos.r},${fromPos.c}`,
+          `${toPos.r},${toPos.c}`,
+          ...state.goldCells,
+          ...state.tapeLocks.keys()
+        ]);
+
         return {
-          badge: `LEVEL ${lvl} WORKSHOP GUIDE • ${step}/2`,
+          badge: `STAGE ${stageNum} EASY RULE • ${step}/2`,
           step,
-          emblem: specialPos ? '✹' : '3x',
+          emblem: step <= 1 ? (hasWax ? '🔴' : hasTape ? '✕' : hasGold ? '★' : '✦') : '🔨',
           emblemBg: '#FF6B35',
-          title: step <= 1 ? 'Recommended Origami Move!' : 'Use Craft Boosters Anytime!',
+          title: step <= 1 ? ruleTitle : 'Use Free Boosters Anytime!',
           desc: step <= 1
-            ? 'Swipe the 2 glowing blocks or double-tap any Special Tile to trigger a chain!'
-            : 'Tap SCISSORS, GLUE, or HAMMER below to break Masking Tape & Wax Seals!',
-          tip: '✦ Match 4 = Line Cutter (↔/↕) • L/T Match = 3x3 Bomb (✦) • Match 5 = Rainbow Pinwheel (✹)',
+            ? ruleDesc
+            : 'Stuck on ✕ Tape, 🔴 Wax, or ★ Gold? Tap SCISSORS, GLUE, or HAMMER at the bottom (0 moves used)!',
+          tip: '✦ Every level starts with a FREE Power-Up on the board—double-tap or swap it!',
           targetType: step <= 1 ? 'BOARD_SWAP' : 'BOOSTER_BAR',
           fromPos,
           toPos,
-          highlights: new Set([`${fromPos.r},${fromPos.c}`, `${toPos.r},${toPos.c}`]),
-          pillText: '✦ SWIPE BLOCKS ↔'
+          highlights: allHighlights,
+          pillText: step <= 1 ? '✦ TRY THIS MOVE!' : '▼ FREE BOOSTERS ▼'
         };
       }
     }
@@ -3493,8 +3689,9 @@
       state.feverMoves = 0;
       state.busy = false;
       state.tutorialStep = 1;
-      state.tutorialDismissed = lvl > 3;
-      if (lvl <= 3) {
+      const showGuideAuto = lvl <= 3 || (lvl - 1) % 5 === 0;
+      state.tutorialDismissed = !showGuideAuto;
+      if (showGuideAuto) {
         state.boosters.SCISSORS = Math.max(2, state.boosters.SCISSORS || 0);
         state.boosters.GLUE = Math.max(2, state.boosters.GLUE || 0);
         state.boosters.HAMMER = Math.max(2, state.boosters.HAMMER || 0);
@@ -4244,20 +4441,143 @@
 
         const coords = levels.map((lvl, idx) => {
           const phase = lvl * 1.15 + (s % 2 === 0 ? 0.8 : 0);
-          const xPct = Math.max(18, Math.min(82, 50 + Math.sin(phase) * 28));
+          const xPct = Math.max(22, Math.min(78, 50 + Math.sin(phase) * 24));
           const yPct = ((idx + 0.5) / LEVELS_PER_STAGE) * 100;
-          return { lvl, xPct, yPct };
+          return { lvl, idx, xPct, yPct };
         });
 
-        let pathD = `M ${coords[0].xPct * 3.6} ${coords[0].yPct * 3.9}`;
+        let pathD = `M ${coords[0].xPct * 3.6} ${coords[0].yPct * 4.3}`;
         for (let i = 0; i < coords.length - 1; i++) {
           const p0 = coords[i];
           const p1 = coords[i + 1];
-          const x0 = p0.xPct * 3.6, y0 = p0.yPct * 3.9;
-          const x1 = p1.xPct * 3.6, y1 = p1.yPct * 3.9;
+          const x0 = p0.xPct * 3.6, y0 = p0.yPct * 4.3;
+          const x1 = p1.xPct * 3.6, y1 = p1.yPct * 4.3;
           const midY = (y0 + y1) * 0.5;
           pathD += ` C ${x0} ${midY}, ${x1} ${midY}, ${x1} ${y1}`;
         }
+
+        const drawPineSvg = (cx, cy, sc, dark) => {
+          const lCol = dark ? '#2D6A4F' : '#52B788';
+          const rCol = dark ? '#1B4332' : '#40916C';
+          return `
+            <g transform="translate(${cx},${cy}) scale(${sc})">
+              <ellipse cx="0" cy="4" rx="14" ry="4" fill="rgba(27,67,50,0.18)"/>
+              <rect x="-3" y="-6" width="6" height="9" rx="1" fill="#7F4F24"/>
+              <polygon points="0,-24 -15,-5 0,-5" fill="${lCol}"/>
+              <polygon points="0,-24 15,-5 0,-5" fill="${rCol}"/>
+              <polygon points="0,-36 -12,-16 0,-16" fill="${lCol}"/>
+              <polygon points="0,-36 12,-16 0,-16" fill="${rCol}"/>
+              <polygon points="0,-46 -8,-28 0,-28" fill="${lCol}"/>
+              <polygon points="0,-46 8,-28 0,-28" fill="${rCol}"/>
+            </g>
+          `;
+        };
+
+        const drawVillagerCupcakeSvg = (cx, cy) => `
+          <g transform="translate(${cx},${cy})">
+            <ellipse cx="0" cy="22" rx="18" ry="5" fill="rgba(59,35,20,0.18)"/>
+            <!-- Paper Baker apron & body -->
+            <polygon points="0,-4 -12,18 12,18" fill="#FF4D8D" stroke="#FFFDF7" stroke-width="1.5"/>
+            <rect x="-5" y="1" width="10" height="14" rx="2" fill="#FFFDF7"/>
+            <!-- Head & Chef Toque -->
+            <circle cx="0" cy="-10" r="7.5" fill="#FFE5D9" stroke="#5C3A21" stroke-width="1.2"/>
+            <circle cx="-2.5" cy="-11" r="1.2" fill="#3B2314"/>
+            <circle cx="2.5" cy="-11" r="1.2" fill="#3B2314"/>
+            <circle cx="-4" cy="-8.5" r="1.6" fill="#FF8FA3"/>
+            <circle cx="4" cy="-8.5" r="1.6" fill="#FF8FA3"/>
+            <ellipse cx="0" cy="-18" rx="9" ry="5" fill="#FFFDF7" stroke="#D9C7B2" stroke-width="1.2"/>
+            <rect x="-6" y="-17" width="12" height="4" fill="#FFFDF7"/>
+            <!-- Giant Frosted Cupcake Held Proudly -->
+            <g transform="translate(15, 0)">
+              <polygon points="-7,2 7,2 5,12 -5,12" fill="#FFB703" stroke="#5C3A21" stroke-width="1"/>
+              <ellipse cx="0" cy="1" rx="8.5" ry="4.5" fill="#FF70A6" stroke="#FFFDF7" stroke-width="1"/>
+              <ellipse cx="0" cy="-3" rx="6" ry="3.5" fill="#FF99C8"/>
+              <circle cx="0" cy="-7" r="2.8" fill="#E63946" stroke="#FFFDF7" stroke-width="0.8"/>
+            </g>
+          </g>
+        `;
+
+        const drawFoxAndBunnySvg = (cx, cy) => `
+          <g transform="translate(${cx},${cy})">
+            <ellipse cx="0" cy="20" rx="20" ry="5" fill="rgba(59,35,20,0.16)"/>
+            <!-- Origami Fox -->
+            <polygon points="-13,16 -2,-4 9,16" fill="#F77F00" stroke="#FFFDF7" stroke-width="1.2"/>
+            <polygon points="-2,-1 -12,-12 8,-12" fill="#FF6B35" stroke="#FFFDF7" stroke-width="1.2"/>
+            <polygon points="-12,-12 -14,-21 -6,-12" fill="#D62828"/>
+            <polygon points="8,-12 10,-21 2,-12" fill="#D62828"/>
+            <circle cx="-5" cy="-8" r="1.3" fill="#3B2314"/>
+            <circle cx="1" cy="-8" r="1.3" fill="#3B2314"/>
+            <circle cx="-2" cy="-2" r="1.8" fill="#3B2314"/>
+            <!-- Origami Paper Bunny -->
+            <g transform="translate(15, 5)">
+              <ellipse cx="0" cy="6" rx="6.5" ry="7.5" fill="#FFFDF7" stroke="#D4A373" stroke-width="1"/>
+              <circle cx="0" cy="-2" r="5.5" fill="#FFFDF7" stroke="#D4A373" stroke-width="1"/>
+              <ellipse cx="-2.2" cy="-10" rx="1.8" ry="5" fill="#FFFDF7" stroke="#D4A373" stroke-width="0.9"/>
+              <ellipse cx="2.2" cy="-10" rx="1.8" ry="5" fill="#FFFDF7" stroke="#D4A373" stroke-width="0.9"/>
+              <circle cx="0" cy="-1" r="1.2" fill="#FF70A6"/>
+            </g>
+          </g>
+        `;
+
+        const drawCandyVillagerSvg = (cx, cy) => `
+          <g transform="translate(${cx},${cy})">
+            <ellipse cx="0" cy="20" rx="17" ry="4.5" fill="rgba(59,35,20,0.16)"/>
+            <polygon points="0,-3 -11,17 11,17" fill="#1D63B8" stroke="#FFFDF7" stroke-width="1.4"/>
+            <circle cx="0" cy="-9" r="7" fill="#FFE5D9" stroke="#5C3A21" stroke-width="1.2"/>
+            <polygon points="0,-22 -7,-13 7,-13" fill="#FFB703" stroke="#FFFDF7" stroke-width="1"/>
+            <circle cx="-2.3" cy="-9.5" r="1.2" fill="#3B2314"/>
+            <circle cx="2.3" cy="-9.5" r="1.2" fill="#3B2314"/>
+            <!-- Giant Peppermint Swirl Lollipop -->
+            <line x1="-13" y1="-4" x2="-13" y2="17" stroke="#FFFDF7" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="-13" cy="-6" r="8.5" fill="#FFFDF7" stroke="#D62828" stroke-width="1.8"/>
+            <path d="M-13,-14.5 A8.5,8.5 0 0,1 -4.5,-6 L-13,-6 Z" fill="#E63946"/>
+            <path d="M-13,2.5 A8.5,8.5 0 0,1 -21.5,-6 L-13,-6 Z" fill="#E63946"/>
+          </g>
+        `;
+
+        const drawBearWithStarSvg = (cx, cy) => `
+          <g transform="translate(${cx},${cy})">
+            <ellipse cx="0" cy="20" rx="17" ry="4.5" fill="rgba(59,35,20,0.16)"/>
+            <ellipse cx="0" cy="8" rx="10" ry="11" fill="#8D5A36" stroke="#FFFDF7" stroke-width="1.2"/>
+            <ellipse cx="0" cy="9" rx="6" ry="7" fill="#D4A373"/>
+            <circle cx="-6.5" cy="-10" r="3.5" fill="#6C4226"/>
+            <circle cx="6.5" cy="-10" r="3.5" fill="#6C4226"/>
+            <circle cx="0" cy="-5" r="7.5" fill="#8D5A36" stroke="#FFFDF7" stroke-width="1.2"/>
+            <ellipse cx="0" cy="-3.5" rx="3.5" ry="2.5" fill="#F3D5B5"/>
+            <circle cx="0" cy="-4.5" r="1.4" fill="#3B2314"/>
+            <!-- Cardboard Star Held by Bear -->
+            <polygon points="13,-6 15,-1 20,-1 16,2 17.5,7 13,4 8.5,7 10,2 6,-1 11,-1" fill="#FFB703" stroke="#FFFDF7" stroke-width="1"/>
+          </g>
+        `;
+
+        const drawBakeryCottageSvg = (cx, cy) => `
+          <g transform="translate(${cx},${cy})">
+            <ellipse cx="0" cy="21" rx="20" ry="5" fill="rgba(59,35,20,0.18)"/>
+            <rect x="-13" y="-2" width="26" height="21" rx="3" fill="#FFFDF7" stroke="#D4A373" stroke-width="1.4"/>
+            <polygon points="0,-18 -17,-1 17,-1" fill="#FF70A6" stroke="#FFFDF7" stroke-width="1.5"/>
+            <rect x="-4.5" y="7" width="9" height="12" rx="4" fill="#8D5A36"/>
+            <!-- Cupcake Sign on Roof -->
+            <circle cx="0" cy="-19" r="4.5" fill="#FFFDF7" stroke="#FF4D8D" stroke-width="1.2"/>
+            <circle cx="0" cy="-21" r="2" fill="#E63946"/>
+          </g>
+        `;
+
+        const scenicVignettesSvg = coords.map(({ idx, xPct, yPct }) => {
+          const cy = yPct * 4.3;
+          const onRight = xPct < 50;
+          const cx = onRight ? 308 : 52;
+          const treeX = onRight ? 38 : 322;
+          const treeSvg = drawPineSvg(treeX, cy + 12, 0.78, (idx + s) % 2 === 0) +
+                          drawPineSvg(onRight ? 22 : 338, cy - 4, 0.58, (idx + s) % 2 !== 0);
+          const kind = (s + idx) % 5;
+          let charSvg = '';
+          if (kind === 0) charSvg = drawVillagerCupcakeSvg(cx, cy);
+          else if (kind === 1) charSvg = drawFoxAndBunnySvg(cx, cy);
+          else if (kind === 2) charSvg = drawCandyVillagerSvg(cx, cy);
+          else if (kind === 3) charSvg = drawBearWithStarSvg(cx, cy);
+          else charSvg = drawBakeryCottageSvg(cx, cy);
+          return treeSvg + charSvg;
+        }).join('');
 
         const nodesHtml = coords.map(({ lvl, xPct, yPct }) => {
           const unlocked = lvl <= state.highestLevel;
@@ -4265,6 +4585,7 @@
           const isFrontier = lvl === state.highestLevel;
           const isSel = lvl === state.mapSelectedLevel;
           const stars = state.levelStars[lvl] || 0;
+          const bp = getLevelBlueprint(lvl);
           const bg = !unlocked
             ? '#E6CCB2'
             : isPlaying
@@ -4285,6 +4606,25 @@
             : '';
           const haloHtml = (isPlaying || isFrontier) ? `<div class="map-node-halo"></div>` : '';
 
+          // Build the "What It Is In The Blocks" pill right next to each level node
+          const pillSideStyle = xPct <= 50 ? 'left: 56px;' : 'right: 56px;';
+          const goalChipsHtml = bp.goals.map(g => `
+            <span class="map-pill-item">
+              <span class="map-pill-icon">${g.piece.svg}</span>
+              <span>${g.target}</span>
+            </span>
+          `).join('');
+          let hazardHtml = '';
+          if (bp.goldCells.size > 0) {
+            hazardHtml += `<span class="map-pill-item" style="color:#B45309;">★${bp.goldCells.size}</span>`;
+          }
+          if (bp.tapeLocks.size > 0) {
+            hazardHtml += `<span class="map-pill-item" style="color:#991B1B;">✕${bp.tapeLocks.size}</span>`;
+          }
+          if (lvl % 5 === 0) {
+            hazardHtml += `<span class="map-pill-item" style="font-size:11px;">👑</span>`;
+          }
+
           return `
             <div class="map-node-wrap" style="left:${xPct}%;top:${yPct}%;">
               ${haloHtml}
@@ -4294,6 +4634,12 @@
                       style="background:${bg};color:${textColor};">
                 ${unlocked ? lvl : `🔒<span style="font-size:10px">${lvl}</span>`}
               </button>
+              <div class="map-node-blocks-pill${isSel ? ' selected-pill' : ''}${!unlocked ? ' locked-pill' : ''}"
+                   data-lvl="${lvl}"
+                   style="${pillSideStyle}">
+                ${goalChipsHtml}
+                ${hazardHtml}
+              </div>
               ${starsHtml}
             </div>
           `;
@@ -4312,11 +4658,28 @@
               ★ ${stageStars}/${LEVELS_PER_STAGE * 3}
             </div>
           </div>
+          <div style="margin-top:6px;background:rgba(252,230,138,0.9);border:1px solid rgba(92,58,33,0.45);border-radius:9px;padding:5px 9px;font-size:11px;font-weight:700;color:#3B2314;line-height:1.25;">
+            ${stg.ruleBadge}
+          </div>
           <div class="stage-trail-box">
-            <svg class="stage-trail-svg" viewBox="0 0 360 390" preserveAspectRatio="none">
-              <path d="${pathD}" fill="none" stroke="rgba(212,163,115,0.65)" stroke-width="18" stroke-linecap="round"/>
-              <path d="${pathD}" fill="none" stroke="#FFFDF7" stroke-width="11" stroke-linecap="round"/>
+            <svg class="stage-trail-svg" viewBox="0 0 360 430" preserveAspectRatio="none">
+              <!-- Layered Origami Forest Hills & Paper Stream -->
+              <path d="M0,70 Q95,38 185,68 T360,55 L360,430 L0,430 Z" fill="#C8E6C9" opacity="0.65"/>
+              <path d="M0,70 Q95,38 185,68 T360,55" fill="none" stroke="#FFFDF7" stroke-width="2.5"/>
+              <path d="M0,210 Q110,175 215,212 T360,195 L360,430 L0,430 Z" fill="#AED581" opacity="0.52"/>
+              <path d="M0,210 Q110,175 215,212 T360,195" fill="none" stroke="#FFFDF7" stroke-width="2.5"/>
+              <path d="M0,340 Q120,312 240,342 T360,325 L360,430 L0,430 Z" fill="#9CCC65" opacity="0.45"/>
+              <!-- Sparkling Paper Brook -->
+              <path d="M${s % 2 === 0 ? 45 : 315},0 C${s % 2 === 0 ? 95 : 265},140 ${s % 2 === 0 ? 25 : 335},280 ${s % 2 === 0 ? 75 : 285},430"
+                    fill="none" stroke="#FFFDF7" stroke-width="18" stroke-linecap="round" opacity="0.85"/>
+              <path d="M${s % 2 === 0 ? 45 : 315},0 C${s % 2 === 0 ? 95 : 265},140 ${s % 2 === 0 ? 25 : 335},280 ${s % 2 === 0 ? 75 : 285},430"
+                    fill="none" stroke="#90E0EF" stroke-width="12" stroke-linecap="round" opacity="0.8"/>
+              <!-- Winding Craft Trail -->
+              <path d="${pathD}" fill="none" stroke="rgba(212,163,115,0.75)" stroke-width="20" stroke-linecap="round"/>
+              <path d="${pathD}" fill="none" stroke="#FFFDF7" stroke-width="12" stroke-linecap="round"/>
               <path d="${pathD}" fill="none" stroke="${stg.color}" stroke-width="3.5" stroke-dasharray="10,8" stroke-linecap="round"/>
+              <!-- Forest Trees, Animals & Villagers with Cupcakes/Candies -->
+              ${scenicVignettesSvg}
             </svg>
             ${nodesHtml}
           </div>
@@ -4324,7 +4687,7 @@
         scrollArea.appendChild(card);
       }
 
-      scrollArea.querySelectorAll('.map-node-btn').forEach(btn => {
+      scrollArea.querySelectorAll('.map-node-btn, .map-node-blocks-pill').forEach(btn => {
         btn.addEventListener('click', () => {
           const lvl = Number(btn.dataset.lvl);
           if (lvl <= state.highestLevel) {

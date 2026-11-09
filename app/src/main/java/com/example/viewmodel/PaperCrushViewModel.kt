@@ -93,14 +93,15 @@ class PaperCrushViewModel(
         val bp = getLevelBlueprint(clampedLevel)
 
         val rawBoard = generatePlayableBoard(bp.tapeLocks.keys)
-        val initialBoard = seedTutorialBoardIfApplicable(rawBoard, clampedLevel)
-        val tutorialBoosters = if (clampedLevel <= 3) {
+        val initialBoard = seedTutorialBoardIfApplicable(rawBoard, clampedLevel, bp.tapeLocks.keys)
+        val tutorialBoosters = if (clampedLevel <= 3 || (clampedLevel - 1) % 5 == 0) {
             boosters.mapValues { (_, count) -> count.coerceAtLeast(2) }
         } else {
             boosters
         }
-        val isTutorialLevel = clampedLevel in 1..3
-        val initialPrompt = if (isTutorialLevel) {
+        // Automatically show the friendly guide on Levels 1-3 AND the first level of every new Stage!
+        val showGuideAutomatically = clampedLevel in 1..3 || (clampedLevel - 1) % 5 == 0
+        val initialPrompt = if (showGuideAutomatically) {
             computeTutorialPrompt(
                 level = clampedLevel,
                 step = 1,
@@ -135,7 +136,7 @@ class PaperCrushViewModel(
             soundEnabled = soundEnabled,
             status = GameStatus.PLAYING,
             tutorialStep = 1,
-            tutorialDismissed = !isTutorialLevel,
+            tutorialDismissed = !showGuideAutomatically,
             tutorialPrompt = initialPrompt
         )
         persistProgress()
@@ -1629,14 +1630,16 @@ class PaperCrushViewModel(
     }
 
     /**
-     * Seeds Levels 1, 2, and 3 with deterministic, crystal-clear interactive tutorial setups
-     * so players immediately learn how to make their first match and use special power-ups & boosters.
+     * Seeds Levels 1-3 with deterministic interactive tutorial setups AND gifts a helpful
+     * starting Special Power-Up Tile on Levels 4-50 matching each stage's theme so kids and adults
+     * always have an easy, exciting power-up on the board!
      */
     private fun seedTutorialBoardIfApplicable(
         board: List<List<BoardTile>>,
-        level: Int
+        level: Int,
+        lockedPositions: Set<GridPos> = emptySet()
     ): List<List<BoardTile>> {
-        if (level !in 1..3 || board.size != BOARD_SIZE) return board
+        if (board.size != BOARD_SIZE) return board
         val mutable = board.map { it.toMutableList() }.toMutableList()
 
         fun setPiece(r: Int, c: Int, type: PieceType, special: TileSpecial = TileSpecial.NONE) {
@@ -1673,7 +1676,6 @@ class PaperCrushViewModel(
             2 -> {
                 // Level 2:
                 // Pre-place a Rainbow Pinwheel (✹) at (3, 3) and a 3x3 Origami Bomb (✦) at (2, 2)
-                // right on the Gold Washi Stamp cells!
                 setPiece(3, 3, PieceType.PEPPERMINT, TileSpecial.PINWHEEL_RAINBOW)
                 setPiece(3, 4, PieceType.PEPPERMINT)
                 setPiece(2, 2, PieceType.ORIGAMI_FOX, TileSpecial.PAPER_BOMB)
@@ -1681,9 +1683,34 @@ class PaperCrushViewModel(
             3 -> {
                 // Level 3:
                 // Pre-place a 3x3 Origami Bomb (✦) at (3, 3) and a Column Cutter (↕) at (2, 3)
-                // inside the Gold Stamp Diamond so using a Craft Booster triggers an epic chain!
                 setPiece(3, 3, PieceType.CARDBOARD_STAR, TileSpecial.PAPER_BOMB)
                 setPiece(2, 3, PieceType.ORIGAMI_CRANE, TileSpecial.COL_CUTTER)
+            }
+            else -> {
+                // Levels 4..50: Gift a helpful stage-themed Special Power-Up on an unlocked cell!
+                val stageIdx = ((level - 1) / 5) % 10
+                val giftPos = listOf(
+                    GridPos(3, 3),
+                    GridPos(1, 3),
+                    GridPos(2, 3),
+                    GridPos(4, 3),
+                    GridPos(1, 2)
+                ).firstOrNull { it !in lockedPositions } ?: GridPos(1, 3)
+
+                val giftSpecial = when (stageIdx) {
+                    2 -> TileSpecial.ROW_CUTTER         // Stage 3: Free Line Cutter
+                    4 -> TileSpecial.PAPER_BOMB         // Stage 5: Free 3x3 Paper Bomb
+                    6 -> TileSpecial.PINWHEEL_RAINBOW   // Stage 7: Free Rainbow Pinwheel
+                    9 -> TileSpecial.PAPER_BOMB         // Stage 10: Free Paper Bomb + adjacent Cutter
+                    else -> if (level % 2 == 0) TileSpecial.ROW_CUTTER else TileSpecial.PAPER_BOMB
+                }
+                setPiece(giftPos.row, giftPos.col, mutable[giftPos.row][giftPos.col].type, giftSpecial)
+                if (stageIdx == 9) {
+                    val buddyPos = GridPos(giftPos.row, (giftPos.col + 1).coerceAtMost(BOARD_SIZE - 1))
+                    if (buddyPos !in lockedPositions) {
+                        setPiece(buddyPos.row, buddyPos.col, mutable[buddyPos.row][buddyPos.col].type, TileSpecial.ROW_CUTTER)
+                    }
+                }
             }
         }
         return mutable.map { it.toList() }
@@ -1715,7 +1742,6 @@ class PaperCrushViewModel(
         return when (level) {
             1 -> {
                 if (step <= 1) {
-                    // Prefer our seeded center move (3, 1) -> (3, 2) if still intact, otherwise bestMove
                     val seededValid = board[3][1].type == PieceType.ORIGAMI_FOX &&
                         board[3][2].type != PieceType.ORIGAMI_FOX &&
                         board[3][3].type == PieceType.ORIGAMI_FOX &&
@@ -1729,10 +1755,10 @@ class PaperCrushViewModel(
                         level = 1,
                         stepIndex = 1,
                         totalSteps = 2,
-                        badgeText = "LEVEL 1 TUTORIAL • STEP 1 OF 2",
-                        title = "Make Your First Origami Match!",
-                        instruction = "Swipe or tap the 2 glowing blocks to fold 3 matching pieces in a row!",
-                        powerUpTip = "✦ Match 4 crafts a Line Cutter (↔/↕) • Match 5 crafts a Rainbow Pinwheel (✹)!",
+                        badgeText = "STAGE 1 EASY GUIDE • STEP 1 OF 2",
+                        title = "Match 3 Same Pictures!",
+                        instruction = "Swipe or tap the 2 glowing blocks to line up 3 matching Foxes in a row!",
+                        powerUpTip = "✦ Match 4 makes a Line Cutter (↔) • Match 5 makes a Rainbow Pinwheel (✹)!",
                         targetType = TutorialTargetType.BOARD_SWAP,
                         fromPos = fromPos,
                         toPos = toPos,
@@ -1746,10 +1772,10 @@ class PaperCrushViewModel(
                         level = 1,
                         stepIndex = 2,
                         totalSteps = 2,
-                        badgeText = "LEVEL 1 TUTORIAL • STEP 2 OF 2",
-                        title = "Use Special Line Cutter (↔)!",
-                        instruction = "Double-tap the glowing Line Cutter (↔) block—or swap it—to slice the entire row!",
-                        powerUpTip = "✦ Every 4-tile match crafts a Row (↔) or Column (↕) Cutter power-up!",
+                        badgeText = "STAGE 1 EASY GUIDE • STEP 2 OF 2",
+                        title = "Use Your Line Cutter (↔)!",
+                        instruction = "Double-tap the glowing Line Cutter (↔) block—or swap it—to clear the whole row!",
+                        powerUpTip = "✦ Match 4 blocks anytime to craft a Row (↔) or Column (↕) Cutter!",
                         targetType = TutorialTargetType.BOARD_SPECIAL_TILE,
                         fromPos = spPos,
                         toPos = neighborPos,
@@ -1775,10 +1801,10 @@ class PaperCrushViewModel(
                         level = 2,
                         stepIndex = 1,
                         totalSteps = 2,
-                        badgeText = "LEVEL 2 TUTORIAL • STEP 1 OF 2",
-                        title = "Rainbow Pinwheel (✹) & Bomb (✦)!",
-                        instruction = "Swap the Rainbow Pinwheel (✹) with ANY adjacent block to shred all blocks of that color!",
-                        powerUpTip = "✦ Also try double-tapping the 3x3 Origami Bomb (✦) at the top-left gold stamp!",
+                        badgeText = "LEVEL 2 EASY GUIDE • STEP 1 OF 2",
+                        title = "Rainbow Pinwheel (✹) Clears 1 Color!",
+                        instruction = "Swap the Rainbow Pinwheel (✹) with ANY block next to it to clear all blocks of that picture!",
+                        powerUpTip = "✦ Also try double-tapping the 3x3 Paper Bomb (✦) at the top-left!",
                         targetType = TutorialTargetType.BOARD_SPECIAL_TILE,
                         fromPos = rainbowPos,
                         toPos = neighborPos,
@@ -1791,10 +1817,10 @@ class PaperCrushViewModel(
                         level = 2,
                         stepIndex = 2,
                         totalSteps = 2,
-                        badgeText = "LEVEL 2 TUTORIAL • STEP 2 OF 2",
-                        title = "Collect Gold Washi Stamps (★)!",
-                        instruction = "Match blocks over Gold Stamp cells (★) or blast them with Special Power-Ups to win!",
-                        powerUpTip = "✦ PRO TIP: Swap 2 Special Power-Ups together for a Mega Cross Slice!",
+                        badgeText = "LEVEL 2 EASY GUIDE • STEP 2 OF 2",
+                        title = "Double-Tap the 3x3 Paper Bomb (✦)!",
+                        instruction = "Double-tap or swap any glowing Special Block to blast a big area at once!",
+                        powerUpTip = "✦ TIP: Swap 2 Special Power-Ups together for a Mega Board Blast!",
                         targetType = TutorialTargetType.BOARD_SWAP,
                         fromPos = fromPos,
                         toPos = toPos,
@@ -1808,14 +1834,14 @@ class PaperCrushViewModel(
                         level = 3,
                         stepIndex = 1,
                         totalSteps = 2,
-                        badgeText = "LEVEL 3 TUTORIAL • STEP 1 OF 2",
-                        title = "Arm a Craft Workshop Booster!",
-                        instruction = "Tap SCISSORS (Cut), GLUE (Swap), or HAMMER (Smash) in the Booster Bar below!",
-                        powerUpTip = "✦ Workshop Boosters NEVER cost a move and can detonate Special Tiles instantly!",
+                        badgeText = "LEVEL 3 EASY GUIDE • STEP 1 OF 2",
+                        title = "Collect ★ Gold & Use Free Boosters!",
+                        instruction = "Match on ★ Gold Squares to collect them—or tap SCISSORS, GLUE, or HAMMER below!",
+                        powerUpTip = "✦ Boosters at the bottom NEVER use a move and work anywhere on the board!",
                         targetType = TutorialTargetType.BOOSTER_BAR,
                         fromPos = GridPos(3, 3),
                         toPos = GridPos(3, 3),
-                        highlightCells = setOf(GridPos(3, 3)),
+                        highlightCells = goldCells + setOf(GridPos(3, 3)),
                         recommendedBooster = BoosterType.HAMMER
                     )
                 } else {
@@ -1836,20 +1862,20 @@ class PaperCrushViewModel(
                         level = 3,
                         stepIndex = 2,
                         totalSteps = 2,
-                        badgeText = "LEVEL 3 TUTORIAL • STEP 2 OF 2",
+                        badgeText = "LEVEL 3 EASY GUIDE • STEP 2 OF 2",
                         title = when (activeBooster) {
-                            BoosterType.SCISSORS -> "Snip the Origami Bomb (✦)!"
-                            BoosterType.GLUE -> "Tap Any 2 Blocks to Glue-Swap!"
-                            BoosterType.HAMMER -> "Smash 3x3 with Cardboard Hammer!"
+                            BoosterType.SCISSORS -> "Tap a Block to Snip It!"
+                            BoosterType.GLUE -> "Tap Any 2 Blocks to Swap!"
+                            BoosterType.HAMMER -> "Tap the Center to Smash 3x3!"
                             null -> "Tap the Glowing Center Block (✦)!"
                         },
                         instruction = when (activeBooster) {
-                            BoosterType.SCISSORS -> "Tap the glowing center block (✦) to snip it and chain-detonate the Origami Bomb!"
-                            BoosterType.GLUE -> "Tap any 2 blocks anywhere on the board to swap them & create a match!"
-                            BoosterType.HAMMER -> "Tap the glowing center block (✦) to smash a 3x3 crater & collect Gold Stamps!"
-                            null -> "Tap the glowing center block (✦) on the board to unleash your Workshop Booster!"
+                            BoosterType.SCISSORS -> "Tap the glowing center block (✦) to snip it and collect ★ Gold!"
+                            BoosterType.GLUE -> "Tap any 2 blocks on the board to swap them and make a match!"
+                            BoosterType.HAMMER -> "Tap the glowing center block (✦) to smash a 3x3 square & collect ★ Gold!"
+                            null -> "Tap the glowing center block (✦) on the board to blast ★ Gold Squares!"
                         },
-                        powerUpTip = "✦ Earn +2 free Boosters every time you complete a level!",
+                        powerUpTip = "✦ You win +2 free Boosters every time you beat a level!",
                         targetType = TutorialTargetType.BOARD_BOOSTER_USE,
                         fromPos = centerPos,
                         toPos = if (activeBooster == BoosterType.GLUE) secondPos else centerPos,
@@ -1859,22 +1885,35 @@ class PaperCrushViewModel(
                 }
             }
             else -> {
-                // Interactive Guide when player taps "?" Help on Level 4+
+                // Stage-specific, easy-to-understand guide for Stages 2-10 (or when '?' is tapped on any level)
+                val stageNum = ((level - 1) / 5) + 1
+                val hasWaxSeals = tapeLocks.values.any { it >= 2 }
+                val hasTape = tapeLocks.isNotEmpty()
+                val hasGold = goldCells.isNotEmpty()
+
                 if (step <= 1) {
                     val fromPos = specialTilePos ?: bestMove?.first ?: GridPos(3, 3)
                     val toPos = bestMove?.second ?: GridPos(fromPos.row, (fromPos.col + 1).coerceAtMost(BOARD_SIZE - 1))
+                    val (stageRuleTitle, stageRuleDesc) = when {
+                        hasWaxSeals -> "Stage $stageNum Rule: Pop 🔴 Red Wax Seals!" to
+                            "Match blocks right NEXT TO a 🔴 Red Wax Seal 2 times (or use Hammer/Scissors) to pop it open!"
+                        hasTape && hasGold -> "Stage $stageNum Rule: ✕ Tape & ★ Gold!" to
+                            "Match NEXT TO ✕ Paper Tape to snip it free, and match ON ★ Gold Squares to collect them!"
+                        hasTape -> "Stage $stageNum Rule: Snip ✕ Paper Tape!" to
+                            "Blocks under ✕ Paper Tape can't move yet—just match blocks right NEXT TO ✕ Tape to snip it open!"
+                        hasGold -> "Stage $stageNum Rule: Collect ★ Gold Squares!" to
+                            "Match blocks on top of ★ Gold Squares (or double-tap your free Power-Up!) to collect them!"
+                        else -> "Stage $stageNum Rule: Match & Use Power-Ups!" to
+                            "Swipe the glowing blocks to match 3+, or double-tap the glowing Power-Up tile on the board!"
+                    }
                     TutorialPrompt(
                         level = level,
                         stepIndex = 1,
                         totalSteps = 2,
-                        badgeText = "LEVEL $level WORKSHOP GUIDE • 1/2",
-                        title = if (specialTilePos != null) "Activate Special Power-Up!" else "Recommended Origami Move!",
-                        instruction = if (specialTilePos != null) {
-                            "Double-tap or swap the glowing Special Tile (${board[fromPos.row][fromPos.col].special.badgeLabel}) for a chain blast!"
-                        } else {
-                            "Swipe the 2 glowing blocks to fold a match & charge your 2x Origami Fever Meter!"
-                        },
-                        powerUpTip = "✦ Match 4 = Line Cutter (↔/↕) • L/T Match = 3x3 Bomb (✦) • Match 5 = Rainbow Pinwheel (✹)",
+                        badgeText = "STAGE $stageNum EASY RULE • 1 OF 2",
+                        title = stageRuleTitle,
+                        instruction = stageRuleDesc,
+                        powerUpTip = "✦ Every level starts with a FREE Power-Up on the board—double-tap or swap it!",
                         targetType = if (specialTilePos != null) TutorialTargetType.BOARD_SPECIAL_TILE else TutorialTargetType.BOARD_SWAP,
                         fromPos = fromPos,
                         toPos = toPos,
@@ -1885,10 +1924,10 @@ class PaperCrushViewModel(
                         level = level,
                         stepIndex = 2,
                         totalSteps = 2,
-                        badgeText = "LEVEL $level WORKSHOP GUIDE • 2/2",
-                        title = "Use Craft Boosters Anytime!",
-                        instruction = "Tap SCISSORS, GLUE, or HAMMER below to break Masking Tape (✕), Red Wax Seals, or Gold Stamps!",
-                        powerUpTip = "✦ Boosters never cost a move and immediately rip through Tape & Wax Seals!",
+                        badgeText = "STAGE $stageNum EASY RULE • 2 OF 2",
+                        title = "Use Free Boosters Anytime!",
+                        instruction = "Stuck on ✕ Tape, 🔴 Wax, or ★ Gold? Tap SCISSORS, GLUE, or HAMMER at the bottom!",
+                        powerUpTip = "✦ Scissors snips 1 tile • Glue swaps 2 tiles • Hammer smashes a 3x3 area (0 moves used)!",
                         targetType = TutorialTargetType.BOOSTER_BAR,
                         fromPos = GridPos(3, 3),
                         toPos = GridPos(3, 3),
