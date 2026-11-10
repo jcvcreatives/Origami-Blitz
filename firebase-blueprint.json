@@ -1,0 +1,84 @@
+{
+  "entities": {
+    "PlayerProfile": {
+      "title": "PlayerProfile",
+      "description": "Single-document quota-optimized player profile and Paper Craft Crush saga progress.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated Firebase UID of the player."
+        },
+        "username": {
+          "type": "string",
+          "description": "Player chosen username or GM handle (e.g., jcv)."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["player", "gm"],
+          "description": "Account role: standard player or Game Master (gm)."
+        },
+        "level": {
+          "type": "integer",
+          "description": "Current active level (1 to 50)."
+        },
+        "highestUnlockedLevel": {
+          "type": "integer",
+          "description": "Highest unlocked level on the Paper Craft Trail (1 to 50)."
+        },
+        "highScore": {
+          "type": "integer",
+          "description": "All-time highest score achieved by the player."
+        },
+        "scissorsCount": {
+          "type": "integer",
+          "description": "Remaining Scissors (Cut) boosters."
+        },
+        "glueCount": {
+          "type": "integer",
+          "description": "Remaining Glue (Swap) boosters."
+        },
+        "hammerCount": {
+          "type": "integer",
+          "description": "Remaining Hammer (Smash) boosters."
+        },
+        "starsEncoded": {
+          "type": "string",
+          "description": "Compact encoded string of level star ratings (e.g., '1:3,2:3') to avoid multi-document reads/writes."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the profile was created (clients must submit FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the profile was last synced (clients must submit FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "username",
+        "role",
+        "level",
+        "highestUnlockedLevel",
+        "highScore",
+        "scissorsCount",
+        "glueCount",
+        "hammerCount",
+        "starsEncoded",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/PlayerProfile"
+      },
+      "description": "Per-user quota-optimized profile document storing account identity, GM role, and full 50-level saga progress in a single document."
+    }
+  }
+}

@@ -535,6 +535,7 @@ data class PaperGameState(
     val streakCount: Int = 0,
     val feverCharge: Float = 0f,
     val feverMovesLeft: Int = 0,
+    val feverBurstSeq: Long = 0L,
     val boardPunchSeq: Long = 0L,
     val boardPunchStrength: Float = 0f,
     val floatingPopups: List<FloatingScorePopup> = emptyList(),
@@ -544,7 +545,12 @@ data class PaperGameState(
     val status: GameStatus = GameStatus.PLAYING,
     val tutorialStep: Int = 1,
     val tutorialDismissed: Boolean = false,
-    val tutorialPrompt: TutorialPrompt? = null
+    val tutorialPrompt: TutorialPrompt? = null,
+    val showHomeScreen: Boolean = true,
+    val showGmPanel: Boolean = false,
+    val isAuthenticatedSession: Boolean = false,
+    val accountUsername: String = "Guest",
+    val isGmAccount: Boolean = false
 ) {
     val currentStage: PaperStageInfo
         get() = getStageInfoForLevel(level)
@@ -564,3 +570,4 @@ data class PaperGameState(
             goldCells.isEmpty() &&
             tapeLocks.isEmpty()
 }
+

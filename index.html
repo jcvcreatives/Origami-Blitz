@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#BDE0FE" />
-  <title>Paper Craft Crush</title>
+  <title>Origami Blitz</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Patrick+Hand&display=swap" rel="stylesheet">
@@ -94,7 +94,7 @@
       background-size: 24px 24px;
     }
 
-    /* Dynamic Tilt Global Lighting Overlay */
+    /* Dynamic Tilt Global Lighting Overlay (Static GPU layer - zero repaint cost) */
     #lighting-overlay {
       position: fixed;
       top: 0;
@@ -103,7 +103,9 @@
       bottom: 0;
       pointer-events: none;
       z-index: 25;
-      will-change: background;
+      background:
+        radial-gradient(circle at 50% 38%, rgba(255,253,245,0.11) 0%, rgba(255,248,225,0.04) 48%, transparent 78%),
+        linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 55%, rgba(43,24,10,0.05) 100%);
     }
 
     /* Confetti Canvas Overlays (Backdrop Depth Plane + Foreground Burst Plane) */
@@ -335,18 +337,27 @@
       color: var(--thumbtack-red);
     }
 
-    /* Origami Fever Progress Bar & Streak Multiplier */
+    /* Origami Fever Progress Bar, Full-Charge Ignition Shockwave & Active Fever Mode */
     #fever-bar-wrap {
       width: 100%;
       background: #4E342E;
       border-radius: 99px;
-      height: 20px;
+      height: 24px;
       padding: 2px;
       position: relative;
       display: flex;
       align-items: center;
       box-shadow: 0 2px 5px rgba(0,0,0,0.22);
+      border: 1.5px solid #3B2314;
+      overflow: visible;
+      transition: transform 0.2s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+    }
+    #fever-track-clip {
+      position: absolute;
+      inset: 2px;
+      border-radius: 99px;
       overflow: hidden;
+      pointer-events: none;
     }
     #fever-fill {
       height: 100%;
@@ -354,13 +365,114 @@
       border-radius: 99px;
       background: linear-gradient(90deg, #F5A623, #FF7043, #FFCA28);
       transition: width 0.25s cubic-bezier(0.22, 1.35, 0.36, 1);
+      position: relative;
+      overflow: hidden;
+    }
+    #fever-fill::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        -55deg,
+        rgba(255,255,255,0.28) 0px,
+        rgba(255,255,255,0.28) 10px,
+        transparent 10px,
+        transparent 22px
+      );
+      background-size: 38px 38px;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    #fever-bar-wrap.fever-near-full {
+      border-color: #FF9F1C;
+      box-shadow: 0 0 8px rgba(255, 159, 28, 0.55);
+    }
+    #fever-bar-wrap.fever-near-full #fever-fill::after {
+      opacity: 0.65;
+      animation: feverStripeScroll 0.85s linear infinite;
     }
     #fever-bar-wrap.fever-active {
-      background: #3E2723;
-      box-shadow: 0 0 12px rgba(255, 193, 7, 0.75);
+      background: #2B160C;
+      border-color: #FFEA79;
+      box-shadow: 0 0 16px rgba(255, 193, 7, 0.9), 0 0 28px rgba(255, 51, 85, 0.55);
+      animation: feverHeartbeat 0.52s ease-in-out infinite alternate;
     }
     #fever-bar-wrap.fever-active #fever-fill {
-      background: linear-gradient(90deg, #FFD54F, #FF5722, #FFC107);
+      background: linear-gradient(90deg, #FF3355, #FF9F1C, #FFEA79, #FF3355);
+      background-size: 200% 100%;
+      animation: feverGradientFlow 1.2s linear infinite;
+    }
+    #fever-bar-wrap.fever-active #fever-fill::after {
+      opacity: 1;
+      animation: feverStripeScroll 0.55s linear infinite;
+    }
+    #fever-bar-wrap.fever-igniting {
+      animation: feverIgnitePop 0.88s cubic-bezier(0.22, 1.4, 0.36, 1) forwards !important;
+      border-color: #FFFFFF;
+    }
+    #fever-shockwave {
+      position: absolute;
+      inset: -2px;
+      border-radius: 99px;
+      border: 4px solid #FFEA79;
+      box-shadow: 0 0 18px #FF3355;
+      opacity: 0;
+      pointer-events: none;
+    }
+    #fever-bar-wrap.fever-igniting #fever-shockwave {
+      animation: feverShockwaveRing 0.85s ease-out forwards;
+    }
+    .fever-pinwheel-icon {
+      position: absolute;
+      top: 50%;
+      width: 15px;
+      height: 15px;
+      margin-top: -7.5px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      color: #FFFDF9;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.65);
+      z-index: 3;
+      pointer-events: none;
+    }
+    .fever-pinwheel-icon.left { left: 7px; animation: feverPinwheelSpin 0.9s linear infinite; }
+    .fever-pinwheel-icon.right { right: 7px; animation: feverPinwheelSpinReverse 0.9s linear infinite; }
+    #fever-bar-wrap.fever-active .fever-pinwheel-icon,
+    #fever-bar-wrap.fever-igniting .fever-pinwheel-icon {
+      display: inline-flex;
+    }
+    @keyframes feverStripeScroll {
+      0% { background-position: 0 0; }
+      100% { background-position: 38px 0; }
+    }
+    @keyframes feverGradientFlow {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 200% 50%; }
+    }
+    @keyframes feverHeartbeat {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.032, 1.08); }
+    }
+    @keyframes feverIgnitePop {
+      0% { transform: scale(1) rotate(0deg); filter: brightness(1.8); }
+      22% { transform: scale(1.13, 1.28) rotate(-1.8deg); filter: brightness(1.45); }
+      45% { transform: scale(1.08, 1.18) rotate(1.6deg); filter: brightness(1.2); }
+      70% { transform: scale(1.04, 1.1) rotate(-0.8deg); }
+      100% { transform: scale(1) rotate(0deg); filter: brightness(1); }
+    }
+    @keyframes feverShockwaveRing {
+      0% { transform: scale(0.96, 0.9); opacity: 1; border-width: 6px; }
+      100% { transform: scale(1.22, 2.6); opacity: 0; border-width: 1px; }
+    }
+    @keyframes feverPinwheelSpin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes feverPinwheelSpinReverse {
+      from { transform: rotate(360deg); }
+      to { transform: rotate(0deg); }
     }
     #fever-label {
       position: absolute;
@@ -371,13 +483,14 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 0 8px;
+      padding: 0 24px;
       font-size: 10.5px;
-      font-weight: 800;
+      font-weight: 900;
       color: #FFFDF7;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.45);
+      text-shadow: 0 1px 2px rgba(0,0,0,0.55);
       pointer-events: none;
       white-space: nowrap;
+      z-index: 2;
     }
 
     /* Flexible Board Stage Area */
@@ -1566,54 +1679,195 @@
       white-space: nowrap;
       box-shadow: 0 4px 10px rgba(0,0,0,0.28);
     }
+
+    /* Compact Phone & Small Screen Compatibility (e.g. iPhone SE, 320px width, Galaxy Fold cover) */
+    @media (max-height: 670px), (max-width: 359px) {
+      #app-shell {
+        padding-top: max(4px, env(safe-area-inset-top, 4px));
+        padding-bottom: max(6px, env(safe-area-inset-bottom, 6px));
+        gap: 3px;
+      }
+      #left-panel, #hud-column {
+        gap: 4px;
+      }
+      .round-paper-btn {
+        width: 34px;
+        height: 34px;
+        font-size: 15px;
+      }
+      .tape-strip {
+        padding: 2px 8px;
+        font-size: 12px;
+      }
+      .tape-strip.level-tape {
+        font-size: 13px;
+      }
+      #tutorial-coach-card {
+        padding: 5px 8px;
+      }
+      .tut-emblem {
+        width: 28px;
+        height: 28px;
+        font-size: 13px;
+      }
+      .tut-title {
+        font-size: 12px;
+      }
+      .tut-desc {
+        font-size: 10.5px;
+      }
+    }
+
+    /* Tablet & Large Screen Scaling */
+    @media (min-width: 768px) and (min-height: 768px) {
+      #app-shell {
+        max-width: 560px;
+      }
+    }
+
+    /* Origami Login UI & Circling Origami Sun Animations */
+    @keyframes origamiSunSpinCW {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes origamiSunSpinCCW {
+      0% { transform: rotate(360deg); }
+      100% { transform: rotate(0deg); }
+    }
+    @keyframes origamiSunCircleOrbit {
+      0% { transform: rotate(0deg) translateX(4px) rotate(0deg); }
+      100% { transform: rotate(360deg) translateX(4px) rotate(-360deg); }
+    }
+    .origami-sun-orbit-wrap {
+      animation: origamiSunCircleOrbit 6.5s linear infinite;
+      transform-origin: center;
+    }
+    .origami-rays-cw {
+      animation: origamiSunSpinCW 12s linear infinite;
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+    .origami-rays-ccw {
+      animation: origamiSunSpinCCW 9s linear infinite;
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+    .origami-sky-rays-cw {
+      animation: origamiSunSpinCW 16s linear infinite;
+      transform-origin: 850px 130px;
+    }
+    .origami-sky-rays-ccw {
+      animation: origamiSunSpinCCW 11s linear infinite;
+      transform-origin: 850px 130px;
+    }
+    .origami-login-card {
+      position: relative;
+      clip-path: polygon(18px 0%, calc(100% - 26px) 0%, 100% 26px, 100% calc(100% - 18px), calc(100% - 18px) 100%, 26px 100%, 0% calc(100% - 26px), 0% 18px);
+      background:
+        linear-gradient(135deg, transparent 48%, rgba(59,35,20,0.08) 49%, rgba(59,35,20,0.08) 51%, transparent 52%),
+        linear-gradient(45deg, rgba(255,234,121,0.22) 0%, #F7EBDC 45%, #F2DEC4 100%);
+      border: 3px solid #3B2314;
+      box-shadow: 0 16px 34px rgba(24, 12, 4, 0.55);
+    }
+    .origami-login-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 26px;
+      height: 26px;
+      background: linear-gradient(225deg, transparent 50%, #FFEA79 50%);
+      border-left: 2px solid #3B2314;
+      border-bottom: 2px solid #3B2314;
+      box-shadow: -3px 3px 5px rgba(0,0,0,0.18);
+      pointer-events: none;
+    }
+    .origami-sheet-panel {
+      position: relative;
+      background:
+        repeating-linear-gradient(-35deg, rgba(59,35,20,0.03) 0px, rgba(59,35,20,0.03) 2px, transparent 2px, transparent 18px),
+        #FFFDF9;
+      border: 2px solid #3B2314;
+      clip-path: polygon(10px 0%, calc(100% - 16px) 0%, 100% 16px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0% calc(100% - 10px), 0% 10px);
+      box-shadow: 0 4px 0 rgba(59,35,20,0.16);
+    }
+    .origami-sheet-panel::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 16px;
+      height: 16px;
+      background: linear-gradient(225deg, transparent 50%, #FFB703 50%);
+      border-left: 1.5px solid #3B2314;
+      border-bottom: 1.5px solid #3B2314;
+      pointer-events: none;
+    }
+    .origami-chamfer-btn {
+      clip-path: polygon(8px 0%, calc(100% - 8px) 0%, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0% calc(100% - 8px), 0% 8px);
+    }
   </style>
 </head>
 <body>
 
   <!-- 1. Layered Paper & Origami Woodland Diorama SVG Backdrop -->
-  <svg id="diorama-backdrop" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice">
-    <rect width="1000" height="1000" fill="#BDE0FE" />
+  <svg id="diorama-backdrop" data-stage="1" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice">
+    <rect id="diorama-sky-rect" width="1000" height="1000" fill="#BDE0FE" style="transition: fill 0.45s ease;" />
     <g id="layer-clouds">
-      <path d="M-50,0 L1050,0 L1050,210 L980,218 L910,204 L840,216 L770,202 L700,218 L630,205 L560,216 L490,202 L420,218 L350,204 L280,216 L210,202 L140,218 L70,204 L-50,215 Z" fill="#E2F1FF" />
+      <path id="diorama-cloud-path" d="M-50,0 L1050,0 L1050,210 L980,218 L910,204 L840,216 L770,202 L700,218 L630,205 L560,216 L490,202 L420,218 L350,204 L280,216 L210,202 L140,218 L70,204 L-50,215 Z" fill="#E2F1FF" style="transition: fill 0.45s ease;" />
     </g>
     <g id="layer-sun">
+      <g class="origami-sky-rays-cw">
+        <polygon points="834,64 850,18 850,64" fill="#FFEA79"/><polygon points="850,64 850,18 866,64" fill="#FFB703"/>
+        <polygon points="834,196 850,242 850,196" fill="#FFEA79"/><polygon points="850,196 850,242 866,196" fill="#FFB703"/>
+        <polygon points="784,114 738,130 784,130" fill="#FFEA79"/><polygon points="784,130 738,130 784,146" fill="#FFB703"/>
+        <polygon points="916,114 962,130 916,130" fill="#FFEA79"/><polygon points="916,130 962,130 916,146" fill="#FFB703"/>
+        <polygon points="795,75 768,48 808,65" fill="#FFEA79"/><polygon points="808,65 768,48 795,88" fill="#FFB703"/>
+        <polygon points="905,75 932,48 892,65" fill="#FFEA79"/><polygon points="892,65 932,48 905,88" fill="#FFB703"/>
+        <polygon points="795,185 768,212 808,195" fill="#FFEA79"/><polygon points="808,195 768,212 795,172" fill="#FFB703"/>
+        <polygon points="905,185 932,212 892,195" fill="#FFEA79"/><polygon points="892,195 932,212 905,172" fill="#FFB703"/>
+      </g>
       <circle cx="854" cy="136" r="72" fill="rgba(0,0,0,0.14)" />
       <circle cx="850" cy="130" r="72" fill="#FFEA79" />
       <circle cx="850" cy="130" r="52" fill="#FFB703" />
     </g>
     <g id="layer-far-hill">
       <path d="M-60,575 Q250,530 500,575 T1060,575 L1060,1050 L-60,1050 Z" fill="#FFFFFF" opacity="0.9" />
-      <path d="M-60,582 Q250,537 500,582 T1060,582 L1060,1050 L-60,1050 Z" fill="#74C69D" />
-      <rect x="100" y="555" width="22" height="45" fill="#7F4F24" />
-      <polygon points="111,465 62,565 111,565" fill="#2EC4B6" />
-      <polygon points="111,465 160,565 111,565" fill="#0F9F90" />
-      <rect x="878" y="545" width="24" height="48" fill="#7F4F24" />
-      <polygon points="890,445 838,555 890,555" fill="#2EC4B6" />
-      <polygon points="890,445 942,555 890,555" fill="#0F9F90" />
+      <path id="diorama-far-hill-path" d="M-60,582 Q250,537 500,582 T1060,582 L1060,1050 L-60,1050 Z" fill="#74C69D" style="transition: fill 0.45s ease;" />
+      <g id="diorama-far-props">
+        <rect x="100" y="555" width="22" height="45" fill="#7F4F24" />
+        <polygon points="111,465 62,565 111,565" fill="#2EC4B6" />
+        <polygon points="111,465 160,565 111,565" fill="#0F9F90" />
+        <rect x="878" y="545" width="24" height="48" fill="#7F4F24" />
+        <polygon points="890,445 838,555 890,555" fill="#2EC4B6" />
+        <polygon points="890,445 942,555 890,555" fill="#0F9F90" />
+      </g>
     </g>
     <g id="layer-near-hill">
       <path d="M-60,694 Q250,735 500,694 T1060,694 L1060,1050 L-60,1050 Z" fill="#FFFFFF" opacity="0.9" />
-      <path d="M-60,700 Q250,741 500,700 T1060,700 L1060,1050 L-60,1050 Z" fill="#52B788" />
-      <g transform="translate(110, 710)">
-        <circle cx="-36" cy="-35" r="20" fill="#7F4F24" />
-        <circle cx="36" cy="-35" r="20" fill="#7F4F24" />
-        <circle cx="-36" cy="-35" r="10" fill="#E6CCB2" />
-        <circle cx="36" cy="-35" r="10" fill="#E6CCB2" />
-        <polygon points="-48,-14 0,-44 48,-14 38,36 -38,36" fill="#D4A373" />
-        <polygon points="0,-6 20,25 -20,25" fill="#E6CCB2" />
-        <circle cx="0" cy="4" r="6" fill="#3B2314" />
-        <circle cx="-20" cy="-8" r="4.5" fill="#3B2314" />
-        <circle cx="20" cy="-8" r="4.5" fill="#3B2314" />
-      </g>
-      <g transform="translate(890, 700)">
-        <polygon points="14,28 62,-10 45,-50 10,-18" fill="#E0531F" />
-        <polygon points="-30,-42 -8,-24 14,-42 23,25 -36,25" fill="#FF6B35" />
-        <circle cx="-14" cy="-6" r="4.5" fill="#3B2314" />
+      <path id="diorama-near-hill-path" d="M-60,700 Q250,741 500,700 T1060,700 L1060,1050 L-60,1050 Z" fill="#52B788" style="transition: fill 0.45s ease;" />
+      <g id="diorama-near-props">
+        <g transform="translate(110, 710)">
+          <circle cx="-36" cy="-35" r="20" fill="#7F4F24" />
+          <circle cx="36" cy="-35" r="20" fill="#7F4F24" />
+          <circle cx="-36" cy="-35" r="10" fill="#E6CCB2" />
+          <circle cx="36" cy="-35" r="10" fill="#E6CCB2" />
+          <polygon points="-48,-14 0,-44 48,-14 38,36 -38,36" fill="#D4A373" />
+          <polygon points="0,-6 20,25 -20,25" fill="#E6CCB2" />
+          <circle cx="0" cy="4" r="6" fill="#3B2314" />
+          <circle cx="-20" cy="-8" r="4.5" fill="#3B2314" />
+          <circle cx="20" cy="-8" r="4.5" fill="#3B2314" />
+        </g>
+        <g transform="translate(890, 700)">
+          <polygon points="14,28 62,-10 45,-50 10,-18" fill="#E0531F" />
+          <polygon points="-30,-42 -8,-24 14,-42 23,25 -36,25" fill="#FF6B35" />
+          <circle cx="-14" cy="-6" r="4.5" fill="#3B2314" />
+        </g>
       </g>
     </g>
     <g id="layer-table">
       <path d="M-60,835 Q500,820 1060,835 L1060,1050 L-60,1050 Z" fill="#FFFFFF" opacity="0.85" />
-      <path d="M-60,840 Q500,825 1060,840 L1060,1050 L-60,1050 Z" fill="#F3E5D0" />
+      <path id="diorama-table-path" d="M-60,840 Q500,825 1060,840 L1060,1050 L-60,1050 Z" fill="#F3E5D0" style="transition: fill 0.45s ease;" />
     </g>
   </svg>
 
@@ -1625,6 +1879,9 @@
       <div id="hud-column">
         <div class="top-tape-row">
           <div class="hud-left-btns">
+            <button id="btn-open-home" class="round-paper-btn" title="Home & Account Login" aria-label="Home & Account Login">
+              🏠
+            </button>
             <button id="btn-sound" class="round-paper-btn" title="Toggle Paper SFX" aria-label="Toggle Paper SFX">
               🔊
             </button>
@@ -1637,6 +1894,9 @@
             <div id="level-tape" class="tape-strip level-tape torn-tape">Torn Level 1</div>
           </div>
           <div class="hud-left-btns">
+            <button id="btn-open-gm" class="map-pill-btn" title="GM Control Panel" style="display:none;background:#FFB703;color:#3B2314;border-color:#3B2314;">
+              ★ GM
+            </button>
             <button id="btn-tutorial-help" class="round-paper-btn" title="Interactive Tutorial Guide" aria-label="Tutorial Guide" style="font-weight:900;font-size:17px;">
               ?
             </button>
@@ -1665,8 +1925,13 @@
         </div>
 
         <div id="fever-bar-wrap">
-          <div id="fever-fill"></div>
+          <div id="fever-shockwave"></div>
+          <div id="fever-track-clip">
+            <div id="fever-fill"></div>
+          </div>
+          <span class="fever-pinwheel-icon left">✹</span>
           <div id="fever-label">FEVER METER • MATCH 4+ FOR LINE RIP!</div>
+          <span class="fever-pinwheel-icon right">✹</span>
         </div>
 
         <!-- Interactive Washi Coach Card for Levels 1-3 -->
@@ -1831,6 +2096,123 @@
     </div>
   </div>
 
+  <!-- 6. Home & Account Login Modal (Origami UI + Circling Origami Sun with Rays) -->
+  <div id="home-login-modal" style="position:fixed;inset:0;z-index:160;background:rgba(34,18,6,0.68);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:14px;">
+    <div class="modal-card origami-login-card" style="max-width:420px;width:100%;max-height:92vh;overflow-y:auto;text-align:left;gap:10px;padding:18px;">
+      <!-- Folded Origami Header Ribbon with Animated Circling Origami Sun & Rays -->
+      <div class="origami-sheet-panel" style="text-align:center;width:100%;background:#FFEA79;padding:10px 12px 12px;">
+        <div class="origami-sun-orbit-wrap" style="display:flex;justify-content:center;align-items:center;margin-bottom:2px;">
+          <svg width="102" height="102" viewBox="0 0 120 120" aria-label="Circling Origami Sun with Folded Paper Rays">
+            <!-- Outer 12 Folded Triangular Origami Rays Circling Clockwise -->
+            <g class="origami-rays-cw">
+              <g><polygon points="53,32 60,6 60,32" fill="#FFEA79" stroke="#3B2314" stroke-width="1.6"/><polygon points="60,32 60,6 67,32" fill="#FF6B35" stroke="#3B2314" stroke-width="1.6"/></g>
+              <g transform="rotate(30 60 60)"><polygon points="53,32 60,6 60,32" fill="#FFEA79" stroke="#3B2314" stroke-width="1.6"/><polygon points="60,32 60,6 67,32" fill="#FF6B35" stroke="#3B2314" stroke-width="1.6"/></g>
+              <g transform="rotate(60 60 60)"><polygon points="53,32 60,6 60,32" fill="#FFEA79" stroke="#3B2314" stroke-width="1.6"/><polygon points="60,32 60,6 67,32" fill="#FF6B35" stroke="#3B2314" stroke-width="1.6"/></g>
+              <g transform="rotate(90 60 60)"><polygon points="53,32 60,6 60,32" fill="#FFEA79" stroke="#3B2314" stroke-width="1.6"/><polygon points="60,32 60,6 67,32" fill="#FF6B35" stroke="#3B2314" stroke-width="1.6"/></g>
+              <g transform="rotate(120 60 60)"><polygon points="53,32 60,6 60,32" fill="#FFEA79" stroke="#3B2314" stroke-width="1.6"/><polygon points="60,32 60,6 67,32" fill="#FF6B35" stroke="#3B2314" stroke-width="1.6"/></g>
+              <g transform="rotate(150 60 60)"><polygon points="53,32 60,6 60,32" fill="#FFEA79" stroke="#3B2314" stroke-width="1.6"/><polygon points="60,32 60,6 67,32" fill="#FF6B35" stroke="#3B2314" stroke-width="1.6"/></g>
+              <g transform="rotate(180 60 60)"><polygon points="53,32 60,6 60,32" fill="#FFEA79" stroke="#3B2314" stroke-width="1.6"/><polygon points="60,32 60,6 67,32" fill="#FF6B35" stroke="#3B2314" stroke-width="1.6"/></g>
+              <g transform="rotate(210 60 60)"><polygon points="53,32 60,6 60,32" fill="#FFEA79" stroke="#3B2314" stroke-width="1.6"/><polygon points="60,32 60,6 67,32" fill="#FF6B35" stroke="#3B2314" stroke-width="1.6"/></g>
+              <g transform="rotate(240 60 60)"><polygon points="53,32 60,6 60,32" fill="#FFEA79" stroke="#3B2314" stroke-width="1.6"/><polygon points="60,32 60,6 67,32" fill="#FF6B35" stroke="#3B2314" stroke-width="1.6"/></g>
+              <g transform="rotate(270 60 60)"><polygon points="53,32 60,6 60,32" fill="#FFEA79" stroke="#3B2314" stroke-width="1.6"/><polygon points="60,32 60,6 67,32" fill="#FF6B35" stroke="#3B2314" stroke-width="1.6"/></g>
+              <g transform="rotate(300 60 60)"><polygon points="53,32 60,6 60,32" fill="#FFEA79" stroke="#3B2314" stroke-width="1.6"/><polygon points="60,32 60,6 67,32" fill="#FF6B35" stroke="#3B2314" stroke-width="1.6"/></g>
+              <g transform="rotate(330 60 60)"><polygon points="53,32 60,6 60,32" fill="#FFEA79" stroke="#3B2314" stroke-width="1.6"/><polygon points="60,32 60,6 67,32" fill="#FF6B35" stroke="#3B2314" stroke-width="1.6"/></g>
+            </g>
+            <!-- Inner 8 Counter-Rotating Folded Paper Rays + Orbiting Origami Diamond Sparks -->
+            <g class="origami-rays-ccw">
+              <g transform="rotate(22.5 60 60)"><polygon points="55,34 60,16 65,34" fill="#FFFDF9" stroke="#3B2314" stroke-width="1.4"/><polygon points="60,2 64,6 60,10 56,6" fill="#E63946" stroke="#3B2314" stroke-width="1.2"/></g>
+              <g transform="rotate(67.5 60 60)"><polygon points="55,34 60,16 65,34" fill="#FFFDF9" stroke="#3B2314" stroke-width="1.4"/><polygon points="60,2 64,6 60,10 56,6" fill="#FFB703" stroke="#3B2314" stroke-width="1.2"/></g>
+              <g transform="rotate(112.5 60 60)"><polygon points="55,34 60,16 65,34" fill="#FFFDF9" stroke="#3B2314" stroke-width="1.4"/><polygon points="60,2 64,6 60,10 56,6" fill="#E63946" stroke="#3B2314" stroke-width="1.2"/></g>
+              <g transform="rotate(157.5 60 60)"><polygon points="55,34 60,16 65,34" fill="#FFFDF9" stroke="#3B2314" stroke-width="1.4"/><polygon points="60,2 64,6 60,10 56,6" fill="#FFB703" stroke="#3B2314" stroke-width="1.2"/></g>
+              <g transform="rotate(202.5 60 60)"><polygon points="55,34 60,16 65,34" fill="#FFFDF9" stroke="#3B2314" stroke-width="1.4"/><polygon points="60,2 64,6 60,10 56,6" fill="#E63946" stroke="#3B2314" stroke-width="1.2"/></g>
+              <g transform="rotate(247.5 60 60)"><polygon points="55,34 60,16 65,34" fill="#FFFDF9" stroke="#3B2314" stroke-width="1.4"/><polygon points="60,2 64,6 60,10 56,6" fill="#FFB703" stroke="#3B2314" stroke-width="1.2"/></g>
+              <g transform="rotate(292.5 60 60)"><polygon points="55,34 60,16 65,34" fill="#FFFDF9" stroke="#3B2314" stroke-width="1.4"/><polygon points="60,2 64,6 60,10 56,6" fill="#E63946" stroke="#3B2314" stroke-width="1.2"/></g>
+              <g transform="rotate(337.5 60 60)"><polygon points="55,34 60,16 65,34" fill="#FFFDF9" stroke="#3B2314" stroke-width="1.4"/><polygon points="60,2 64,6 60,10 56,6" fill="#FFB703" stroke="#3B2314" stroke-width="1.2"/></g>
+            </g>
+            <!-- Faceted Octagonal Origami Sun Core -->
+            <polygon points="60,32 80,40 88,60 80,80 60,88 40,80 32,60 40,40" fill="#FFB703" stroke="#3B2314" stroke-width="2.4"/>
+            <polygon points="60,60 60,32 80,40" fill="#FFEA79" stroke="#3B2314" stroke-width="1"/>
+            <polygon points="60,60 88,60 80,80" fill="#FFEA79" stroke="#3B2314" stroke-width="1"/>
+            <polygon points="60,60 60,88 40,80" fill="#FFEA79" stroke="#3B2314" stroke-width="1"/>
+            <polygon points="60,60 32,60 40,40" fill="#FFEA79" stroke="#3B2314" stroke-width="1"/>
+            <circle cx="60" cy="60" r="10" fill="#E63946" stroke="#3B2314" stroke-width="1.8"/>
+            <circle cx="60" cy="60" r="4.5" fill="#FFEA79"/>
+          </svg>
+        </div>
+        <div class="modal-title" style="font-size:26px;letter-spacing:0.8px;">ORIGAMI BLITZ</div>
+        <div style="font-family:'Patrick Hand',cursive;font-size:16px;color:#6D4C3D;font-weight:700;">Sign in to play and save your progress</div>
+      </div>
+
+      <!-- Current Session Banner (when logged in) -->
+      <div id="home-session-box" class="origami-sheet-panel" style="display:none;width:100%;background:#E0F2FE;border:2px solid #0284C7;padding:10px 12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <div>
+            <div id="home-session-user" style="font-weight:800;font-size:14px;color:#3B2314;">Signed in as Player</div>
+            <div id="home-session-sub" style="font-size:12px;color:#0369A1;">Level 1 • Best: 0</div>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button id="btn-home-play" class="map-play-btn origami-chamfer-btn" style="padding:6px 12px;font-size:13px;">▶ Play</button>
+            <button id="btn-home-logout" class="round-paper-btn" title="Sign Out" style="width:34px;height:34px;font-size:13px;">🚪</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Login / Register Origami Tabs -->
+      <div class="origami-chamfer-btn" style="display:flex;gap:6px;width:100%;background:#EAD7BF;padding:4px;border:2px solid #3B2314;">
+        <button id="tab-auth-login" class="origami-chamfer-btn" style="flex:1;padding:7px;border:none;font-family:inherit;font-weight:800;font-size:13px;background:#FF6B35;color:#FFFDF9;cursor:pointer;">Log In</button>
+        <button id="tab-auth-register" class="origami-chamfer-btn" style="flex:1;padding:7px;border:none;font-family:inherit;font-weight:800;font-size:13px;background:transparent;color:#3B2314;cursor:pointer;">Create Account</button>
+      </div>
+
+      <!-- Username & Password Origami Sheet Form -->
+      <div class="origami-sheet-panel" style="width:100%;padding:12px;display:flex;flex-direction:column;gap:8px;">
+        <input id="auth-username-input" class="origami-chamfer-btn" type="text" placeholder="Username" autocomplete="username" style="width:100%;padding:9px 11px;border:2px solid #3B2314;font-family:inherit;font-size:14px;font-weight:700;color:#3B2314;background:#FFF9F0;" />
+        <input id="auth-password-input" class="origami-chamfer-btn" type="password" placeholder="Password" autocomplete="current-password" style="width:100%;padding:9px 11px;border:2px solid #3B2314;font-family:inherit;font-size:14px;font-weight:700;color:#3B2314;background:#FFF9F0;" />
+        <div id="auth-msg-banner" style="display:none;font-size:12px;font-weight:700;padding:6px 9px;border-radius:8px;"></div>
+        <button id="btn-submit-credentials" class="modal-btn origami-chamfer-btn" style="width:100%;padding:10px;font-size:15px;margin-top:2px;">Log In</button>
+      </div>
+
+      <!-- Gmail / Google Sign-In Origami Button -->
+      <button id="btn-gmail-login" class="modal-btn secondary origami-chamfer-btn" style="width:100%;padding:10px;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px;background:#FFFFFF;color:#3B2314;">
+        <span style="background:#EA4335;color:#FFF;font-weight:900;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:13px;">G</span>
+        <span>Sign in with Gmail</span>
+      </button>
+
+      <!-- Play as Guest Origami Section -->
+      <div class="origami-sheet-panel" style="width:100%;padding:10px 12px;display:flex;flex-direction:column;align-items:center;gap:6px;">
+        <button id="btn-skip-home" class="modal-btn origami-chamfer-btn" style="width:100%;padding:10px;font-size:14px;background:#2A9D8F;color:#FFFDF9;margin:0;">▶ Play as Guest</button>
+        <div style="font-size:11.5px;font-weight:700;color:#6D4C3D;text-align:center;line-height:1.35;">Play right away without logging in. Create an account anytime to save your progress!</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. GM (Game Master) Control Modal -->
+  <div id="gm-control-modal" style="position:fixed;inset:0;z-index:165;background:rgba(34,18,6,0.72);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:14px;">
+    <div class="modal-card" style="max-width:400px;width:100%;text-align:left;gap:10px;padding:18px;border-color:#FFB703;">
+      <div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
+        <div>
+          <div style="font-size:20px;font-weight:900;color:#3B2314;">★ GM Command Deck</div>
+          <div style="font-size:12px;color:#6D4C3D;font-weight:700;">Account: jcv • Full Saga Override</div>
+        </div>
+        <button id="btn-close-gm" class="round-paper-btn" title="Close GM Panel">✕</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;">
+        <button id="gm-btn-unlock-all" class="map-play-btn" style="background:#2A9D8F;padding:10px;font-size:12px;">🔓 Unlock 50 Lvls</button>
+        <button id="gm-btn-boosters" class="map-play-btn" style="background:#7209B7;padding:10px;font-size:12px;">🧰 +99 Boosters</button>
+        <button id="gm-btn-instant-win" class="map-play-btn" style="background:#FF6B35;padding:10px;font-size:12px;">🏆 Instant Win 3★</button>
+        <button id="gm-btn-add-moves" class="map-play-btn" style="background:#0284C7;padding:10px;font-size:12px;">➕ +15 Moves</button>
+      </div>
+
+      <div style="font-weight:800;font-size:12px;color:#3B2314;margin-top:4px;">WARP TO STAGE (1–10):</div>
+      <div id="gm-stage-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;width:100%;"></div>
+
+      <div style="width:100%;background:#FFF8E7;border:1.5px solid #FFB703;border-radius:10px;padding:8px 10px;font-size:11px;color:#3B2314;display:flex;justify-content:space-between;align-items:center;">
+        <span id="gm-quota-detail">Quota Guard: 0W / 0R (0 skipped)</span>
+        <button id="gm-btn-force-sync" style="background:#3B2314;color:#FFEA79;border:none;border-radius:6px;padding:4px 8px;font-family:inherit;font-weight:800;font-size:11px;cursor:pointer;">Sync Now</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const BOARD_SIZE = 7;
     const STORAGE_KEY = 'paper_craft_crush_web_v2';
@@ -1975,11 +2357,11 @@
         this.bgmStep = 0;
         this.activeVoices = 0;
         this.maxVoices = 28;
-        // Japanese Yo Pentatonic Scale (D, E, G, A, B) across octaves for unmistakable Origami identity
+        // Playful Major Pentatonic + Mixolydian Toy-Box Scale (C, D, E, G, A, Bb, C...)
         this.yoScale = [
-          293.66, 329.63, 392.00, 440.00, 493.88,
-          587.33, 659.25, 783.99, 880.00, 987.77,
-          1174.66, 1318.51, 1567.98
+          261.63, 293.66, 329.63, 392.00, 440.00, 466.16,
+          523.25, 587.33, 659.25, 783.99, 880.00, 932.33,
+          1046.50, 1174.66, 1318.51, 1567.98
         ];
       }
       ensureCtx() {
@@ -1992,7 +2374,6 @@
               this.activeVoices = 0;
               this.rebuildMasterBus();
 
-              // Pre-build 1.0s organic paper-fiber noise buffer for zero-alloc foley bursts
               const sr = this.ctx.sampleRate;
               this.noiseBuf = this.ctx.createBuffer(1, sr, sr);
               const data = this.noiseBuf.getChannelData(0);
@@ -2046,9 +2427,25 @@
       }
       startBgmLoop() {
         if (this.bgmTimer || !this.enabled) return;
-        const melodyPattern = [5, 7, 8, 7, 9, 8, 7, 5, 6, 7, 9, 10, 9, 7, 6, 5];
-        const bassPattern   = [0, -1, 2, -1, 3, -1, 2, -1, 1, -1, 3, -1, 4, -1, 0, -1];
-        const chimePattern  = [-1, 10, -1, 9, -1, 11, -1, 10, -1, 9, -1, 12, -1, 10, -1, 8];
+        // 32-step bouncy "Origami Toy-Box & Craft Carnival" swung arrangement
+        const melodyPattern = [
+          6, 8, 9, -1,  10, 9, 8, 6,
+          7, 8, 9, 11,  12, -1, 9, -1,
+          6, 7, 8, 9,   10, 12, 13, 12,
+          10, 9, 8, 7,  6, 9, 12, -1
+        ];
+        const ocarinaPattern = [
+          -1, -1, 12, -1,  -1, 13, 12, -1,
+          -1, -1, 13, 14,  15, -1, 12, -1,
+          8, -1, 10, -1,   12, -1, 15, -1,
+          13, 12, 10, 9,   8, 12, 15, -1
+        ];
+        const bassPattern = [
+          0, -1, 3, -1,   4, -1, 3, -1,
+          1, -1, 3, -1,   6, -1, 3, 1,
+          0, -1, 2, -1,   3, -1, 4, -1,
+          1, -1, 3, -1,   0, 3, 6, -1
+        ];
 
         const tick = () => {
           if (!this.enabled) {
@@ -2058,39 +2455,55 @@
           if (this.ctx && (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted')) {
             this.ctx.resume().catch(() => {});
           }
+          const s = this.bgmStep % 32;
           if (this.ctx && this.ctx.state === 'running' && this.canSpawnVoice(true)) {
             const now = this.ctx.currentTime;
             const stgMod = this.stageNumber % 5;
-            const semitones = stgMod === 1 ? 0 : stgMod === 2 ? 2 : stgMod === 3 ? -2 : stgMod === 4 ? 5 : 3;
+            const semitones = stgMod === 1 ? 0 : stgMod === 2 ? 2 : stgMod === 3 ? 5 : stgMod === 4 ? -3 : 4;
             const shift = Math.pow(2, semitones / 12);
-            const s = this.bgmStep % 16;
-            const melFreq = this.yoScale[melodyPattern[s]] * shift;
+            const melIdx = melodyPattern[s];
+            const ocaIdx = ocarinaPattern[s];
             const bassIdx = bassPattern[s];
-            const chimeIdx = chimePattern[s];
 
-            // 1. Plucked Silk Koto + Music-Box Kalimba Melody Note
-            this.triggerKotoPluck(melFreq, now, 0.052, 0.22, s % 4 === 0, true);
+            // 1. Playful Toy Marimba + Cheeky Upward Pitch Scoop on accented beats
+            if (melIdx >= 0) {
+              this.triggerKotoPluck(this.yoScale[melIdx] * shift, now, 0.056, 0.21, s % 4 === 0, true);
+            }
 
-            // 2. Warm Hollow Bamboo Bass Pluck
+            // 2. Bouncy Rubber-Band Pizzicato Bass
             if (bassIdx >= 0) {
-              this.triggerKotoPluck(this.yoScale[bassIdx] * shift * 0.5, now, 0.042, 0.25, false, true);
+              this.triggerTonePair(
+                now,
+                0.19,
+                0.048,
+                'triangle',
+                this.yoScale[bassIdx] * shift * 0.54,
+                this.yoScale[bassIdx] * shift * 0.50
+              );
             }
 
-            // 3. Sparkling Furin Wind-Chime Counter-Melody during Fever / Cascades
-            if (this.isExcited && chimeIdx >= 0) {
-              this.triggerKotoPluck(this.yoScale[chimeIdx] * shift, now + 0.12, 0.032, 0.16, false, true);
+            // 3. Whimsical Whistling Ocarina / Glockenspiel Counter-Hook
+            if (ocaIdx >= 0 && (this.isExcited || s % 4 >= 2)) {
+              this.triggerKotoPluck(this.yoScale[ocaIdx] * shift, now + 0.02, 0.036, 0.18, true, true);
             }
 
-            // 4. Soft Washi Paper-Brush Shaker on off-beats
-            if (s % 2 === 1) {
-              this.triggerFoleyBurst(now, 0.042, 2400, 3.2, 0.022, null, true);
+            // 4. Craft-Table Percussion (Cardboard Kick, Washi Snap, Paper Shaker)
+            if (s % 8 === 0 || (this.isExcited && s % 4 === 0)) {
+              this.triggerTonePair(now, 0.09, 0.05, 'sine', 145, 56);
             }
-            this.bgmStep = (this.bgmStep + 1) % 16;
+            if (s % 8 === 4) {
+              this.triggerFoleyBurst(now, 0.045, 1950, 2.2, 0.032, 920, true);
+            } else if (s % 2 === 1) {
+              this.triggerFoleyBurst(now, 0.038, 2850, 3.0, 0.020, null, true);
+            }
+            this.bgmStep = (this.bgmStep + 1) % 32;
           }
-          const intervalMs = this.isExcited ? 245 : 285;
-          this.bgmTimer = setTimeout(tick, intervalMs);
+          // Bouncy Swing Groove!
+          const baseMs = this.isExcited ? 168 : 198;
+          const swingMult = (s % 2 === 0) ? 1.15 : 0.85;
+          this.bgmTimer = setTimeout(tick, Math.round(baseMs * swingMult));
         };
-        this.bgmTimer = setTimeout(tick, 180);
+        this.bgmTimer = setTimeout(tick, 160);
       }
       stopBgmLoop() {
         if (this.bgmTimer) {
@@ -2145,14 +2558,15 @@
           osc1.type = 'triangle';
           oscTine.type = 'sine';
           if (graceBend) {
-            osc1.frequency.setValueAtTime(freq * 1.022, startTime);
-            osc1.frequency.exponentialRampToValueAtTime(freq, startTime + 0.028);
+            // Cheeky upward marimba pitch-scoop!
+            osc1.frequency.setValueAtTime(freq * 0.94, startTime);
+            osc1.frequency.exponentialRampToValueAtTime(freq, startTime + 0.026);
           } else {
             osc1.frequency.setValueAtTime(freq, startTime);
           }
-          const tineDur = duration * 0.45;
-          oscTine.frequency.setValueAtTime(freq * 2.96, startTime);
-          tineGain.gain.setValueAtTime(peakGain * 0.35, startTime);
+          const tineDur = duration * 0.48;
+          oscTine.frequency.setValueAtTime(freq * 3.98, startTime);
+          tineGain.gain.setValueAtTime(peakGain * 0.36, startTime);
           tineGain.gain.exponentialRampToValueAtTime(0.0001, startTime + tineDur);
           tineGain.gain.setValueAtTime(0, startTime + tineDur + 0.002);
 
@@ -2240,45 +2654,32 @@
         const ctx = this.ensureCtx();
         if (!ctx) return;
         const now = ctx.currentTime;
-        const idx = (this.tapIdx++ + Math.max(0, intensity - 1)) % 8;
-        const baseFreq = this.yoScale[3 + idx];
+        const idx = (this.tapIdx++ + Math.max(0, intensity - 1)) % 10;
+        const baseFreq = this.yoScale[4 + idx];
 
-        // 1. Tactile Origami Paper Fold Crease Foley (twin micro-crackle fiber impulses)
-        this.triggerFoleyBurst(now, 0.042, 1850, 2.2, 0.18, 2900);
-        this.triggerFoleyBurst(now + 0.018, 0.038, 2600, 2.5, 0.13);
-
-        // 2. Hollow Corrugated Box Wood-Cavity Knock (290Hz -> 175Hz)
-        this.triggerTonePair(now, 0.045, 0.14, 'sine', 290, 175);
-
-        // 3. Plucked Bamboo Kalimba Tine
-        this.triggerKotoPluck(baseFreq, now, 0.20, 0.16, true);
+        // 1. Tactile Origami Paper Fold Zip
+        this.triggerFoleyBurst(now, 0.042, 1950, 2.2, 0.17, 3100);
+        // 2. Cheeky "Bubble/Cork Pop" upward pitch sweep (240Hz -> 920Hz)
+        this.triggerTonePair(now, 0.044, 0.19, 'sine', 240, 920);
+        // 3. Playful Toy Kalimba + Xylophone Bell
+        this.triggerKotoPluck(baseFreq, now, 0.21, 0.17, true);
       }
       playWhoosh() {
         const ctx = this.ensureCtx();
         if (!ctx) return;
         const now = ctx.currentTime;
-        // 1. Textured construction-paper coaster sliding across corrugated cardboard + mid-swap fold snap
-        this.triggerFoleyBurst(now, 0.15, 920, 1.8, 0.22, 2450);
-        this.triggerFoleyBurst(now + 0.065, 0.035, 3100, 2.8, 0.16);
-
-        // 2. Two-note Bamboo & Koto fifth interval (D5 587.33Hz -> A5 880.0Hz)
-        this.triggerKotoPluck(587.33, now, 0.16, 0.13, false);
-        this.triggerKotoPluck(880.00, now + 0.065, 0.18, 0.14, true);
+        // Playful Slide-Whistle Zip-Up (523Hz -> 910Hz) + Crisp Paper Wing Flap
+        this.triggerFoleyBurst(now, 0.14, 1100, 1.8, 0.20, 2650);
+        this.triggerTonePair(now, 0.15, 0.18, 'sine', 523.25, 910.0, 'triangle', 1046.5, 0.09);
       }
       playInvalidShake() {
         const ctx = this.ensureCtx();
         if (!ctx) return;
         const now = ctx.currentTime;
-        // Dry crumpled-paper crinkle + hollow bamboo woodblock double-tok (G4 -> D4)
-        this.triggerFoleyBurst(now, 0.06, 1600, 1.6, 0.16);
-        this.triggerFoleyBurst(now + 0.095, 0.06, 1400, 1.6, 0.14);
-        [
-          { delay: 0, freq: 392.00 },
-          { delay: 0.095, freq: 293.66 }
-        ].forEach(({ delay, freq }) => {
-          const start = now + delay;
-          this.triggerTonePair(start, 0.085, 0.20, 'triangle', freq, freq, 'sine', freq * 2.42, 0.085);
-        });
+        // Cheeky Cartoon Rubber-Band Twang / Jaw-Harp "Boioing-Bonk!" (F4 -> B3)
+        this.triggerFoleyBurst(now, 0.06, 1600, 1.6, 0.15);
+        this.triggerTonePair(now, 0.11, 0.22, 'sawtooth', 310.0, 370.0, 'triangle', 698.46, 0.09);
+        this.triggerTonePair(now + 0.105, 0.13, 0.22, 'sawtooth', 265.0, 220.0, 'triangle', 493.88, 0.11);
       }
       playBounce(tileCount = 4, combo = 1) {
         const ctx = this.ensureCtx();
@@ -2287,60 +2688,50 @@
         const hits = Math.max(2, Math.min(6, tileCount));
         const comboBoost = Math.min(5, Math.max(0, combo - 1));
         const comboPitchMult = Math.pow(2, Math.min(Math.max(1, combo) - 1, 10) * 2 / 12);
-        const stepDelay = Math.max(0.016, 0.026 - comboBoost * 0.002);
-        // Yo Pentatonic Bamboo Marimba notes: D4, E4, G4, A4, B4, D5
-        const dropNotes = [293.66, 329.63, 392.00, 440.00, 493.88, 587.33];
+        const stepDelay = Math.max(0.015, 0.024 - comboBoost * 0.002);
+        const dropNotes = [392.00, 440.00, 523.25, 587.33, 659.25, 783.99];
 
         for (let i = 0; i < hits; i++) {
           const start = now + i * stepDelay;
           const f = dropNotes[i % dropNotes.length] * comboPitchMult;
-
-          // 1. Hollow Corrugated Cardboard Box-Lid Thump (138Hz -> 64Hz)
-          this.triggerTonePair(start, 0.065, 0.16 + comboBoost * 0.015, 'sine', 138 + comboBoost * 12, 64);
-
-          // 2. Crisp Paper-Coaster Edge Slap Foley
-          this.triggerFoleyBurst(start, 0.028, 1950 + comboBoost * 220, 2.0, 0.11 + comboBoost * 0.015);
-
-          // 3. Resonant Bamboo Marimba + Koto Tine
-          this.triggerKotoPluck(f, start, 0.18 + comboBoost * 0.015, 0.13, combo >= 2);
+          // Bouncy rubber-ball pop + Toy Xylophone staircase
+          this.triggerTonePair(start, 0.055, 0.15 + comboBoost * 0.015, 'sine', 210 + comboBoost * 15, 95);
+          this.triggerKotoPluck(f, start, 0.19 + comboBoost * 0.015, 0.14, true);
         }
       }
       playSnip() {
         const ctx = this.ensureCtx();
         if (!ctx) return;
         const now = ctx.currentTime;
-        // Twin steel scissor-blade shear friction + inharmonic tuning-fork ring
+        // Playful Barber-Scissor Double-Snip ("Snip-Snip!") + Sparkling Completion Bell
         [
-          { delay: 0, f1: 1480.0, f2: 3890.0, noiseF: 3600 },
-          { delay: 0.082, f1: 1975.5, f2: 5120.0, noiseF: 4800 }
+          { delay: 0, f1: 1520.0, f2: 3950.0, noiseF: 3600 },
+          { delay: 0.078, f1: 2080.0, f2: 5240.0, noiseF: 4800 }
         ].forEach(({ delay, f1, f2, noiseF }) => {
           const start = now + delay;
-          this.triggerFoleyBurst(start, 0.065, noiseF, 3.0, 0.25, noiseF * 1.45);
-          this.triggerTonePair(start, 0.13, 0.18, 'sine', f1, f1, 'triangle', f2, 0.13);
+          this.triggerFoleyBurst(start, 0.06, noiseF, 3.0, 0.25, noiseF * 1.45);
+          this.triggerTonePair(start, 0.12, 0.18, 'sine', f1, f1 * 1.18, 'triangle', f2, 0.11);
         });
+        this.triggerKotoPluck(1567.98, now + 0.14, 0.18, 0.18, true);
       }
       playGlue() {
         const ctx = this.ensureCtx();
         if (!ctx) return;
         const now = ctx.currentTime;
-        // Wet craft-glue uncapping squish glide (280Hz -> 820Hz) + sticky paper peel + Koto pluck
-        this.triggerTonePair(now, 0.16, 0.24, 'sine', 280.0, 820.0);
-        this.triggerFoleyBurst(now + 0.09, 0.055, 2200, 2.2, 0.16);
-        this.triggerKotoPluck(1174.66, now + 0.095, 0.20, 0.16, true);
+        // Squeezy Glue-Bottle Squirt ("Bloop-Squelch-Pop!") + Suction Cup Pop
+        this.triggerTonePair(now, 0.15, 0.24, 'sine', 250.0, 880.0, 'triangle', 520.0, 0.12);
+        this.triggerFoleyBurst(now + 0.095, 0.05, 2400, 2.2, 0.17);
+        this.triggerTonePair(now + 0.105, 0.09, 0.22, 'sine', 780.0, 1680.0);
       }
       playSmash() {
         const ctx = this.ensureCtx();
         if (!ctx) return;
         const now = ctx.currentTime;
-        // 1. Deep Hollow Corrugated Box Lid Stomp (175Hz -> 48Hz) + Box Cavity (142Hz)
-        this.triggerTonePair(now, 0.30, 0.36, 'sine', 175, 48, 'triangle', 142, 0.16);
-
-        // 2. Bursting Kraft-Paper Rip Foley
-        this.triggerFoleyBurst(now, 0.14, 1450, 1.5, 0.28, 2800);
-
-        // 3. Resonant Japanese Yo Fifth + Octave Koto Chord (D5 + A5 + D6)
-        [587.33, 880.00, 1174.66].forEach(freq => {
-          this.triggerKotoPluck(freq, now + 0.01, 0.14, 0.26, true);
+        // Cartoon Accordion-Squash + Giant Cardboard Box Boom + Toy Brass Power Chord
+        this.triggerTonePair(now, 0.32, 0.36, 'sine', 185, 50, 'triangle', 148, 0.18);
+        this.triggerFoleyBurst(now, 0.15, 1450, 1.5, 0.28, 2900);
+        [523.25, 659.25, 783.99, 1046.50].forEach(freq => {
+          this.triggerKotoPluck(freq, now + 0.01, 0.15, 0.28, true);
         });
       }
       playChord(step = 1) {
@@ -2350,14 +2741,19 @@
         const now = ctx.currentTime;
         const mult = Math.pow(2, Math.min(step - 1, 10) * 2 / 12);
 
-        // 1. Tactile Torn Washi Paper Rip Foley (staggered fiber tear impulses)
-        this.triggerFoleyBurst(now, 0.055, 1650, 2.0, 0.22, 2600);
-        this.triggerFoleyBurst(now + 0.038, 0.065, 2250, 2.2, 0.20, 3200);
+        // 1. Bubble-Wrap & Paper Confetti Pop Burst
+        this.triggerFoleyBurst(now, 0.055, 1750, 2.0, 0.22, 2900);
+        this.triggerFoleyBurst(now + 0.036, 0.06, 2400, 2.2, 0.20, 3500);
 
-        // 2. Strumming 6-String Silk Koto & Music-Box Yo-Pentatonic Arpeggio (D5, E5, G5, A5, B5, D6)
-        [587.33, 659.25, 783.99, 880.00, 987.77, 1174.66].forEach((freq, idx) => {
-          const start = now + idx * 0.032;
-          this.triggerKotoPluck(freq * mult, start, 0.18, 0.32, idx === 0 || idx === 5);
+        // 2. Playful Upward Slide-Whistle Cheer on x2+ Cascades!
+        if (step >= 2) {
+          this.triggerTonePair(now, 0.22, 0.16, 'sine', 440 * Math.min(1.6, mult), 1160 * Math.min(1.6, mult));
+        }
+
+        // 3. Ascending Toy-Marimba & Glockenspiel Arpeggio
+        [523.25, 659.25, 783.99, 880.00, 1046.50, 1174.66].forEach((freq, idx) => {
+          const start = now + idx * 0.028;
+          this.triggerKotoPluck(freq * mult, start, 0.19, 0.30, true);
         });
       }
       playFanfare() {
@@ -2365,12 +2761,12 @@
         if (!ctx) return;
         this.isExcited = true;
         const now = ctx.currentTime;
-        // Celebratory paper-popper burst + 7-note Yo Pentatonic Royal Koto Glissando
-        this.triggerFoleyBurst(now, 0.08, 2100, 1.8, 0.24, 3600);
-        [587.33, 659.25, 783.99, 880.00, 987.77, 1174.66, 1567.98].forEach((freq, idx) => {
-          const start = now + idx * 0.046;
-          const sustain = idx === 6 ? 0.50 : 0.34;
-          this.triggerKotoPluck(freq, start, 0.19, sustain, true);
+        // Joyful Origami Carnival Fanfare + Confetti Popper!
+        this.triggerFoleyBurst(now, 0.08, 2200, 1.8, 0.25, 3800);
+        [523.25, 659.25, 783.99, 1046.50, 987.77, 1174.66, 1567.98].forEach((freq, idx) => {
+          const start = now + idx * 0.044;
+          const sustain = idx === 6 ? 0.52 : 0.34;
+          this.triggerKotoPluck(freq, start, 0.20, sustain, true);
         });
       }
     }
@@ -2387,11 +2783,13 @@
     const dioramaCanvas = document.getElementById('diorama-confetti-canvas');
     const dctx = dioramaCanvas.getContext('2d');
     let dpr = 1;
+    let cachedBoardCellPx = 48;
 
     function syncResponsiveLayout() {
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const vw = window.visualViewport ? window.visualViewport.width : window.innerWidth;
+      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      // Cap canvas backing store DPR at 1.35x so high-DPI mobile GPUs stay cool and locked at 60fps
+      dpr = Math.min(window.devicePixelRatio || 1, 1.35);
       canvas.width = Math.floor(vw * dpr);
       canvas.height = Math.floor(vh * dpr);
       cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -2411,15 +2809,19 @@
       }
 
       const stageRect = boardStageAreaEl.getBoundingClientRect();
-      const availW = Math.max(220, stageRect.width - 4);
-      const availH = Math.max(220, stageRect.height - 4);
-      const maxCap = isLandscapeMode ? 460 : 440;
+      const availW = Math.max(180, stageRect.width - 4);
+      const availH = Math.max(180, stageRect.height - 4);
+      const maxCap = isLandscapeMode ? 460 : (vw >= 768 && vh >= 768 ? 480 : 440);
       const side = Math.floor(Math.min(availW, availH, maxCap));
+      cachedBoardCellPx = side / BOARD_SIZE;
       document.documentElement.style.setProperty('--board-px', `${side}px`);
     }
 
-    window.addEventListener('resize', syncResponsiveLayout);
-    window.addEventListener('orientationchange', () => setTimeout(syncResponsiveLayout, 80));
+    window.addEventListener('resize', syncResponsiveLayout, { passive: true });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', syncResponsiveLayout, { passive: true });
+    }
+    window.addEventListener('orientationchange', () => setTimeout(syncResponsiveLayout, 80), { passive: true });
 
     /* Persistent 49-Cell DOM Pool for Zero-Reflow 60fps Rendering */
     const boardGridEl = document.getElementById('board-grid');
@@ -2477,7 +2879,9 @@
             specialBadgeDiv,
             lockOverlayDiv,
             renderedPieceId: null,
-            renderedSpecial: 'NONE'
+            renderedSpecial: 'NONE',
+            isResting: true,
+            lastZClass: ''
           };
         }
       }
@@ -2690,7 +3094,7 @@
       ctx.restore();
     }
 
-    function spawnConfettiAtCell(r, c, piece, count = 16) {
+    function spawnConfettiAtCell(r, c, piece, count = 8) {
       const rect = boardGridEl.getBoundingClientRect();
       const cx = rect.left + ((c + 0.5) / BOARD_SIZE) * rect.width;
       const cy = rect.top + ((r + 0.5) / BOARD_SIZE) * rect.height;
@@ -2720,8 +3124,8 @@
           isLanded: false
         });
       }
-      if (scraps.length > 260) {
-        scraps.splice(0, scraps.length - 260);
+      if (scraps.length > 96) {
+        scraps.splice(0, scraps.length - 96);
       }
     }
 
@@ -2750,24 +3154,43 @@
     }
 
     const cardboardLidEl = document.getElementById('cardboard-lid');
+    let hadScrapsLastFrame = false;
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (audio.ctx && audio.ctx.state === 'running') {
+          try { audio.ctx.suspend(); } catch (_) {}
+        }
+      } else {
+        lastFrameTime = performance.now();
+        if (audio.enabled && audio.ctx && audio.ctx.state === 'suspended') {
+          try { audio.ctx.resume(); } catch (_) {}
+        }
+      }
+    });
 
     function masterFrameLoop(now) {
+      if (document.hidden) {
+        requestAnimationFrame(masterFrameLoop);
+        return;
+      }
       const dtMs = Math.min(40, Math.max(4, now - lastFrameTime));
       const dtScale = dtMs / 16.6667;
       lastFrameTime = now;
       const vw = window.innerWidth;
       const vh = window.innerHeight;
 
-      // 1. Update Depth-Layered Confetti Particles & Render across Backdrop + Foreground Canvases
-      cctx.clearRect(0, 0, vw, vh);
-      dctx.clearRect(0, 0, vw, vh);
-
+      // 1. Update Depth-Layered Confetti Particles (only clear canvases when particles exist or just finished)
       if (scraps.length > 0) {
+        hadScrapsLastFrame = true;
+        cctx.clearRect(0, 0, vw, vh);
+        dctx.clearRect(0, 0, vw, vh);
+
         for (let i = scraps.length - 1; i >= 0; i--) {
           const s = scraps[i];
           if (s.isLanded) {
             s.y = computeDioramaLandingY(s.x, s.layer.id, s.landingBandOffset, vw, vh);
-            s.alpha -= 0.0062 * dtScale;
+            s.alpha -= 0.015 * dtScale;
             if (s.alpha <= 0.01) {
               scraps.splice(i, 1);
             }
@@ -2780,7 +3203,7 @@
             s.y += s.vy * dtScale;
             s.rot += s.vRot * dtScale;
             s.depthScale += (s.layer.targetScale - s.depthScale) * Math.min(1, 0.08 * dtScale);
-            s.alpha -= 0.014 * dtScale;
+            s.alpha -= 0.016 * dtScale;
 
             const contourY = computeDioramaLandingY(s.x, s.layer.id, s.landingBandOffset, vw, vh);
             if (s.y >= contourY && s.vy > 0) {
@@ -2798,7 +3221,7 @@
                 s.vRot = 0;
                 s.depthScale = s.layer.targetScale;
                 s.isLanded = true;
-                s.alpha = Math.max(s.alpha, 0.82);
+                s.alpha = Math.max(s.alpha, 0.75);
               }
             }
 
@@ -2820,6 +3243,10 @@
             }
           }
         }
+      } else if (hadScrapsLastFrame) {
+        hadScrapsLastFrame = false;
+        cctx.clearRect(0, 0, vw, vh);
+        dctx.clearRect(0, 0, vw, vh);
       }
 
       // 2. Update Board Recoil / Punch (Rock-steady anchored position, subtle 0.8% scale breath only)
@@ -2836,16 +3263,42 @@
         }
       }
 
-      // 3. Update 60fps Block Animations (Calm, Zero-Warp Planar Origami Motion)
-      const idleWave = Math.sin(now * 0.0022);
-      const cellPx = boardGridEl.clientWidth / BOARD_SIZE;
+      // 3. Update 60fps Block Animations (Dirty-checked: 0 DOM writes on resting cells!)
+      const hasAnyAnim = activeTileAnims.size > 0;
+      const hasSelOrHint = Boolean(state.selected || state.glueFirst || state.hintPair || activeDragPreview);
+      const idleWave = hasSelOrHint ? Math.sin(now * 0.0022) : 0;
+      const cellPx = cachedBoardCellPx;
 
       for (let r = 0; r < BOARD_SIZE; r++) {
         for (let c = 0; c < BOARD_SIZE; c++) {
           const slot = cellPool[r][c];
           const key = `${r},${c}`;
-          const anim = activeTileAnims.get(key);
+          const anim = hasAnyAnim ? activeTileAnims.get(key) : undefined;
+          const isSel = (state.selected && state.selected.r === r && state.selected.c === c) ||
+                        (state.glueFirst && state.glueFirst.r === r && state.glueFirst.c === c);
+          let partner = null;
+          if (!anim && state.hintPair) {
+            const [h0, h1] = state.hintPair;
+            if (h0.r === r && h0.c === c) partner = h1;
+            else if (h1.r === r && h1.c === c) partner = h0;
+          }
+          const isDragged = Boolean(!anim && activeDragPreview && activeDragPreview.r === r && activeDragPreview.c === c && cellPx > 0);
 
+          if (!anim && !isSel && !partner && !isDragged) {
+            if (!slot.isResting) {
+              slot.isResting = true;
+              if (slot.lastZClass) {
+                slot.cell.classList.remove('moving', 'moving-top');
+                slot.lastZClass = '';
+              }
+              slot.streakDiv.style.opacity = '0';
+              slot.pieceDiv.style.opacity = '1';
+              slot.pieceDiv.style.transform = 'translate3d(0%, 0%, 0) scale3d(1, 1, 1) rotateZ(0deg)';
+            }
+            continue;
+          }
+
+          slot.isResting = false;
           let tx = 0, ty = 0;
           let sx = 1, sy = 1;
           let rz = 0;
@@ -2946,31 +3399,22 @@
             }
           }
 
-          // Calm Idle Selected Lift, Gentle Hint Nudge, & Planar Finger Drag Follow
-          const isSel = (state.selected && state.selected.r === r && state.selected.c === c) ||
-                        (state.glueFirst && state.glueFirst.r === r && state.glueFirst.c === c);
           if (!anim && isSel) {
             const sc = 1.09 + idleWave * 0.018;
             sx = sc;
             sy = sc;
           }
 
-          if (!anim && state.hintPair) {
-            const [h0, h1] = state.hintPair;
-            let partner = null;
-            if (h0.r === r && h0.c === c) partner = h1;
-            else if (h1.r === r && h1.c === c) partner = h0;
-            if (partner) {
-              const nudge = (idleWave + 1) * 0.5;
-              tx += (partner.c - c) * nudge * 9;
-              ty += (partner.r - r) * nudge * 9;
-              const sc = 1.04 + idleWave * 0.02;
-              sx = sc;
-              sy = sc;
-            }
+          if (partner) {
+            const nudge = (idleWave + 1) * 0.5;
+            tx += (partner.c - c) * nudge * 9;
+            ty += (partner.r - r) * nudge * 9;
+            const sc = 1.04 + idleWave * 0.02;
+            sx = sc;
+            sy = sc;
           }
 
-          if (!anim && activeDragPreview && activeDragPreview.r === r && activeDragPreview.c === c && cellPx > 0) {
+          if (isDragged) {
             const maxDragPx = cellPx * 0.24;
             const clampX = Math.max(-maxDragPx, Math.min(maxDragPx, activeDragPreview.dxPx * 0.40));
             const clampY = Math.max(-maxDragPx, Math.min(maxDragPx, activeDragPreview.dyPx * 0.40));
@@ -2982,8 +3426,11 @@
             zClass = 'moving-top';
           }
 
-          slot.cell.classList.toggle('moving', zClass === 'moving');
-          slot.cell.classList.toggle('moving-top', zClass === 'moving-top');
+          if (slot.lastZClass !== zClass) {
+            slot.cell.classList.toggle('moving', zClass === 'moving');
+            slot.cell.classList.toggle('moving-top', zClass === 'moving-top');
+            slot.lastZClass = zClass;
+          }
 
           if (streakOpacity > 0.01) {
             slot.streakDiv.style.opacity = streakOpacity.toFixed(3);
@@ -3002,27 +3449,32 @@
       requestAnimationFrame(masterFrameLoop);
     }
 
-    /* Tilt Parallax & Global Lighting Overlay (Board & HUD anchored rock-steady) */
-    const lightingEl = document.getElementById('lighting-overlay');
+    /* Throttled & Deadbanded Tilt Parallax (Zero Full-Screen Gradient Repaint) */
     const boardWrapperEl = document.getElementById('board-wrapper');
+    const cloudLayerEl = document.getElementById('layer-clouds');
+    const sunLayerEl = document.getElementById('layer-sun');
+    const farHillLayerEl = document.getElementById('layer-far-hill');
+    const nearHillLayerEl = document.getElementById('layer-near-hill');
+    const tableLayerEl = document.getElementById('layer-table');
+    let lastTiltUpdateMs = 0;
 
-    function applyTiltLighting(tx, ty) {
-      const clampedX = Math.max(-1, Math.min(1, tx));
-      const clampedY = Math.max(-1, Math.min(1, ty));
+    function applyTiltLighting(tx, ty, force = false) {
+      const nowMs = performance.now();
+      if (!force && nowMs - lastTiltUpdateMs < 42) return;
+      const clampedX = Math.round(Math.max(-1, Math.min(1, tx)) * 40) / 40;
+      const clampedY = Math.round(Math.max(-1, Math.min(1, ty)) * 40) / 40;
+      if (!force && Math.abs(clampedX - currentTiltX) < 0.025 && Math.abs(clampedY - currentTiltY) < 0.025) {
+        return;
+      }
+      lastTiltUpdateMs = nowMs;
       currentTiltX = clampedX;
       currentTiltY = clampedY;
-      const lx = 50 + clampedX * 14;
-      const ly = 38 + clampedY * 12;
-      lightingEl.style.background = `
-        radial-gradient(circle at ${lx}% ${ly}%, rgba(255,253,245,0.12) 0%, rgba(255,248,225,0.04) 48%, transparent 78%),
-        linear-gradient(${135 + clampedX * 12}deg, rgba(255,255,255,0.06) 0%, transparent 55%, rgba(43,24,10,0.06) 100%)
-      `;
       boardWrapperEl.style.transform = 'translate3d(0, 0, 0)';
-      document.getElementById('layer-clouds').setAttribute('transform', `translate(${clampedX * 3}, ${clampedY * 2})`);
-      document.getElementById('layer-sun').setAttribute('transform', `translate(${clampedX * 4.5}, ${clampedY * 3})`);
-      document.getElementById('layer-far-hill').setAttribute('transform', `translate(${clampedX * 6}, ${clampedY * 4})`);
-      document.getElementById('layer-near-hill').setAttribute('transform', `translate(${clampedX * 8}, ${clampedY * 5})`);
-      document.getElementById('layer-table').setAttribute('transform', `translate(${clampedX * 10}, ${clampedY * 6})`);
+      cloudLayerEl.setAttribute('transform', `translate(${(clampedX * 3).toFixed(2)}, ${(clampedY * 2).toFixed(2)})`);
+      sunLayerEl.setAttribute('transform', `translate(${(clampedX * 4.5).toFixed(2)}, ${(clampedY * 3).toFixed(2)})`);
+      farHillLayerEl.setAttribute('transform', `translate(${(clampedX * 6).toFixed(2)}, ${(clampedY * 4).toFixed(2)})`);
+      nearHillLayerEl.setAttribute('transform', `translate(${(clampedX * 8).toFixed(2)}, ${(clampedY * 5).toFixed(2)})`);
+      tableLayerEl.setAttribute('transform', `translate(${(clampedX * 10).toFixed(2)}, ${(clampedY * 6).toFixed(2)})`);
     }
     window.addEventListener('pointermove', e => {
       const tx = (e.clientX / Math.max(1, window.innerWidth) - 0.5) * 0.35;
@@ -3034,7 +3486,7 @@
         applyTiltLighting(e.gamma / 75, (e.beta - 35) / 75);
       }
     }, { passive: true });
-    applyTiltLighting(0, 0);
+    applyTiltLighting(0, 0, true);
 
     function spawnFloatingPopup(r, c, text, isBig = false, combo = 1) {
       const el = document.createElement('div');
@@ -3372,26 +3824,35 @@
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
-          state.level = Math.max(1, Math.min(TOTAL_LEVELS, parsed.level || 1));
-          state.highestLevel = Math.max(state.level, Math.min(TOTAL_LEVELS, parsed.highestLevel || state.level));
-          state.levelStars = parsed.levelStars || {};
-          state.highScore = parsed.highScore || 0;
-          if (parsed.boosters) state.boosters = parsed.boosters;
           if (typeof parsed.sound === 'boolean') audio.enabled = parsed.sound;
+          // Only restore saved progress if logged into an account
+          if (typeof currentSession !== 'undefined' && currentSession.loggedIn) {
+            state.level = Math.max(1, Math.min(TOTAL_LEVELS, parsed.level || 1));
+            state.highestLevel = Math.max(state.level, Math.min(TOTAL_LEVELS, parsed.highestLevel || state.level));
+            state.levelStars = parsed.levelStars || {};
+            state.highScore = parsed.highScore || 0;
+            if (parsed.boosters) state.boosters = parsed.boosters;
+          }
         }
       } catch (_) {}
     }
 
     function saveProgress() {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({
-          level: state.level,
-          highestLevel: state.highestLevel,
-          levelStars: state.levelStars,
-          highScore: state.highScore,
-          boosters: state.boosters,
-          sound: audio.enabled
-        }));
+        // Only save level/score/booster progress when the player has created an account or logged in
+        if (typeof currentSession !== 'undefined' && currentSession.loggedIn) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            level: state.level,
+            highestLevel: state.highestLevel,
+            levelStars: state.levelStars,
+            highScore: state.highScore,
+            boosters: state.boosters,
+            sound: audio.enabled
+          }));
+          if (typeof scheduleWebAutoCloudSync === 'function') {
+            scheduleWebAutoCloudSync(false);
+          }
+        }
       } catch (_) {}
     }
 
@@ -3716,8 +4177,325 @@
       scheduleIdleHint();
     }
 
+    let activeDioramaStageNumber = 0;
+
+    function buildBearAndFoxNearProps(extraLeftSvg = '', extraRightSvg = '') {
+      return `
+        <g transform="translate(110, 710)">
+          <circle cx="-36" cy="-35" r="20" fill="#7F4F24" />
+          <circle cx="36" cy="-35" r="20" fill="#7F4F24" />
+          <circle cx="-36" cy="-35" r="10" fill="#E6CCB2" />
+          <circle cx="36" cy="-35" r="10" fill="#E6CCB2" />
+          <polygon points="-48,-14 0,-44 48,-14 38,36 -38,36" fill="#D4A373" />
+          <polygon points="0,-6 20,25 -20,25" fill="#E6CCB2" />
+          <circle cx="0" cy="4" r="6" fill="#3B2314" />
+          <circle cx="-20" cy="-8" r="4.5" fill="#3B2314" />
+          <circle cx="20" cy="-8" r="4.5" fill="#3B2314" />
+          ${extraLeftSvg}
+        </g>
+        <g transform="translate(890, 700)">
+          <polygon points="14,28 62,-10 45,-50 10,-18" fill="#E0531F" />
+          <polygon points="-30,-42 -8,-24 14,-42 23,25 -36,25" fill="#FF6B35" />
+          <circle cx="-14" cy="-6" r="4.5" fill="#3B2314" />
+          ${extraRightSvg}
+        </g>
+      `;
+    }
+
+    const DIORAMA_STAGE_THEMES = {
+      1: {
+        sky: '#BDE0FE',
+        cloud: '#E2F1FF',
+        farHill: '#74C69D',
+        nearHill: '#52B788',
+        table: '#F3E5D0',
+        sunSvg: `
+          <circle cx="854" cy="136" r="72" fill="rgba(0,0,0,0.14)" />
+          <circle cx="850" cy="130" r="72" fill="#FFEA79" />
+          <circle cx="850" cy="130" r="52" fill="#FFB703" />
+        `,
+        farPropsSvg: `
+          <rect x="100" y="555" width="22" height="45" fill="#7F4F24" />
+          <polygon points="111,465 62,565 111,565" fill="#2EC4B6" />
+          <polygon points="111,465 160,565 111,565" fill="#0F9F90" />
+          <rect x="878" y="545" width="24" height="48" fill="#7F4F24" />
+          <polygon points="890,445 838,555 890,555" fill="#2EC4B6" />
+          <polygon points="890,445 942,555 890,555" fill="#0F9F90" />
+        `,
+        nearPropsSvg: buildBearAndFoxNearProps()
+      },
+      2: {
+        sky: '#FFD6E0',
+        cloud: '#FFF0F5',
+        farHill: '#80ED99',
+        nearHill: '#57CC99',
+        table: '#F9EAE1',
+        sunSvg: `
+          <circle cx="854" cy="136" r="72" fill="rgba(0,0,0,0.14)" />
+          <circle cx="850" cy="130" r="72" fill="#FFFDF7" />
+          <circle cx="850" cy="130" r="52" fill="#E63946" />
+          <line x1="850" y1="78" x2="850" y2="182" stroke="#FFFDF7" stroke-width="12" />
+          <line x1="798" y1="130" x2="902" y2="130" stroke="#FFFDF7" stroke-width="12" />
+          <circle cx="850" cy="130" r="16" fill="#FFFDF7" />
+        `,
+        farPropsSvg: `
+          <rect x="104" y="520" width="14" height="78" rx="4" fill="#FFFDF7" />
+          <circle cx="111" cy="505" r="42" fill="#FFFDF7" />
+          <circle cx="111" cy="505" r="30" fill="#E63946" />
+          <circle cx="111" cy="505" r="17" fill="#FFFDF7" />
+          <rect x="883" y="510" width="14" height="82" rx="4" fill="#FFFDF7" />
+          <circle cx="890" cy="495" r="45" fill="#FFFDF7" />
+          <circle cx="890" cy="495" r="32" fill="#E63946" />
+          <circle cx="890" cy="495" r="18" fill="#FFFDF7" />
+        `,
+        nearPropsSvg: buildBearAndFoxNearProps(
+          `<circle cx="0" cy="-54" r="16" fill="#FF70A6"/><circle cx="0" cy="-70" r="7" fill="#E63946"/>`,
+          `<circle cx="65" cy="10" r="18" fill="#FFFDF7" stroke="#E63946" stroke-width="6"/>`
+        )
+      },
+      3: {
+        sky: '#FDE4CF',
+        cloud: '#FFF5EB',
+        farHill: '#E09F67',
+        nearHill: '#C67D4E',
+        table: '#F4E2C6',
+        sunSvg: `
+          <circle cx="854" cy="136" r="72" fill="rgba(0,0,0,0.14)" />
+          <circle cx="850" cy="130" r="72" fill="#FFEA79" />
+          <polygon points="850,68 866,110 912,110 874,136 888,180 850,154 812,180 826,136 788,110 834,110" fill="#D97706" />
+        `,
+        farPropsSvg: `
+          <polygon points="55,595 82,495 142,495 168,595" fill="#B45309" />
+          <polygon points="112,455 120,475 142,475 124,487 130,508 112,495 94,508 100,487 82,475 104,475" fill="#FFB703" />
+          <polygon points="832,585 860,480 922,480 948,585" fill="#92400E" />
+          <polygon points="890,440 898,460 920,460 902,472 908,493 890,480 872,493 878,472 860,460 882,460" fill="#FFB703" />
+        `,
+        nearPropsSvg: buildBearAndFoxNearProps(
+          `<polygon points="78,-22 85,-6 102,-6 88,4 93,20 78,10 63,20 68,4 54,-6 71,-6" fill="#FFB703" />`,
+          ''
+        )
+      },
+      4: {
+        sky: '#C7D2FE',
+        cloud: '#E0E7FF',
+        farHill: '#64B5F6',
+        nearHill: '#26A69A',
+        table: '#EBF3F5',
+        sunSvg: `
+          <circle cx="854" cy="136" r="72" fill="rgba(0,0,0,0.14)" />
+          <circle cx="850" cy="130" r="70" fill="#FEF08A" />
+          <circle cx="872" cy="116" r="46" fill="#C7D2FE" />
+          <polygon points="790,90 796,105 812,105 799,114 804,130 790,120 776,130 781,114 768,105 784,105" fill="#FDE047" />
+        `,
+        farPropsSvg: `
+          <rect x="100" y="555" width="22" height="45" fill="#5C3A21" />
+          <polygon points="111,465 62,565 111,565" fill="#0096C7" />
+          <polygon points="111,465 160,565 111,565" fill="#023E8A" />
+          <rect x="878" y="545" width="24" height="48" fill="#5C3A21" />
+          <polygon points="890,445 838,555 890,555" fill="#0096C7" />
+          <polygon points="890,445 942,555 890,555" fill="#023E8A" />
+        `,
+        nearPropsSvg: buildBearAndFoxNearProps(
+          `<polygon points="70,12 135,12 118,32 86,32" fill="#0096C7"/><polygon points="102,-24 126,12 82,12" fill="#FFFDF7"/>`,
+          ''
+        )
+      },
+      5: {
+        sky: '#FBCFE8',
+        cloud: '#FCE7F3',
+        farHill: '#86EFAC',
+        nearHill: '#4ADE80',
+        table: '#FDF2F8',
+        sunSvg: `
+          <circle cx="854" cy="136" r="72" fill="rgba(0,0,0,0.14)" />
+          <circle cx="850" cy="130" r="72" fill="#FDE68A" />
+          <circle cx="850" cy="130" r="50" fill="#F472B6" />
+        `,
+        farPropsSvg: `
+          <rect x="100" y="555" width="22" height="45" fill="#7F4F24" />
+          <polygon points="111,460 58,565 111,565" fill="#F472B6" />
+          <polygon points="111,460 164,565 111,565" fill="#DB2777" />
+          <rect x="878" y="545" width="24" height="48" fill="#7F4F24" />
+          <polygon points="890,440 834,555 890,555" fill="#F472B6" />
+          <polygon points="890,440 946,555 890,555" fill="#DB2777" />
+        `,
+        nearPropsSvg: buildBearAndFoxNearProps(
+          '',
+          `<circle cx="-8" cy="14" r="10" fill="#EC4899"/>`
+        )
+      },
+      6: {
+        sky: '#A5F3FC',
+        cloud: '#ECFEFF',
+        farHill: '#38BDF8',
+        nearHill: '#0284C7',
+        table: '#F5EBE0',
+        sunSvg: `
+          <circle cx="854" cy="136" r="72" fill="rgba(0,0,0,0.14)" />
+          <circle cx="850" cy="130" r="72" fill="#FEF08A" />
+          <circle cx="850" cy="130" r="52" fill="#0284C7" />
+          <circle cx="850" cy="130" r="28" fill="#F59E0B" />
+        `,
+        farPropsSvg: `
+          <rect x="100" y="555" width="22" height="45" fill="#7F4F24" />
+          <polygon points="111,465 62,565 111,565" fill="#0EA5E9" />
+          <polygon points="111,465 160,565 111,565" fill="#0369A1" />
+          <polygon points="864,585 876,455 906,455 918,585" fill="#FFFDF7" />
+          <rect x="871" y="495" width="40" height="28" fill="#E63946" />
+          <circle cx="891" cy="442" r="16" fill="#FFB703" />
+        `,
+        nearPropsSvg: buildBearAndFoxNearProps(
+          `<polygon points="70,12 135,12 118,32 86,32" fill="#FFFDF7"/><polygon points="102,-24 126,12 82,12" fill="#E63946"/>`,
+          ''
+        )
+      },
+      7: {
+        sky: '#F5D0FE',
+        cloud: '#FAE8FF',
+        farHill: '#F9A8D4',
+        nearHill: '#EC4899',
+        table: '#FFF1F2',
+        sunSvg: `
+          <circle cx="854" cy="136" r="72" fill="rgba(0,0,0,0.14)" />
+          <circle cx="850" cy="130" r="72" fill="#FDE047" />
+          <circle cx="850" cy="130" r="50" fill="#FF70A6" />
+          <circle cx="850" cy="76" r="14" fill="#E11D48" />
+        `,
+        farPropsSvg: `
+          <polygon points="76,545 146,545 134,595 88,595" fill="#FFB703" />
+          <circle cx="111" cy="528" r="38" fill="#FF70A6" />
+          <circle cx="111" cy="488" r="12" fill="#E63946" />
+          <polygon points="854,535 926,535 914,588 866,588" fill="#FFB703" />
+          <circle cx="890" cy="518" r="40" fill="#FFFDF7" />
+          <circle cx="890" cy="476" r="13" fill="#E63946" />
+        `,
+        nearPropsSvg: buildBearAndFoxNearProps(
+          `<circle cx="0" cy="-54" r="16" fill="#FF70A6"/><circle cx="0" cy="-70" r="7" fill="#E63946"/>`,
+          `<polygon points="-85,5 -45,5 -52,32 -78,32" fill="#FFB703"/><circle cx="-65" cy="-4" r="18" fill="#FF70A6"/>`
+        )
+      },
+      8: {
+        sky: '#DDD6FE',
+        cloud: '#EDE9FE',
+        farHill: '#A78BFA',
+        nearHill: '#7C3AED',
+        table: '#F3E8FF',
+        sunSvg: `
+          <circle cx="854" cy="136" r="72" fill="rgba(0,0,0,0.14)" />
+          <circle cx="850" cy="130" r="72" fill="#FDE68A" />
+          <circle cx="850" cy="130" r="50" fill="#8338EC" />
+          <circle cx="835" cy="115" r="6" fill="#FFFDF7" />
+          <circle cx="865" cy="115" r="6" fill="#FFFDF7" />
+          <circle cx="835" cy="145" r="6" fill="#FFFDF7" />
+          <circle cx="865" cy="145" r="6" fill="#FFFDF7" />
+        `,
+        farPropsSvg: `
+          <rect x="84" y="495" width="54" height="82" fill="#8338EC" />
+          <rect x="74" y="482" width="74" height="14" fill="#7F4F24" />
+          <rect x="74" y="575" width="74" height="14" fill="#7F4F24" />
+          <rect x="862" y="485" width="56" height="85" fill="#EC4899" />
+          <rect x="852" y="472" width="76" height="14" fill="#7F4F24" />
+          <rect x="852" y="568" width="76" height="14" fill="#7F4F24" />
+        `,
+        nearPropsSvg: buildBearAndFoxNearProps(
+          '',
+          `<circle cx="-8" cy="14" r="11" fill="#8338EC"/>`
+        )
+      },
+      9: {
+        sky: '#FED7AA',
+        cloud: '#FFEDD5',
+        farHill: '#FBBF24',
+        nearHill: '#D97706',
+        table: '#FEF3C7',
+        sunSvg: `
+          <circle cx="854" cy="136" r="72" fill="rgba(0,0,0,0.14)" />
+          <circle cx="850" cy="130" r="72" fill="#FEF08A" />
+          <polygon points="850,62 872,112 918,130 872,148 850,198 828,148 782,130 828,112" fill="#FF6B35" />
+          <circle cx="850" cy="130" r="22" fill="#0096C7" />
+        `,
+        farPropsSvg: `
+          <rect x="100" y="555" width="22" height="45" fill="#7F4F24" />
+          <polygon points="111,465 62,565 111,565" fill="#E63946" />
+          <polygon points="111,465 160,565 111,565" fill="#0096C7" />
+          <rect x="878" y="545" width="24" height="48" fill="#7F4F24" />
+          <polygon points="890,445 838,555 890,555" fill="#FFB703" />
+          <polygon points="890,445 942,555 890,555" fill="#8338EC" />
+        `,
+        nearPropsSvg: buildBearAndFoxNearProps(
+          `<polygon points="78,-22 85,-6 102,-6 88,4 93,20 78,10 63,20 68,4 54,-6 71,-6" fill="#FFB703" />`,
+          ''
+        )
+      },
+      10: {
+        sky: '#FECDD3',
+        cloud: '#FFE4E6',
+        farHill: '#34D399',
+        nearHill: '#059669',
+        table: '#FEF9C3',
+        sunSvg: `
+          <circle cx="854" cy="136" r="72" fill="rgba(0,0,0,0.14)" />
+          <circle cx="850" cy="130" r="72" fill="#FDE047" />
+          <polygon points="850,65 868,110 915,110 876,138 890,184 850,156 810,184 824,138 785,110 832,110" fill="#E11D48" />
+          <circle cx="850" cy="130" r="25" fill="#FFB703" />
+        `,
+        farPropsSvg: `
+          <rect x="82" y="490" width="58" height="105" fill="#FFFDF7" />
+          <polygon points="111,435 68,492 154,492" fill="#E11D48" />
+          <circle cx="111" cy="430" r="10" fill="#FFB703" />
+          <rect x="860" y="480" width="60" height="108" fill="#FFFDF7" />
+          <polygon points="890,425 846,482 934,482" fill="#E11D48" />
+          <circle cx="890" cy="420" r="10" fill="#FFB703" />
+        `,
+        nearPropsSvg: buildBearAndFoxNearProps(
+          `<polygon points="-24,-44 -18,-72 0,-54 18,-72 24,-44" fill="#FFB703" />`,
+          `<polygon points="-22,-42 -15,-64 0,-50 15,-64 22,-42" fill="#FFB703" />`
+        )
+      }
+    };
+
+    function updateDioramaBackdropForStage(stageNum) {
+      const normalized = Math.max(1, Math.min(10, Number(stageNum) || 1));
+      if (activeDioramaStageNumber === normalized) return;
+      activeDioramaStageNumber = normalized;
+      const theme = DIORAMA_STAGE_THEMES[normalized] || DIORAMA_STAGE_THEMES[1];
+      const svgEl = document.getElementById('diorama-backdrop');
+      if (svgEl) svgEl.setAttribute('data-stage', String(normalized));
+      const skyEl = document.getElementById('diorama-sky-rect');
+      if (skyEl) skyEl.setAttribute('fill', theme.sky);
+      const cloudEl = document.getElementById('diorama-cloud-path');
+      if (cloudEl) cloudEl.setAttribute('fill', theme.cloud);
+      const sunGroup = document.getElementById('layer-sun');
+      if (sunGroup) {
+        const circlingSkyRays = `
+          <g class="origami-sky-rays-cw">
+            <polygon points="834,64 850,18 850,64" fill="#FFEA79"/><polygon points="850,64 850,18 866,64" fill="#FFB703"/>
+            <polygon points="834,196 850,242 850,196" fill="#FFEA79"/><polygon points="850,196 850,242 866,196" fill="#FFB703"/>
+            <polygon points="784,114 738,130 784,130" fill="#FFEA79"/><polygon points="784,130 738,130 784,146" fill="#FFB703"/>
+            <polygon points="916,114 962,130 916,130" fill="#FFEA79"/><polygon points="916,130 962,130 916,146" fill="#FFB703"/>
+            <polygon points="795,75 768,48 808,65" fill="#FFEA79"/><polygon points="808,65 768,48 795,88" fill="#FFB703"/>
+            <polygon points="905,75 932,48 892,65" fill="#FFEA79"/><polygon points="892,65 932,48 905,88" fill="#FFB703"/>
+            <polygon points="795,185 768,212 808,195" fill="#FFEA79"/><polygon points="808,195 768,212 795,172" fill="#FFB703"/>
+            <polygon points="905,185 932,212 892,195" fill="#FFEA79"/><polygon points="892,195 932,212 905,172" fill="#FFB703"/>
+          </g>
+        `;
+        sunGroup.innerHTML = circlingSkyRays + theme.sunSvg;
+      }
+      const farHillPath = document.getElementById('diorama-far-hill-path');
+      if (farHillPath) farHillPath.setAttribute('fill', theme.farHill);
+      const farPropsGroup = document.getElementById('diorama-far-props');
+      if (farPropsGroup) farPropsGroup.innerHTML = theme.farPropsSvg;
+      const nearHillPath = document.getElementById('diorama-near-hill-path');
+      if (nearHillPath) nearHillPath.setAttribute('fill', theme.nearHill);
+      const nearPropsGroup = document.getElementById('diorama-near-props');
+      if (nearPropsGroup) nearPropsGroup.innerHTML = theme.nearPropsSvg;
+      const tablePath = document.getElementById('diorama-table-path');
+      if (tablePath) tablePath.setAttribute('fill', theme.table);
+    }
+
     function renderAll(motionMap = null) {
       const stg = getStageInfo(state.level);
+      updateDioramaBackdropForStage(stg.stageNumber);
       document.getElementById('stage-tape').textContent = `Stage ${stg.stageNumber}`;
       document.getElementById('level-tape').textContent = `Torn Level ${state.level}`;
       document.getElementById('score-val').textContent = state.score;
@@ -3731,14 +4509,19 @@
       const feverFill = document.getElementById('fever-fill');
       const feverLabel = document.getElementById('fever-label');
       const isFever = state.feverMoves > 0;
+      const isNearFull = !isFever && state.feverCharge >= 0.72;
       feverWrap.classList.toggle('fever-active', isFever);
+      feverWrap.classList.toggle('fever-near-full', isNearFull);
       cardboardLidEl.classList.toggle('fever', isFever);
       feverFill.style.width = `${Math.max(6, Math.min(100, isFever ? 100 : state.feverCharge * 100))}%`;
+      const starsPips = isFever ? '★'.repeat(Math.min(5, Math.max(1, state.feverMoves))) : '';
       feverLabel.textContent = isFever
-        ? `★ ORIGAMI FEVER 2x SCORE! (${state.feverMoves} MOVES) ★`
-        : state.streak >= 2
-          ? `FEVER METER • HOT STREAK x${state.streak}!`
-          : (state.mechanicLabel ? state.mechanicLabel.toUpperCase() : 'MATCH 4+ TO CRAFT PAPER CUTTERS!');
+        ? `${starsPips} ORIGAMI FEVER 2x SCORE! (${state.feverMoves} MOVES) ${starsPips}`
+        : isNearFull
+          ? `⚡ ALMOST FEVER! (${Math.round(state.feverCharge * 100)}%) • ${state.mechanicLabel ? state.mechanicLabel.toUpperCase() : 'KEEP MATCHING!'}`
+          : state.streak >= 2
+            ? `FEVER METER • HOT STREAK x${state.streak}!`
+            : (state.mechanicLabel ? state.mechanicLabel.toUpperCase() : 'MATCH 4+ TO CRAFT PAPER CUTTERS!');
 
       const goalsContainer = document.getElementById('goal-chips');
       let goalsHtml = state.goals.map(g => {
@@ -4196,17 +4979,31 @@
               : freedLocks > 0
                 ? (combo >= 2 ? `TAPE SEAL RIPPED x${combo}!` : 'TAPE SEAL RIPPED!')
                 : combo >= 5
-                  ? `MASTERWORK ORIGAMI FOLD x${combo}!!!!`
+                  ? `GODLIKE ORIGAMI MASTER x${combo}!!!!`
                   : combo === 4
-                    ? 'ULTRA CREASE CASCADE x4!!!'
+                    ? 'UNSTOPPABLE CREASE BLITZ x4!!!'
                     : combo === 3
-                      ? 'MEGA ORIGAMI CASCADE x3!!'
+                      ? 'ORIGAMI GENIUS CASCADE x3!!'
                       : combo === 2
-                        ? 'SUPER PAPER FOLD x2!'
+                        ? 'JUICY PAPER FOLD x2!'
                         : state.streak >= 3
-                          ? `HOT STREAK x${state.streak}!`
-                          : null;
+                          ? `🔥 HOT STREAK x${state.streak}! (+${Math.min(100, state.streak * 20)}% PTS)`
+                          : 'SWEET FOLD!';
         if (banner) showComboBanner(banner, combo);
+
+        // Addictive Fever Perk: While in Fever Mode, 1st cascade wave automatically crafts a bonus Special Tile!
+        if (state.feverMoves > 0 && combo === 1 && spawns.size === 0) {
+          for (const key of expanded) {
+            if (!state.tapeLocks.has(key)) {
+              const [ar, ac] = key.split(',').map(Number);
+              spawns.set(key, {
+                piece: state.board[ar][ac],
+                special: Math.random() < 0.5 ? 'ROW_CUTTER' : 'PAPER_BOMB'
+              });
+              break;
+            }
+          }
+        }
 
         punchBoard(colorStorm || triggeredAny ? 1.25 : lineRip || combo >= 2 ? Math.min(1.35, 0.75 + combo * 0.14) : 0.4);
         applyClearedSet(expanded, combo, colorStorm ? 65 : (lineRip || triggeredAny) ? 48 : 32);
@@ -4217,6 +5014,28 @@
         audio.playBounce(expanded.size, combo);
         renderAll(dropMotion);
         await sleep(Math.max(270, 335 - Math.min(4, combo - 1) * 15));
+      }
+
+      // Addictive Hot Streak Gift: Every 3 consecutive matching moves drops a free Special Power-Up on the board!
+      const goalsDoneNow = state.goals.every(g => g.count >= g.target) && state.goldCells.size === 0 && state.tapeLocks.size === 0;
+      if (state.streak >= 3 && state.streak % 3 === 0 && !goalsDoneNow) {
+        const candidates = [];
+        for (let r = 0; r < BOARD_SIZE; r++) {
+          for (let c = 0; c < BOARD_SIZE; c++) {
+            const k = `${r},${c}`;
+            if (getSpecial(r, c) === 'NONE' && !state.tapeLocks.has(k)) {
+              candidates.push({ r, c });
+            }
+          }
+        }
+        if (candidates.length > 0) {
+          const pick = candidates[Math.floor(Math.random() * candidates.length)];
+          const specType = state.streak >= 6 ? 'PINWHEEL_RAINBOW' : (state.streak % 2 === 0 ? 'PAPER_BOMB' : 'ROW_CUTTER');
+          setSpecial(pick.r, pick.c, specType);
+          audio.playCrinkle(4);
+          showComboBanner(`🔥 HOT STREAK x${state.streak}! FREE POWER-UP DROPPED!`, 2);
+          spawnFloatingPopup(pick.r, pick.c, `🔥 STREAK x${state.streak} GIFT!`, true, 2);
+        }
       }
 
       if (!findFirstValidMove()) {
@@ -4231,6 +5050,27 @@
           }
         } else {
           state.tutorialDismissed = true;
+        }
+      }
+
+      // Addictive End-of-Level "ORIGAMI BONUS TIME!" Leftover Moves Celebration Eruption!
+      if (goalsDoneNow && state.moves > 0) {
+        const bursts = Math.min(5, state.moves);
+        showComboBanner(`🎉 ORIGAMI BONUS TIME! +${state.moves * 250} PTS! 🎉`, 3);
+        for (let b = 1; b <= bursts; b++) {
+          const br = Math.floor(Math.random() * BOARD_SIZE);
+          const bc = Math.floor(Math.random() * BOARD_SIZE);
+          const bp = state.board[br][bc];
+          spawnConfettiAtCell(br, bc, bp, 18);
+          audio.playChord(b + 1);
+          const bonusPts = 250 * b;
+          state.score += bonusPts;
+          if (state.score > state.highScore) state.highScore = state.score;
+          state.moves = Math.max(0, state.moves - 1);
+          spawnFloatingPopup(br, bc, `★ BONUS +${bonusPts}! ★`, true, b + 1);
+          punchBoard(0.75);
+          renderAll();
+          await sleep(145);
         }
       }
 
@@ -4265,17 +5105,27 @@
 
       const isFever = state.feverMoves > 0;
       const mult = isFever ? 2 : 1;
-      const gained = set.size * ptsPerTile * combo * mult + goldBonus;
+      const streakMult = 1 + Math.min(5, state.streak || 0) * 0.20;
+      const gained = Math.round((set.size * ptsPerTile * combo * mult + goldBonus) * streakMult);
       state.score += gained;
       if (state.score > state.highScore) state.highScore = state.score;
 
-      state.feverCharge += set.size * 0.065 + (combo >= 2 ? 0.14 : 0);
+      state.feverCharge += set.size * 0.072 + (combo >= 2 ? 0.16 : 0);
       let triggeredFever = false;
       if (state.feverCharge >= 1) {
         state.feverCharge = 0;
-        state.feverMoves = Math.max(state.feverMoves, 3);
+        state.feverMoves = Math.max(state.feverMoves, 4);
         triggeredFever = true;
         audio.playFanfare();
+        const fw = document.getElementById('fever-bar-wrap');
+        if (fw) {
+          fw.classList.remove('fever-igniting');
+          void fw.offsetWidth;
+          fw.classList.add('fever-igniting');
+          setTimeout(() => fw.classList.remove('fever-igniting'), 920);
+        }
+        showComboBanner('★ ORIGAMI FEVER IGNITED! 2x SCORE! ★');
+        triggerBoardPunch(1.0);
       }
 
       if (set.size > 0) {
@@ -4285,11 +5135,11 @@
         const label = triggeredFever
           ? (combo >= 2 ? `x${combo}${bangs} +${gained} FEVER!` : `+${gained} FEVER 2x!`)
           : isFever
-            ? (combo >= 2 ? `x${combo}${bangs} +${gained} (2x!)` : `+${gained} (2x!)`)
+            ? (combo >= 2 ? `x${combo}${bangs} +${gained} (2x!)` : `+${gained} (2x FEVER!)`)
             : combo >= 2
               ? `x${combo}${bangs} +${gained}`
-              : `+${gained}`;
-        spawnFloatingPopup(avgR, avgC, label, isFever || combo >= 2 || set.size >= 4, combo);
+              : (state.streak >= 3 ? `🔥+${gained} (STREAK!)` : `+${gained}`);
+        spawnFloatingPopup(avgR, avgC, label, isFever || combo >= 2 || set.size >= 4 || state.streak >= 3, combo);
       }
     }
 
@@ -4415,6 +5265,7 @@
     function closeWorldMap() {
       audio.playCrinkle(1);
       document.getElementById('world-map-modal').classList.remove('visible');
+      updateDioramaBackdropForStage(getStageInfo(state.level).stageNumber);
       scheduleIdleHint();
     }
 
@@ -4704,6 +5555,7 @@
     function updateMapInspector() {
       const sel = state.mapSelectedLevel;
       const stg = getStageInfo(sel);
+      updateDioramaBackdropForStage(stg.stageNumber);
       const bp = getLevelBlueprint(sel);
       const stars = state.levelStars[sel] || 0;
       const starStr = [1, 2, 3].map(s => `<span style="color:${s <= stars ? '#FF6B35' : '#D4C29A'}">★</span>`).join('');
@@ -5122,6 +5974,333 @@
       if (!state.busy) startLevel(state.level);
     });
 
+    // --- Account Login, Gmail Sign-In, GM (jcv / jan27) & Firebase Quota Guard ---
+    const AUTH_STORAGE_KEY = 'paper_craft_crush_accounts_v1';
+    const SESSION_STORAGE_KEY = 'paper_craft_crush_session_v1';
+    const quotaStats = { reads: 0, writes: 0, skipped: 0, lastSig: '', lastWriteAt: 0 };
+    let isRegisterTab = false;
+    let currentSession = { loggedIn: false, username: 'Guest', isGm: false, method: 'local' };
+
+    function updateQuotaBadge() {
+      const pill = document.getElementById('quota-stats-pill');
+      if (pill) pill.textContent = `R:${quotaStats.reads} • W:${quotaStats.writes} • Saved:${quotaStats.skipped}`;
+      const gmDetail = document.getElementById('gm-quota-detail');
+      if (gmDetail) gmDetail.textContent = `Quota Guard: ${quotaStats.writes}W / ${quotaStats.reads}R (${quotaStats.skipped} skipped)`;
+    }
+
+    let webDebounceTimer = null;
+
+    function computeWebMilestoneSig() {
+      return `${ currentSession.username }|${ state.level }|${ state.highestLevel }|${ JSON.stringify(state.levelStars || {}) }|${ JSON.stringify(state.boosters || {}) }`;
+    }
+
+    function scheduleWebAutoCloudSync(forceImmediate = false) {
+      if (!currentSession || !currentSession.loggedIn) return;
+      const sig = computeWebMilestoneSig();
+      if (!forceImmediate && sig === quotaStats.lastSig) {
+        return;
+      }
+      if (webDebounceTimer) clearTimeout(webDebounceTimer);
+      if (forceImmediate) {
+        syncProgressWithQuotaGuard(true);
+      } else {
+        const elapsed = Date.now() - quotaStats.lastWriteAt;
+        const waitMs = Math.max(3500, 8000 - elapsed);
+        webDebounceTimer = setTimeout(() => {
+          syncProgressWithQuotaGuard(false);
+        }, waitMs);
+      }
+    }
+
+    function syncProgressWithQuotaGuard(forceImmediate = false) {
+      if (!currentSession || !currentSession.loggedIn) return;
+      const sig = computeWebMilestoneSig();
+      if (!forceImmediate && sig === quotaStats.lastSig) {
+        quotaStats.skipped++;
+        updateQuotaBadge();
+        return;
+      }
+      const now = Date.now();
+      if (!forceImmediate && now - quotaStats.lastWriteAt < 8000) {
+        quotaStats.skipped++;
+        updateQuotaBadge();
+        return;
+      }
+      quotaStats.lastSig = sig;
+      quotaStats.lastWriteAt = now;
+      quotaStats.writes++;
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          level: state.level,
+          highestLevel: state.highestLevel,
+          levelStars: state.levelStars,
+          highScore: state.highScore,
+          boosters: state.boosters,
+          sound: audio.enabled
+        }));
+      } catch (_) {}
+      updateQuotaBadge();
+    }
+
+    // Real-time cross-tab/cloud storage listener merging level progress, unlocked stages, and boosters
+    window.addEventListener('storage', e => {
+      if (e.key === STORAGE_KEY && e.newValue && currentSession && currentSession.loggedIn) {
+        try {
+          const remote = JSON.parse(e.newValue);
+          state.highestLevel = Math.max(state.highestLevel || 1, remote.highestLevel || 1);
+          state.highScore = Math.max(state.highScore || 0, remote.highScore || 0);
+          if (remote.levelStars) {
+            Object.keys(remote.levelStars).forEach(k => {
+              state.levelStars[k] = Math.max(state.levelStars[k] || 0, remote.levelStars[k] || 0);
+            });
+          }
+          if (remote.boosters) {
+            state.boosters = remote.boosters;
+          }
+          quotaStats.lastSig = computeWebMilestoneSig();
+          quotaStats.reads++;
+          updateQuotaBadge();
+          if (!state.busy) renderAll();
+        } catch (_) {}
+      }
+    });
+
+    function showAuthBanner(msg, isError) {
+      const el = document.getElementById('auth-msg-banner');
+      if (!el) return;
+      el.style.display = 'block';
+      el.style.background = isError ? '#FEE2E2' : '#DCFCE7';
+      el.style.color = isError ? '#991B1B' : '#166534';
+      el.style.border = isError ? '1.5px solid #DC2626' : '1.5px solid #16A34A';
+      el.textContent = msg;
+    }
+
+    function updateAuthUi() {
+      const gmBtn = document.getElementById('btn-open-gm');
+      if (gmBtn) gmBtn.style.display = currentSession.isGm ? 'inline-flex' : 'none';
+      const gmPill = document.getElementById('home-gm-pill');
+      if (gmPill) gmPill.style.display = currentSession.isGm ? 'inline-block' : 'none';
+      const sessionBox = document.getElementById('home-session-box');
+      if (sessionBox) {
+        sessionBox.style.display = currentSession.loggedIn ? 'block' : 'none';
+        document.getElementById('home-session-user').textContent =
+          `Player: ${currentSession.username}`;
+        document.getElementById('home-session-sub').textContent =
+          `Unlocked Lvl ${state.highestLevel}/50 • Best: ${state.highScore}`;
+      }
+      updateQuotaBadge();
+    }
+
+    function loadSession() {
+      try {
+        const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.loggedIn) {
+            currentSession = parsed;
+            quotaStats.reads++;
+            document.getElementById('home-login-modal').style.display = 'none';
+          }
+        }
+      } catch (e) {}
+      updateAuthUi();
+    }
+
+    function saveSession() {
+      try {
+        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(currentSession));
+      } catch (e) {}
+      updateAuthUi();
+    }
+
+    document.getElementById('tab-auth-login').addEventListener('click', () => {
+      isRegisterTab = false;
+      document.getElementById('tab-auth-login').style.background = '#FF6B35';
+      document.getElementById('tab-auth-login').style.color = '#FFFDF9';
+      document.getElementById('tab-auth-register').style.background = 'transparent';
+      document.getElementById('tab-auth-register').style.color = '#3B2314';
+      document.getElementById('btn-submit-credentials').textContent = 'Log In';
+    });
+
+    document.getElementById('tab-auth-register').addEventListener('click', () => {
+      isRegisterTab = true;
+      document.getElementById('tab-auth-register').style.background = '#2A9D8F';
+      document.getElementById('tab-auth-register').style.color = '#FFFDF9';
+      document.getElementById('tab-auth-login').style.background = 'transparent';
+      document.getElementById('tab-auth-login').style.color = '#3B2314';
+      document.getElementById('btn-submit-credentials').textContent = 'Create Account';
+    });
+
+    document.getElementById('btn-submit-credentials').addEventListener('click', () => {
+      const u = (document.getElementById('auth-username-input').value || '').trim();
+      const p = document.getElementById('auth-password-input').value || '';
+      if (!u || !p) {
+        showAuthBanner('Please enter both a username and password.', true);
+        return;
+      }
+      // Built-in GM account: username jcv and password jan27
+      if (u.toLowerCase() === 'jcv' && p === 'jan27') {
+        audio.playWinFanfare();
+        currentSession = { loggedIn: true, username: 'jcv', isGm: true, method: 'gm' };
+        state.unlockedLevel = 50;
+        for (let lv = 1; lv <= 50; lv++) {
+          if ((state.levelStars[lv] || 0) < 3) state.levelStars[lv] = 3;
+        }
+        state.boosters = { SCISSORS: 99, GLUE: 99, HAMMER: 99 };
+        saveSession();
+        syncProgressWithQuotaGuard(true);
+        renderAll();
+        showAuthBanner('★ GM Account (jcv) activated! All 50 levels & 99 boosters unlocked.', false);
+        setTimeout(() => {
+          document.getElementById('home-login-modal').style.display = 'none';
+        }, 650);
+        return;
+      }
+      if (u.toLowerCase() === 'jcv' && p !== 'jan27') {
+        showAuthBanner('Invalid password for GM account "jcv".', true);
+        return;
+      }
+      let accounts = {};
+      try {
+        accounts = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || '{}');
+      } catch (e) {}
+      const key = u.toLowerCase();
+      if (isRegisterTab) {
+        if (p.length < 4) {
+          showAuthBanner('Password must be at least 4 characters.', true);
+          return;
+        }
+        accounts[key] = p;
+        try { localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(accounts)); } catch (e) {}
+        currentSession = { loggedIn: true, username: u, isGm: false, method: 'account' };
+        saveSession();
+        syncProgressWithQuotaGuard(true);
+        showAuthBanner(`Account "${u}" created & synced!`, false);
+        setTimeout(() => {
+          document.getElementById('home-login-modal').style.display = 'none';
+        }, 500);
+      } else {
+        if (!accounts[key]) {
+          accounts[key] = p;
+          try { localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(accounts)); } catch (e) {}
+        } else if (accounts[key] !== p) {
+          showAuthBanner(`Incorrect password for "${u}".`, true);
+          return;
+        }
+        quotaStats.reads++;
+        currentSession = { loggedIn: true, username: u, isGm: false, method: 'account' };
+        saveSession();
+        syncProgressWithQuotaGuard(true);
+        showAuthBanner(`Welcome back, ${u}!`, false);
+        setTimeout(() => {
+          document.getElementById('home-login-modal').style.display = 'none';
+        }, 500);
+      }
+    });
+
+    document.getElementById('btn-gmail-login').addEventListener('click', () => {
+      audio.playCrinkle(2);
+      const emailInput = (document.getElementById('auth-username-input').value || '').trim();
+      const gmailName = emailInput.includes('@') ? emailInput : 'jcv.ai.use@gmail.com';
+      const isGmEmail = gmailName.toLowerCase() === 'jcv.ai.use@gmail.com';
+      quotaStats.reads++;
+      currentSession = { loggedIn: true, username: gmailName, isGm: isGmEmail, method: 'gmail' };
+      if (isGmEmail) {
+        state.unlockedLevel = 50;
+        state.boosters = {
+          SCISSORS: Math.max(state.boosters.SCISSORS || 3, 99),
+          GLUE: Math.max(state.boosters.GLUE || 3, 99),
+          HAMMER: Math.max(state.boosters.HAMMER || 2, 99)
+        };
+      }
+      saveSession();
+      syncProgressWithQuotaGuard(true);
+      renderAll();
+      showAuthBanner(`Connected with Gmail (${gmailName})!`, false);
+      setTimeout(() => {
+        document.getElementById('home-login-modal').style.display = 'none';
+      }, 500);
+    });
+
+    document.getElementById('btn-open-home').addEventListener('click', () => {
+      audio.playCrinkle(1);
+      updateAuthUi();
+      document.getElementById('home-login-modal').style.display = 'flex';
+    });
+
+    document.getElementById('btn-home-play').addEventListener('click', () => {
+      document.getElementById('home-login-modal').style.display = 'none';
+    });
+
+    document.getElementById('btn-skip-home').addEventListener('click', () => {
+      document.getElementById('home-login-modal').style.display = 'none';
+    });
+
+    document.getElementById('btn-home-logout').addEventListener('click', () => {
+      currentSession = { loggedIn: false, username: 'Guest', isGm: false, method: 'local' };
+      saveSession();
+      showAuthBanner('Signed out.', false);
+    });
+
+    // GM Control Modal Wiring
+    const gmStageGrid = document.getElementById('gm-stage-grid');
+    if (gmStageGrid) {
+      for (let s = 1; s <= 10; s++) {
+        const b = document.createElement('button');
+        b.textContent = `S${s}`;
+        b.style.cssText = 'padding:7px 0;border-radius:8px;border:1.5px solid #3B2314;background:#FFF3B0;font-family:inherit;font-weight:800;font-size:12px;color:#3B2314;cursor:pointer;';
+        b.addEventListener('click', () => {
+          const targetLvl = (s - 1) * 5 + 1;
+          state.unlockedLevel = 50;
+          document.getElementById('gm-control-modal').style.display = 'none';
+          startLevel(targetLvl);
+        });
+        gmStageGrid.appendChild(b);
+      }
+    }
+
+    document.getElementById('btn-open-gm').addEventListener('click', () => {
+      audio.playCrinkle(1);
+      updateQuotaBadge();
+      document.getElementById('gm-control-modal').style.display = 'flex';
+    });
+
+    document.getElementById('btn-close-gm').addEventListener('click', () => {
+      document.getElementById('gm-control-modal').style.display = 'none';
+    });
+
+    document.getElementById('gm-btn-unlock-all').addEventListener('click', () => {
+      state.unlockedLevel = 50;
+      for (let lv = 1; lv <= 50; lv++) state.levelStars[lv] = 3;
+      syncProgressWithQuotaGuard(true);
+      renderAll();
+      document.getElementById('gm-control-modal').style.display = 'none';
+    });
+
+    document.getElementById('gm-btn-boosters').addEventListener('click', () => {
+      state.boosters = { SCISSORS: 99, GLUE: 99, HAMMER: 99 };
+      syncProgressWithQuotaGuard(true);
+      renderAll();
+      document.getElementById('gm-control-modal').style.display = 'none';
+    });
+
+    document.getElementById('gm-btn-instant-win').addEventListener('click', () => {
+      document.getElementById('gm-control-modal').style.display = 'none';
+      Object.keys(state.goalsLeft).forEach(k => { state.goalsLeft[k] = 0; });
+      state.score = Math.max(state.score, state.targetScore + 1500);
+      checkEndState();
+    });
+
+    document.getElementById('gm-btn-add-moves').addEventListener('click', () => {
+      state.moves += 15;
+      renderAll();
+      document.getElementById('gm-control-modal').style.display = 'none';
+    });
+
+    document.getElementById('gm-btn-force-sync').addEventListener('click', () => {
+      syncProgressWithQuotaGuard(true);
+    });
+
     // Animate the Origami Pointer Hand in the 60fps loop when tutorial overlay is visible
     setInterval(() => {
       const tutPrompt = getActiveTutorialPrompt();
@@ -5137,6 +6316,7 @@
       handEl.setAttribute('transform', `translate(${hx.toFixed(1)}, ${hy.toFixed(1)})`);
     }, 32);
 
+    loadSession();
     loadSaved();
     syncResponsiveLayout();
     startLevel(state.level);

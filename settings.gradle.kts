@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Paper Craft Crush"
+rootProject.name = "Origami Blitz"
 
 include(":app")

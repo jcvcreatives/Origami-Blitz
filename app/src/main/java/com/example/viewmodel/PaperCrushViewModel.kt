@@ -27,12 +27,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.example.data.CloudQuotaStats
+import com.example.data.PaperProfileRepository
+import com.example.data.PlayerProfile
+import com.google.firebase.Firebase
+import com.google.firebase.auth.auth
 import kotlin.math.abs
 import kotlin.random.Random
 
 class PaperCrushViewModel(
     private val prefs: SharedPreferences? = null,
-    private val soundSynth: PaperSoundSynthesizer = PaperSoundSynthesizer()
+    private val soundSynth: PaperSoundSynthesizer = PaperSoundSynthesizer(),
+    private val profileRepository: PaperProfileRepository? = null
 ) : ViewModel() {
 
     private var nextTileId = 1L
@@ -42,6 +48,10 @@ class PaperCrushViewModel(
     private var nextPunchSeq = 1L
     private var particleLoopJob: Job? = null
     private var idleHintJob: Job? = null
+    private var cloudListenerJob: Job? = null
+    private var debouncedSyncJob: Job? = null
+    private var lastQueuedMilestoneSignature: String = ""
+    private var isApplyingRemoteSnapshot: Boolean = false
 
     private val _uiState = MutableStateFlow(PaperGameState())
     val uiState: StateFlow<PaperGameState> = _uiState.asStateFlow()
@@ -49,31 +59,70 @@ class PaperCrushViewModel(
     private val _confettiScraps = MutableStateFlow<List<ConfettiScrap>>(emptyList())
     val confettiScraps: StateFlow<List<ConfettiScrap>> = _confettiScraps.asStateFlow()
 
+    private val fallbackQuotaStats = MutableStateFlow(CloudQuotaStats())
+    val quotaStats: StateFlow<CloudQuotaStats>
+        get() = profileRepository?.quotaStats ?: fallbackQuotaStats
+
     init {
         loadSavedStateAndStart()
     }
 
     private fun loadSavedStateAndStart() {
-        val savedLevel = prefs?.getInt(KEY_LEVEL, 1)?.coerceIn(1, TOTAL_LEVELS) ?: 1
-        val savedHighest = prefs?.getInt(KEY_HIGHEST_LEVEL, savedLevel)?.coerceIn(savedLevel, TOTAL_LEVELS) ?: savedLevel
-        val savedHighScore = prefs?.getInt(KEY_HIGH_SCORE, 0) ?: 0
-        val savedScissors = prefs?.getInt(KEY_SCISSORS, 3) ?: 3
-        val savedGlue = prefs?.getInt(KEY_GLUE, 3) ?: 3
-        val savedHammer = prefs?.getInt(KEY_HAMMER, 2) ?: 2
         val savedSound = prefs?.getBoolean(KEY_SOUND, true) ?: true
-        val savedStarsRaw = prefs?.getString(KEY_LEVEL_STARS, "") ?: ""
+        val savedIsAuth = prefs?.getBoolean(KEY_IS_AUTHENTICATED, false) ?: false
+        val savedUsername = if (savedIsAuth) {
+            prefs?.getString(KEY_ACTIVE_USERNAME, "Guest") ?: "Guest"
+        } else {
+            "Guest"
+        }
+        val savedIsGm = if (savedIsAuth) {
+            prefs?.getBoolean(KEY_IS_GM, false) ?: false
+        } else {
+            false
+        }
+
+        // Only restore saved progress if the player has logged into or created an account
+        val savedLevel = if (savedIsAuth) {
+            prefs?.getInt(KEY_LEVEL, 1)?.coerceIn(1, TOTAL_LEVELS) ?: 1
+        } else 1
+        val savedHighest = if (savedIsAuth) {
+            prefs?.getInt(KEY_HIGHEST_LEVEL, savedLevel)?.coerceIn(savedLevel, TOTAL_LEVELS) ?: savedLevel
+        } else 1
+        val savedHighScore = if (savedIsAuth) {
+            prefs?.getInt(KEY_HIGH_SCORE, 0) ?: 0
+        } else 0
+        val savedScissors = if (savedIsAuth) {
+            prefs?.getInt(KEY_SCISSORS, 3) ?: 3
+        } else 3
+        val savedGlue = if (savedIsAuth) {
+            prefs?.getInt(KEY_GLUE, 3) ?: 3
+        } else 3
+        val savedHammer = if (savedIsAuth) {
+            prefs?.getInt(KEY_HAMMER, 2) ?: 2
+        } else 2
+        val savedStarsRaw = if (savedIsAuth) {
+            prefs?.getString(KEY_LEVEL_STARS, "") ?: ""
+        } else ""
         val parsedStars = parseStarsMap(savedStarsRaw)
 
         soundSynth.isEnabled = savedSound
+        _uiState.update {
+            it.copy(
+                accountUsername = savedUsername,
+                isAuthenticatedSession = savedIsAuth,
+                isGmAccount = savedIsGm,
+                showHomeScreen = !savedIsAuth
+            )
+        }
         startLevel(
             level = savedLevel,
-            highestUnlockedLevel = savedHighest,
+            highestUnlockedLevel = if (savedIsGm) TOTAL_LEVELS else savedHighest,
             levelStars = parsedStars,
             carryHighScore = savedHighScore,
             boosters = mapOf(
-                BoosterType.SCISSORS to savedScissors,
-                BoosterType.GLUE to savedGlue,
-                BoosterType.HAMMER to savedHammer
+                BoosterType.SCISSORS to if (savedIsGm) maxOf(savedScissors, 99) else savedScissors,
+                BoosterType.GLUE to if (savedIsGm) maxOf(savedGlue, 99) else savedGlue,
+                BoosterType.HAMMER to if (savedIsGm) maxOf(savedHammer, 99) else savedHammer
             ),
             soundEnabled = savedSound
         )
@@ -114,6 +163,7 @@ class PaperCrushViewModel(
         } else {
             null
         }
+        val prev = _uiState.value
         _uiState.value = PaperGameState(
             level = clampedLevel,
             highestUnlockedLevel = maxOf(highestUnlockedLevel, clampedLevel).coerceAtMost(TOTAL_LEVELS),
@@ -137,12 +187,17 @@ class PaperCrushViewModel(
             status = GameStatus.PLAYING,
             tutorialStep = 1,
             tutorialDismissed = !showGuideAutomatically,
-            tutorialPrompt = initialPrompt
+            tutorialPrompt = initialPrompt,
+            showHomeScreen = prev.showHomeScreen,
+            showGmPanel = false,
+            isAuthenticatedSession = prev.isAuthenticatedSession,
+            accountUsername = prev.accountUsername,
+            isGmAccount = prev.isGmAccount
         )
         persistProgress()
         val stageNum = ((clampedLevel - 1) / 5) + 1
         soundSynth.updateMusicalMood(stageNumber = stageNum, isFeverOrHighCombo = false)
-        if (!showMap) {
+        if (!showMap && !_uiState.value.showHomeScreen) {
             scheduleIdleHint()
         }
     }
@@ -1102,19 +1157,20 @@ class PaperCrushViewModel(
                 analysis.triggeredLineRip -> 48
                 else -> 32
             }
+            val currentStreak = _uiState.value.streakCount
             val comboPrefix = if (combo >= 2) "x$combo " else ""
             val banner = when {
                 analysis.triggeredColorStorm -> "${comboPrefix}5-FOLD RAINBOW PINWHEEL! +1 BOOSTER"
                 analysis.triggeredPaperBomb -> "${comboPrefix}L/T FOLD • ORIGAMI BOMB CRAFTED!"
                 analysis.triggeredLineRip -> "${comboPrefix}4-FOLD • LINE CUTTER CRAFTED!"
-                combo >= 5 -> "MASTERWORK ORIGAMI FOLD x$combo!!!!"
-                combo == 4 -> "ULTRA CREASE CASCADE x4!!!"
-                combo == 3 -> "MEGA ORIGAMI CASCADE x3!!"
-                combo == 2 -> "SUPER PAPER FOLD x2!"
+                combo >= 5 -> "GODLIKE ORIGAMI MASTER x$combo!!!!"
+                combo == 4 -> "UNSTOPPABLE CREASE BLITZ x4!!!"
+                combo == 3 -> "ORIGAMI GENIUS CASCADE x3!!"
+                combo == 2 -> "JUICY PAPER FOLD x2!"
                 goldCollectedCount > 0 -> "GOLD WASHI STAMP COLLECTED! +${goldCollectedCount * 80}"
                 tapeDamagedCount > 0 -> "TAPE / WAX SEAL RIPPED!"
-                _uiState.value.streakCount >= 3 -> "HOT STREAK x${_uiState.value.streakCount}!"
-                else -> null
+                currentStreak >= 3 -> "🔥 HOT STREAK x$currentStreak! (+${(currentStreak * 20).coerceAtMost(100)}% PTS)"
+                else -> "SWEET FOLD!"
             }
 
             val punchStrength = when {
@@ -1160,6 +1216,16 @@ class PaperCrushViewModel(
             // Filter spawnedSpecials to positions that were actually crushed and aren't locked
             val validSpawnedSpecials = analysis.spawnedSpecials.filterKeys { pos ->
                 pos in actualCrushed && (nextTapeLocks[pos] ?: 0) == 0
+            }.toMutableMap()
+
+            // Addictive Fever Perk: While in Fever Mode, 1st cascade wave automatically crafts a bonus Special Tile!
+            if (_uiState.value.feverMovesLeft > 0 && combo == 1 && validSpawnedSpecials.isEmpty()) {
+                val feverAnchor = actualCrushed.firstOrNull { (nextTapeLocks[it] ?: 0) == 0 }
+                if (feverAnchor != null) {
+                    val piece = currentBoard[feverAnchor.row][feverAnchor.col].type
+                    val bonusSpec = if (Random.nextBoolean()) TileSpecial.ROW_CUTTER else TileSpecial.PAPER_BOMB
+                    validSpawnedSpecials[feverAnchor] = piece to bonusSpec
+                }
             }
 
             val refilledBoard = dropAndRefillBoard(
@@ -1176,10 +1242,101 @@ class PaperCrushViewModel(
             _uiState.update { it.copy(board = currentBoard) }
         }
 
+        // Addictive Hot Streak Gift: Every 3 consecutive matching moves drops a free Special Power-Up on the board!
+        val streakAfterCascade = _uiState.value.streakCount
+        if (streakAfterCascade >= 3 && streakAfterCascade % 3 == 0 && !_uiState.value.areAllObjectivesComplete) {
+            val activeLocksNow = _uiState.value.tapeLocks
+            val candidates = mutableListOf<GridPos>()
+            for (r in 0 until BOARD_SIZE) {
+                for (c in 0 until BOARD_SIZE) {
+                    val p = GridPos(r, c)
+                    if (currentBoard[r][c].special == TileSpecial.NONE && (activeLocksNow[p] ?: 0) == 0) {
+                        candidates.add(p)
+                    }
+                }
+            }
+            if (candidates.isNotEmpty()) {
+                val giftPos = candidates[Random.nextInt(candidates.size)]
+                val giftSpec = when {
+                    streakAfterCascade >= 6 -> TileSpecial.PINWHEEL_RAINBOW
+                    streakAfterCascade % 2 == 0 -> TileSpecial.PAPER_BOMB
+                    else -> if (Random.nextBoolean()) TileSpecial.ROW_CUTTER else TileSpecial.COL_CUTTER
+                }
+                currentBoard = ensureSpecialTileAt(currentBoard, giftPos, giftSpec)
+                soundSynth.playPaperCrinkle(4)
+                val giftPopupId = nextPopupId++
+                val giftPopup = FloatingScorePopup(
+                    id = giftPopupId,
+                    row = giftPos.row.toFloat(),
+                    col = giftPos.col.toFloat(),
+                    text = "🔥 STREAK x$streakAfterCascade GIFT! ${giftSpec.badgeLabel}",
+                    color = currentBoard[giftPos.row][giftPos.col].type.primaryColor,
+                    isBig = true,
+                    comboMultiplier = 2
+                )
+                _uiState.update { st ->
+                    st.copy(
+                        board = currentBoard,
+                        comboBannerText = "🔥 HOT STREAK x$streakAfterCascade! FREE POWER-UP DROPPED!",
+                        floatingPopups = (st.floatingPopups + giftPopup).takeLast(6)
+                    )
+                }
+                viewModelScope.launch {
+                    delay(760)
+                    _uiState.update { st ->
+                        st.copy(floatingPopups = st.floatingPopups.filterNot { it.id == giftPopupId })
+                    }
+                }
+            }
+        }
+
         // Ensure board has at least one valid unlocked move
         val activeLocks = _uiState.value.tapeLocks.keys
         if (!hasValidMove(currentBoard, activeLocks)) {
             currentBoard = generatePlayableBoard(activeLocks)
+        }
+
+        // Addictive End-of-Level "ORIGAMI BONUS TIME!" Leftover Moves Celebration Eruption!
+        if (_uiState.value.areAllObjectivesComplete && _uiState.value.movesRemaining > 0) {
+            val bonusBursts = _uiState.value.movesRemaining.coerceIn(1, 5)
+            _uiState.update {
+                it.copy(
+                    comboBannerText = "🎉 ORIGAMI BONUS TIME! +${it.movesRemaining * 250} PTS! 🎉",
+                    boardPunchSeq = nextPunchSeq++,
+                    boardPunchStrength = 1.1f
+                )
+            }
+            for (b in 1..bonusBursts) {
+                val bonusRow = Random.nextInt(BOARD_SIZE)
+                val bonusCol = Random.nextInt(BOARD_SIZE)
+                val bonusTile = currentBoard[bonusRow][bonusCol]
+                spawnConfettiForTiles(listOf(bonusTile), scrapsPerTile = 16)
+                soundSynth.playComboChord(b + 1)
+                val bonusPopId = nextPopupId++
+                val bonusPts = 250 * b
+                val pop = FloatingScorePopup(
+                    id = bonusPopId,
+                    row = bonusRow.toFloat(),
+                    col = bonusCol.toFloat(),
+                    text = "★ BONUS +$bonusPts! ★",
+                    color = bonusTile.type.primaryColor,
+                    isBig = true,
+                    comboMultiplier = b + 1
+                )
+                _uiState.update { st ->
+                    val nextScore = st.score + bonusPts
+                    st.copy(
+                        score = nextScore,
+                        highScore = maxOf(st.highScore, nextScore),
+                        movesRemaining = (st.movesRemaining - 1).coerceAtLeast(0),
+                        boardPunchSeq = nextPunchSeq++,
+                        boardPunchStrength = 0.7f,
+                        floatingPopups = (st.floatingPopups + pop).takeLast(6)
+                    )
+                }
+                delay(145)
+            }
+            spawnFeverCelebrationBurst()
         }
 
         val postState = _uiState.value
@@ -1197,8 +1354,8 @@ class PaperCrushViewModel(
         if (nextStatus == GameStatus.WON) {
             soundSynth.playFeverFanfare()
             earnedStars = when {
-                postState.movesRemaining >= 8 || postState.score >= 2200 -> 3
-                postState.movesRemaining >= 4 || postState.score >= 1300 -> 2
+                postState.movesRemaining >= 6 || postState.score >= 2000 -> 3
+                postState.movesRemaining >= 3 || postState.score >= 1200 -> 2
                 else -> 1
             }
             val prevBest = updatedStarsMap[postState.level] ?: 0
@@ -1252,6 +1409,9 @@ class PaperCrushViewModel(
             isFeverOrHighCombo = finalState.feverMovesLeft > 0
         )
         persistProgress()
+        if (nextStatus == GameStatus.WON) {
+            syncToCloudIfEligible(forceImmediate = true)
+        }
         if (nextStatus == GameStatus.PLAYING) {
             scheduleIdleHint()
         }
@@ -1275,33 +1435,43 @@ class PaperCrushViewModel(
 
             val isFeverActive = state.feverMovesLeft > 0
             val feverMult = if (isFeverActive) 2 else 1
+            // Addictive Hot Streak multiplier (+20% per consecutive match up to 2x!)
+            val streakBonusMult = 1f + (state.streakCount.coerceIn(0, 5) * 0.20f)
             val mechanicBonus = (goldCollected * 80) + (tapeCleared * 60)
-            val gainedScore = ((clearedTiles.size * pointsPerTile * comboStep) + mechanicBonus) * feverMult
+            val basePts = ((clearedTiles.size * pointsPerTile * comboStep) + mechanicBonus) * feverMult
+            val gainedScore = (basePts * streakBonusMult).toInt()
             val newScore = state.score + gainedScore
             val newHigh = maxOf(state.highScore, newScore)
 
-            val chargeDelta = (clearedTiles.size * 0.065f) + (if (comboStep >= 2) 0.14f else 0f) + (goldCollected * 0.05f)
+            val chargeDelta = (clearedTiles.size * 0.072f) + (if (comboStep >= 2) 0.16f else 0f) + (goldCollected * 0.06f)
             val rawNextCharge = state.feverCharge + chargeDelta
             val triggeredNewFever = rawNextCharge >= 1f
             if (triggeredNewFever) {
                 soundSynth.playFeverFanfare()
+                spawnFeverCelebrationBurst()
             }
             val nextCharge = if (triggeredNewFever) 0f else rawNextCharge.coerceIn(0f, 1f)
             val nextFeverMoves = if (triggeredNewFever) {
-                maxOf(state.feverMovesLeft, 3)
+                maxOf(state.feverMovesLeft, 4)
             } else {
                 state.feverMovesLeft
+            }
+            val nextFeverBurstSeq = if (triggeredNewFever) {
+                nextPunchSeq++
+            } else {
+                state.feverBurstSeq
             }
 
             val avgRow = if (clearedTiles.isNotEmpty()) clearedTiles.map { it.row }.average().toFloat() else 3f
             val avgCol = if (clearedTiles.isNotEmpty()) clearedTiles.map { it.col }.average().toFloat() else 3f
             val bang = "!".repeat(comboStep.coerceIn(1, 4))
             val popupText = when {
-                triggeredNewFever -> "+$gainedScore FEVER 2x!"
+                triggeredNewFever -> "★ FEVER IGNITED! +$gainedScore (2x!) ★"
                 comboStep >= 2 -> "x$comboStep$bang +$gainedScore"
                 goldCollected > 0 -> "+$gainedScore ★STAMP!"
                 tapeCleared > 0 -> "+$gainedScore RIP!"
-                isFeverActive -> "+$gainedScore (2x!)"
+                isFeverActive -> "+$gainedScore (2x FEVER!)"
+                state.streakCount >= 3 -> "🔥+$gainedScore (STREAK!)"
                 else -> "+$gainedScore"
             }
             val popupColor = clearedTiles.firstOrNull()?.type?.primaryColor
@@ -1312,7 +1482,7 @@ class PaperCrushViewModel(
                 col = avgCol,
                 text = popupText,
                 color = popupColor,
-                isBig = isFeverActive || comboStep >= 2 || clearedTiles.size >= 4 || goldCollected > 0,
+                isBig = triggeredNewFever || isFeverActive || comboStep >= 2 || clearedTiles.size >= 4 || goldCollected > 0 || state.streakCount >= 3,
                 comboMultiplier = comboStep
             )
 
@@ -1321,6 +1491,10 @@ class PaperCrushViewModel(
                 highScore = newHigh,
                 feverCharge = nextCharge,
                 feverMovesLeft = nextFeverMoves,
+                feverBurstSeq = nextFeverBurstSeq,
+                boardPunchSeq = if (triggeredNewFever) nextPunchSeq++ else state.boardPunchSeq,
+                boardPunchStrength = if (triggeredNewFever) 1.0f else state.boardPunchStrength,
+                comboBannerText = if (triggeredNewFever) "★ ORIGAMI FEVER IGNITED! 2x SCORE! ★" else state.comboBannerText,
                 floatingPopups = (state.floatingPopups + popup).takeLast(6),
                 goal = state.goal.copy(collectedCount = state.goal.collectedCount + primaryHits),
                 secondaryGoal = state.secondaryGoal?.copy(
@@ -1335,6 +1509,43 @@ class PaperCrushViewModel(
                 st.copy(floatingPopups = st.floatingPopups.filterNot { it.id == popupId })
             }
         }
+    }
+
+    private fun spawnFeverCelebrationBurst() {
+        val currentScraps = _confettiScraps.value
+        if (currentScraps.size >= 64) return
+        val feverColors = listOf(
+            PieceType.CARDBOARD_STAR.primaryColor to PieceType.CARDBOARD_STAR.secondaryColor,
+            PieceType.PEPPERMINT.primaryColor to PieceType.PEPPERMINT.secondaryColor,
+            PieceType.ORIGAMI_FOX.primaryColor to PieceType.ORIGAMI_FOX.secondaryColor,
+            PieceType.ORIGAMI_CRANE.primaryColor to PieceType.ORIGAMI_CRANE.secondaryColor
+        )
+        val newScraps = (0 until 18).map { i ->
+            val (c1, c2) = feverColors[i % feverColors.size]
+            val startX = 0.14f + (i / 17f) * 0.72f
+            val startY = 0.20f
+            val layer = ConfettiDepthLayer.entries[i % ConfettiDepthLayer.entries.size]
+            ConfettiScrap(
+                id = nextScrapId++,
+                x = startX,
+                y = startY,
+                vx = (Random.nextFloat() - 0.5f) * 0.022f,
+                vy = -0.012f - Random.nextFloat() * 0.014f,
+                rotation = Random.nextFloat() * 360f,
+                vRotation = (Random.nextFloat() - 0.5f) * 19f,
+                widthDp = Random.nextInt(10, 17).toFloat(),
+                heightDp = Random.nextInt(7, 13).toFloat(),
+                color = c1,
+                foldColor = c2,
+                depthLayer = layer,
+                depthScale = layer.targetScale,
+                landingBandOffset = Random.nextFloat(),
+                flutterPhase = Random.nextFloat() * 6.28f,
+                vFlutter = 0.18f + Random.nextFloat() * 0.16f
+            )
+        }
+        _confettiScraps.update { (it + newScraps).takeLast(72) }
+        ensureParticleLoopRunning()
     }
 
     fun findMatchedPositions(board: List<List<BoardTile>>): Set<GridPos> {
@@ -1941,7 +2152,7 @@ class PaperCrushViewModel(
 
     private fun spawnConfettiForTiles(
         tiles: List<BoardTile>,
-        scrapsPerTile: Int = 15
+        scrapsPerTile: Int = 8
     ) {
         val created = ArrayList<ConfettiScrap>(tiles.size * scrapsPerTile)
         val layers = ConfettiDepthLayer.entries
@@ -1976,7 +2187,7 @@ class PaperCrushViewModel(
                 )
             }
         }
-        _confettiScraps.update { (it + created).takeLast(260) }
+        _confettiScraps.update { (it + created).takeLast(96) }
         ensureParticleLoopRunning()
     }
 
@@ -1992,14 +2203,14 @@ class PaperCrushViewModel(
                 _confettiScraps.update { current ->
                     current.mapNotNull { s ->
                         if (s.isLanded) {
-                            val nextAlpha = s.alpha - (0.0062f * dtScale)
+                            val nextAlpha = s.alpha - (0.015f * dtScale)
                             if (nextAlpha <= 0f) {
                                 null
                             } else {
                                 s.copy(alpha = nextAlpha)
                             }
                         } else {
-                            val nextAlpha = s.alpha - (0.014f * dtScale)
+                            val nextAlpha = s.alpha - (0.016f * dtScale)
                             if (nextAlpha <= 0f || s.y > 1.12f) {
                                 null
                             } else {
@@ -2035,7 +2246,7 @@ class PaperCrushViewModel(
                                             vRotation = 0f,
                                             depthScale = s.depthLayer.targetScale,
                                             isLanded = true,
-                                            alpha = nextAlpha.coerceAtLeast(0.82f)
+                                            alpha = nextAlpha.coerceAtLeast(0.75f)
                                         )
                                     }
                                 } else {
@@ -2056,6 +2267,28 @@ class PaperCrushViewModel(
                 }
             }
         }
+    }
+
+    fun onAppPaused() {
+        idleHintJob?.cancel()
+        particleLoopJob?.cancel()
+        _confettiScraps.value = emptyList()
+        soundSynth.pauseForLifecycle()
+        // Flush any pending coalesced milestone change before backgrounding, then detach listener to save free-tier quota
+        if (debouncedSyncJob?.isActive == true) {
+            debouncedSyncJob?.cancel()
+            debouncedSyncJob = null
+            syncToCloudIfEligible(forceImmediate = true)
+        }
+        stopCloudProfileListener()
+    }
+
+    fun onAppResumed() {
+        soundSynth.resumeForLifecycle()
+        if (_uiState.value.status == GameStatus.PLAYING && !_uiState.value.showWorldMap) {
+            scheduleIdleHint()
+        }
+        startCloudProfileListener()
     }
 
     private fun randomPiece(): PieceType {
@@ -2080,31 +2313,472 @@ class PaperCrushViewModel(
     }
 
     private fun serializeStarsMap(map: Map<Int, Int>): String {
-        return map.entries.joinToString(",") { "${it.key}:${it.value}" }
+        return map.entries.sortedBy { it.key }.joinToString(",") { "${it.key}:${it.value}" }
+    }
+
+    /**
+     * Computes a compact milestone signature covering ONLY level progress, unlocked stages, stars, and booster counts.
+     * Ordinary tile swaps/score increments during a level do not change this signature, preventing mid-level write spam.
+     */
+    private fun computeMilestoneSignature(state: PaperGameState): String {
+        val scissors = state.boosters[BoosterType.SCISSORS] ?: 0
+        val glue = state.boosters[BoosterType.GLUE] ?: 0
+        val hammer = state.boosters[BoosterType.HAMMER] ?: 0
+        return "${state.accountUsername}|${state.isGmAccount}|${state.level}|${state.highestUnlockedLevel}|${serializeStarsMap(state.levelStars)}|$scissors|$glue|$hammer"
     }
 
     private fun persistProgress() {
         val state = _uiState.value
         prefs?.edit()?.apply {
-            putInt(KEY_LEVEL, state.level)
-            putInt(KEY_HIGHEST_LEVEL, state.highestUnlockedLevel)
-            putString(KEY_LEVEL_STARS, serializeStarsMap(state.levelStars))
-            putInt(KEY_HIGH_SCORE, state.highScore)
-            putInt(KEY_SCISSORS, state.boosters[BoosterType.SCISSORS] ?: 0)
-            putInt(KEY_GLUE, state.boosters[BoosterType.GLUE] ?: 0)
-            putInt(KEY_HAMMER, state.boosters[BoosterType.HAMMER] ?: 0)
             putBoolean(KEY_SOUND, state.soundEnabled)
+            putString(KEY_ACTIVE_USERNAME, state.accountUsername)
+            putBoolean(KEY_IS_AUTHENTICATED, state.isAuthenticatedSession)
+            putBoolean(KEY_IS_GM, state.isGmAccount)
+            // Only save level/score/booster progress when the player has created an account or logged in
+            if (state.isAuthenticatedSession) {
+                putInt(KEY_LEVEL, state.level)
+                putInt(KEY_HIGHEST_LEVEL, state.highestUnlockedLevel)
+                putString(KEY_LEVEL_STARS, serializeStarsMap(state.levelStars))
+                putInt(KEY_HIGH_SCORE, state.highScore)
+                putInt(KEY_SCISSORS, state.boosters[BoosterType.SCISSORS] ?: 0)
+                putInt(KEY_GLUE, state.boosters[BoosterType.GLUE] ?: 0)
+                putInt(KEY_HAMMER, state.boosters[BoosterType.HAMMER] ?: 0)
+            }
             apply()
+        }
+
+        // Automatically queue a debounced cloud sync whenever level progress, unlocked stages, or booster counts change
+        if (state.isAuthenticatedSession && !isApplyingRemoteSnapshot) {
+            val milestoneSig = computeMilestoneSignature(state)
+            if (milestoneSig != lastQueuedMilestoneSignature) {
+                lastQueuedMilestoneSignature = milestoneSig
+                scheduleAutoCloudSync(immediate = state.status == GameStatus.WON)
+            }
         }
     }
 
+    fun openHomeScreen() {
+        idleHintJob?.cancel()
+        soundSynth.playPaperCrinkle(1)
+        _uiState.update { it.copy(showHomeScreen = true, showGmPanel = false) }
+    }
+
+    fun closeHomeScreenAndPlay() {
+        soundSynth.playPaperCrinkle(1)
+        _uiState.update { it.copy(showHomeScreen = false, showGmPanel = false) }
+        if (_uiState.value.status == GameStatus.PLAYING && !_uiState.value.showWorldMap) {
+            scheduleIdleHint()
+        }
+    }
+
+    fun openGmPanel() {
+        if (!_uiState.value.isGmAccount) return
+        soundSynth.playPaperCrinkle(2)
+        _uiState.update { it.copy(showGmPanel = true) }
+    }
+
+    fun closeGmPanel() {
+        soundSynth.playPaperCrinkle(1)
+        _uiState.update { it.copy(showGmPanel = false) }
+    }
+
+    fun loginWithUsernameAndPassword(
+        username: String,
+        password: String,
+        isRegister: Boolean
+    ): String? {
+        val cleanUser = username.trim()
+        if (cleanUser.length < 2) {
+            return "Please enter a username (at least 2 characters)."
+        }
+        if (password.length < 3) {
+            return "Please enter a password (at least 3 characters)."
+        }
+
+        // Built-in GM Account check: username "jcv" and password "jan27"
+        if (cleanUser.equals(GM_USERNAME, ignoreCase = true)) {
+            if (password != GM_PASSWORD) {
+                return "Invalid GM password for 'jcv'."
+            }
+            soundSynth.playFeverFanfare()
+            val gmStars = (1..TOTAL_LEVELS).associateWith { lvl ->
+                maxOf(_uiState.value.levelStars[lvl] ?: 0, 3)
+            }
+            _uiState.update { state ->
+                state.copy(
+                    accountUsername = GM_USERNAME,
+                    isGmAccount = true,
+                    isAuthenticatedSession = true,
+                    showHomeScreen = false,
+                    highestUnlockedLevel = TOTAL_LEVELS,
+                    levelStars = gmStars,
+                    boosters = mapOf(
+                        BoosterType.SCISSORS to maxOf(state.boosters[BoosterType.SCISSORS] ?: 3, 99),
+                        BoosterType.GLUE to maxOf(state.boosters[BoosterType.GLUE] ?: 3, 99),
+                        BoosterType.HAMMER to maxOf(state.boosters[BoosterType.HAMMER] ?: 2, 99)
+                    )
+                )
+            }
+            persistProgress()
+            syncToCloudIfEligible(forceImmediate = true)
+            scheduleIdleHint()
+            return null
+        }
+
+        // Standard Username & Password Account
+        val accountsMap = loadSavedAccountsMap().toMutableMap()
+        val keyLower = cleanUser.lowercase()
+        if (isRegister) {
+            accountsMap[keyLower] = password
+            saveAccountsMap(accountsMap)
+        } else {
+            val existingPass = accountsMap[keyLower]
+            if (existingPass != null && existingPass != password) {
+                return "Incorrect password for '$cleanUser'."
+            }
+            if (existingPass == null) {
+                accountsMap[keyLower] = password
+                saveAccountsMap(accountsMap)
+            }
+        }
+
+        soundSynth.playPaperCrinkle(2)
+        _uiState.update { state ->
+            state.copy(
+                accountUsername = cleanUser.take(40),
+                isGmAccount = false,
+                isAuthenticatedSession = true,
+                showHomeScreen = false
+            )
+        }
+        persistProgress()
+        syncToCloudIfEligible(forceImmediate = true)
+        scheduleIdleHint()
+        return null
+    }
+
+    fun onGoogleAuthSuccess(emailOrDisplayName: String?) {
+        val isBootstrappedAdmin = emailOrDisplayName?.equals("jcv.ai.use@gmail.com", ignoreCase = true) == true
+        val fallbackName = emailOrDisplayName?.substringBefore("@")?.takeIf { it.isNotBlank() } ?: "Crafter"
+
+        _uiState.update { state ->
+            val keepGm = state.isGmAccount || isBootstrappedAdmin
+            val nextUser = if (state.accountUsername == "Guest" || state.accountUsername.isBlank()) {
+                if (keepGm) GM_USERNAME else fallbackName.take(40)
+            } else {
+                state.accountUsername
+            }
+            state.copy(
+                isAuthenticatedSession = true,
+                accountUsername = nextUser,
+                isGmAccount = keepGm,
+                highestUnlockedLevel = if (keepGm) TOTAL_LEVELS else state.highestUnlockedLevel,
+                showHomeScreen = false
+            )
+        }
+        persistProgress()
+
+        val repo = profileRepository ?: return
+        val hasFirebaseUser = try {
+            Firebase.auth.currentUser != null
+        } catch (_: Exception) {
+            false
+        }
+        if (!hasFirebaseUser) return
+
+        viewModelScope.launch {
+            val remoteResult = repo.getMyProfile()
+            val remote = remoteResult.getOrNull()
+            if (remote != null) {
+                applyRemoteProfileSnapshot(
+                    remote = remote,
+                    fallbackName = fallbackName,
+                    isBootstrappedAdmin = isBootstrappedAdmin,
+                    syncBoostersStrictly = false
+                )
+            }
+            syncToCloudIfEligible(forceImmediate = true)
+            startCloudProfileListener()
+        }
+    }
+
+    /**
+     * Attaches a single real-time Firestore snapshot listener to `/users/{uid}` while the user is authenticated
+     * and the app is in the foreground. Automatically merges remote level progress, unlocked stages, and boosters
+     * from other devices while keeping free-tier reads minimal.
+     */
+    private fun startCloudProfileListener() {
+        val repo = profileRepository ?: return
+        if (cloudListenerJob?.isActive == true) return
+        val currentUser = try {
+            Firebase.auth.currentUser
+        } catch (_: Exception) {
+            null
+        } ?: return
+
+        val isBootstrappedAdmin = currentUser.email?.equals("jcv.ai.use@gmail.com", ignoreCase = true) == true
+        val fallbackName = currentUser.email?.substringBefore("@")?.takeIf { it.isNotBlank() } ?: "Crafter"
+
+        cloudListenerJob = viewModelScope.launch {
+            try {
+                repo.observeMyProfile().collect { remoteProfile ->
+                    if (remoteProfile != null) {
+                        applyRemoteProfileSnapshot(
+                            remote = remoteProfile,
+                            fallbackName = fallbackName,
+                            isBootstrappedAdmin = isBootstrappedAdmin,
+                            syncBoostersStrictly = true
+                        )
+                    }
+                }
+            } catch (_: Exception) {
+                // Listener errors are logged by PaperProfileRepository's structured error handler
+            }
+        }
+    }
+
+    private fun stopCloudProfileListener() {
+        cloudListenerJob?.cancel()
+        cloudListenerJob = null
+    }
+
+    private fun applyRemoteProfileSnapshot(
+        remote: PlayerProfile,
+        fallbackName: String,
+        isBootstrappedAdmin: Boolean,
+        syncBoostersStrictly: Boolean
+    ) {
+        isApplyingRemoteSnapshot = true
+        try {
+            val remoteStars = parseStarsMap(remote.starsEncoded)
+            _uiState.update { local ->
+                val mergedStars = (local.levelStars.keys + remoteStars.keys).associateWith { lvl ->
+                    maxOf(local.levelStars[lvl] ?: 0, remoteStars[lvl] ?: 0)
+                }
+                val mergedGm = local.isGmAccount || remote.isGm || isBootstrappedAdmin
+                val mergedHighest = if (mergedGm) {
+                    TOTAL_LEVELS
+                } else {
+                    maxOf(local.highestUnlockedLevel, remote.highestUnlockedLevel.toInt()).coerceIn(1, TOTAL_LEVELS)
+                }
+                val mergedHighScore = maxOf(local.highScore, remote.highScore.toInt())
+                val remoteScissors = remote.scissorsCount.toInt().coerceIn(0, 999)
+                val remoteGlue = remote.glueCount.toInt().coerceIn(0, 999)
+                val remoteHammer = remote.hammerCount.toInt().coerceIn(0, 999)
+                val mergedBoosters = if (syncBoostersStrictly) {
+                    mapOf(
+                        BoosterType.SCISSORS to if (mergedGm) maxOf(remoteScissors, 99) else remoteScissors,
+                        BoosterType.GLUE to if (mergedGm) maxOf(remoteGlue, 99) else remoteGlue,
+                        BoosterType.HAMMER to if (mergedGm) maxOf(remoteHammer, 99) else remoteHammer
+                    )
+                } else {
+                    mapOf(
+                        BoosterType.SCISSORS to maxOf(local.boosters[BoosterType.SCISSORS] ?: 3, remoteScissors),
+                        BoosterType.GLUE to maxOf(local.boosters[BoosterType.GLUE] ?: 3, remoteGlue),
+                        BoosterType.HAMMER to maxOf(local.boosters[BoosterType.HAMMER] ?: 2, remoteHammer)
+                    )
+                }
+                val resolvedUsername = if (local.accountUsername != "Guest") {
+                    local.accountUsername
+                } else {
+                    remote.username.ifBlank { fallbackName }
+                }
+                val remoteLevel = remote.level.toInt().coerceIn(1, mergedHighest)
+                val nextLevel = if (!local.isAnimating && remoteLevel > local.level) {
+                    remoteLevel
+                } else {
+                    local.level
+                }
+                local.copy(
+                    accountUsername = resolvedUsername.take(40),
+                    isGmAccount = mergedGm,
+                    isAuthenticatedSession = true,
+                    level = nextLevel,
+                    mapSelectedLevel = maxOf(local.mapSelectedLevel, nextLevel),
+                    highestUnlockedLevel = mergedHighest,
+                    highScore = mergedHighScore,
+                    levelStars = mergedStars,
+                    boosters = mergedBoosters
+                )
+            }
+            lastQueuedMilestoneSignature = computeMilestoneSignature(_uiState.value)
+            persistProgress()
+        } finally {
+            isApplyingRemoteSnapshot = false
+        }
+    }
+
+    /**
+     * Debounces and coalesces outbound cloud writes (3.5s debounce + repository 8s cooldown)
+     * so rapid booster usage or stage unlocks batch into a single Firestore write.
+     */
+    private fun scheduleAutoCloudSync(immediate: Boolean = false) {
+        val repo = profileRepository ?: return
+        debouncedSyncJob?.cancel()
+        debouncedSyncJob = viewModelScope.launch {
+            if (!immediate) {
+                val cooldownWait = repo.getRemainingCooldownMs()
+                val delayMs = maxOf(AUTO_SYNC_DEBOUNCE_MS, cooldownWait)
+                delay(delayMs)
+            }
+            syncToCloudIfEligible(forceImmediate = immediate)
+        }
+    }
+
+    fun signOutSession() {
+        stopCloudProfileListener()
+        debouncedSyncJob?.cancel()
+        debouncedSyncJob = null
+        soundSynth.playPaperCrinkle(1)
+        _uiState.update { state ->
+            state.copy(
+                isAuthenticatedSession = false,
+                isGmAccount = false,
+                accountUsername = "Guest",
+                showGmPanel = false,
+                showHomeScreen = true
+            )
+        }
+        persistProgress()
+    }
+
+    fun triggerManualCloudSync() {
+        syncToCloudIfEligible(forceImmediate = true)
+    }
+
+    fun gmUnlockAllLevels() {
+        if (!_uiState.value.isGmAccount) return
+        soundSynth.playFeverFanfare()
+        val allThreeStars = (1..TOTAL_LEVELS).associateWith { 3 }
+        _uiState.update {
+            it.copy(
+                highestUnlockedLevel = TOTAL_LEVELS,
+                levelStars = allThreeStars
+            )
+        }
+        persistProgress()
+        syncToCloudIfEligible(forceImmediate = true)
+    }
+
+    fun gmGrant99Boosters() {
+        if (!_uiState.value.isGmAccount) return
+        soundSynth.playPaperCrinkle(3)
+        _uiState.update {
+            it.copy(
+                boosters = mapOf(
+                    BoosterType.SCISSORS to 99,
+                    BoosterType.GLUE to 99,
+                    BoosterType.HAMMER to 99
+                )
+            )
+        }
+        persistProgress()
+        syncToCloudIfEligible(forceImmediate = true)
+    }
+
+    fun gmInstantWinLevel() {
+        if (!_uiState.value.isGmAccount) return
+        soundSynth.playFeverFanfare()
+        _uiState.update { state ->
+            val updatedStars = state.levelStars + (state.level to 3)
+            val nextUnlocked = maxOf(state.highestUnlockedLevel, (state.level + 1).coerceAtMost(TOTAL_LEVELS))
+            val nextScore = state.score + 3500
+            state.copy(
+                goal = state.goal.copy(collectedCount = state.goal.targetCount),
+                secondaryGoal = state.secondaryGoal?.copy(collectedCount = state.secondaryGoal.targetCount),
+                goldCells = emptySet(),
+                tapeLocks = emptyMap(),
+                score = nextScore,
+                highScore = maxOf(state.highScore, nextScore),
+                lastEarnedStars = 3,
+                levelStars = updatedStars,
+                highestUnlockedLevel = nextUnlocked,
+                status = GameStatus.WON,
+                showGmPanel = false
+            )
+        }
+        persistProgress()
+        syncToCloudIfEligible(forceImmediate = true)
+    }
+
+    fun gmAdd15Moves() {
+        if (!_uiState.value.isGmAccount) return
+        soundSynth.playPaperCrinkle(2)
+        _uiState.update { state ->
+            state.copy(
+                movesRemaining = state.movesRemaining + 15,
+                status = GameStatus.PLAYING
+            )
+        }
+    }
+
+    fun gmJumpToLevel(targetLevel: Int) {
+        if (!_uiState.value.isGmAccount) return
+        startLevel(
+            level = targetLevel.coerceIn(1, TOTAL_LEVELS),
+            highestUnlockedLevel = TOTAL_LEVELS
+        )
+    }
+
+    private fun syncToCloudIfEligible(forceImmediate: Boolean = false) {
+        val repo = profileRepository ?: return
+        val hasFirebaseUser = try {
+            Firebase.auth.currentUser != null
+        } catch (_: Exception) {
+            false
+        }
+        if (!hasFirebaseUser) return
+
+        val snapshotState = _uiState.value
+        if (!snapshotState.isAuthenticatedSession) return
+        viewModelScope.launch {
+            repo.syncMyProfile(
+                username = snapshotState.accountUsername.ifBlank { "Crafter" },
+                role = if (snapshotState.isGmAccount) "gm" else "player",
+                level = snapshotState.level,
+                highestUnlockedLevel = snapshotState.highestUnlockedLevel,
+                highScore = snapshotState.highScore,
+                scissorsCount = snapshotState.boosters[BoosterType.SCISSORS] ?: 0,
+                glueCount = snapshotState.boosters[BoosterType.GLUE] ?: 0,
+                hammerCount = snapshotState.boosters[BoosterType.HAMMER] ?: 0,
+                starsEncoded = serializeStarsMap(snapshotState.levelStars),
+                forceImmediate = forceImmediate
+            )
+        }
+    }
+
+    private fun loadSavedAccountsMap(): Map<String, String> {
+        val raw = prefs?.getString(KEY_ACCOUNTS_MAP, "") ?: ""
+        if (raw.isBlank()) return emptyMap()
+        val result = mutableMapOf<String, String>()
+        raw.split("|").forEach { item ->
+            val idx = item.indexOf(':')
+            if (idx > 0) {
+                val u = item.substring(0, idx)
+                val p = item.substring(idx + 1)
+                result[u] = p
+            }
+        }
+        return result
+    }
+
+    private fun saveAccountsMap(map: Map<String, String>) {
+        val encoded = map.entries.joinToString("|") { "${it.key}:${it.value}" }
+        prefs?.edit()?.putString(KEY_ACCOUNTS_MAP, encoded)?.apply()
+    }
+
     override fun onCleared() {
+        stopCloudProfileListener()
+        debouncedSyncJob?.cancel()
         super.onCleared()
         soundSynth.shutdown()
     }
 
     companion object {
         const val PREFS_NAME = "paper_craft_crush_storage"
+        const val GM_USERNAME = "jcv"
+        const val GM_PASSWORD = "jan27"
+        private const val AUTO_SYNC_DEBOUNCE_MS = 3_500L
         private const val KEY_LEVEL = "current_level"
         private const val KEY_HIGHEST_LEVEL = "highest_unlocked_level"
         private const val KEY_LEVEL_STARS = "level_stars_map"
@@ -2113,5 +2787,9 @@ class PaperCrushViewModel(
         private const val KEY_GLUE = "booster_glue"
         private const val KEY_HAMMER = "booster_hammer"
         private const val KEY_SOUND = "sound_enabled"
+        private const val KEY_ACTIVE_USERNAME = "active_username"
+        private const val KEY_IS_AUTHENTICATED = "is_authenticated_session"
+        private const val KEY_IS_GM = "is_gm_account"
+        private const val KEY_ACCOUNTS_MAP = "registered_accounts_map"
     }
 }

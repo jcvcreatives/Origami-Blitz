@@ -714,189 +714,191 @@ private fun PaperBoardCell(
         )
 
         // 2. Bespoke Origami Accordion-Ribbon Wake, Fold-Crease Starburst & Scissor-Cut Perforation FX
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val rowOff = offsetRowAnim.value
-            val dashEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 5f), 0f)
+        val dashEffect = remember { PathEffect.dashPathEffect(floatArrayOf(6f, 5f), 0f) }
+        if (tile.spawnDistance > 0.001f || tile.isCrushing) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val rowOff = offsetRowAnim.value
 
-            // A) Accordion-Folded Washi Paper Ribbon & Fluttering Origami Diamond Wake above falling blocks
-            if (tile.spawnDistance > 0.001f && rowOff < -0.06f) {
-                val streakAlpha = ((-rowOff / tile.spawnDistance.coerceAtLeast(1f)).coerceIn(0f, 1f)) *
-                    (0.55f + tierBoost * 0.10f).coerceAtMost(0.95f)
-                val topY = (rowOff * size.height) - size.height * (0.34f + tierBoost * 0.10f)
-                val botY = (rowOff * size.height) + size.height * 0.18f
-                val ribbonColor = if (comboTier >= 2) tierColor.copy(alpha = streakAlpha)
-                else tile.type.primaryColor.copy(alpha = streakAlpha * 0.85f)
-                val foldLight = PeppermintWhite.copy(alpha = streakAlpha * 0.88f)
+                // A) Accordion-Folded Washi Paper Ribbon & Fluttering Origami Diamond Wake above falling blocks
+                if (tile.spawnDistance > 0.001f && rowOff < -0.06f) {
+                    val streakAlpha = ((-rowOff / tile.spawnDistance.coerceAtLeast(1f)).coerceIn(0f, 1f)) *
+                        (0.55f + tierBoost * 0.10f).coerceAtMost(0.95f)
+                    val topY = (rowOff * size.height) - size.height * (0.34f + tierBoost * 0.10f)
+                    val botY = (rowOff * size.height) + size.height * 0.18f
+                    val ribbonColor = if (comboTier >= 2) tierColor.copy(alpha = streakAlpha)
+                    else tile.type.primaryColor.copy(alpha = streakAlpha * 0.85f)
+                    val foldLight = PeppermintWhite.copy(alpha = streakAlpha * 0.88f)
 
-                // Zig-zag accordion-folded Washi ribbon in center
-                val folds = 4 + tierBoost.coerceAtMost(3)
-                val segH = (botY - topY) / folds
-                val halfRibbonW = size.width * (0.14f + tierBoost * 0.02f)
-                for (f in 0 until folds) {
-                    val y0 = topY + f * segH
-                    val y1 = y0 + segH
-                    val xShift0 = if (f % 2 == 0) -halfRibbonW * 0.35f else halfRibbonW * 0.35f
-                    val xShift1 = -xShift0
-                    val quad = Path().apply {
-                        moveTo(center.x - halfRibbonW + xShift0, y0)
-                        lineTo(center.x + halfRibbonW + xShift0, y0)
-                        lineTo(center.x + halfRibbonW + xShift1, y1)
-                        lineTo(center.x - halfRibbonW + xShift1, y1)
+                    // Zig-zag accordion-folded Washi ribbon in center
+                    val folds = 4 + tierBoost.coerceAtMost(3)
+                    val segH = (botY - topY) / folds
+                    val halfRibbonW = size.width * (0.14f + tierBoost * 0.02f)
+                    for (f in 0 until folds) {
+                        val y0 = topY + f * segH
+                        val y1 = y0 + segH
+                        val xShift0 = if (f % 2 == 0) -halfRibbonW * 0.35f else halfRibbonW * 0.35f
+                        val xShift1 = -xShift0
+                        val quad = Path().apply {
+                            moveTo(center.x - halfRibbonW + xShift0, y0)
+                            lineTo(center.x + halfRibbonW + xShift0, y0)
+                            lineTo(center.x + halfRibbonW + xShift1, y1)
+                            lineTo(center.x - halfRibbonW + xShift1, y1)
+                            close()
+                        }
+                        drawPath(
+                            path = quad,
+                            color = if (f % 2 == 0) ribbonColor else tile.type.secondaryColor.copy(alpha = streakAlpha * 0.85f)
+                        )
+                        // Crisp horizontal origami fold-crease line
+                        drawLine(
+                            color = foldLight,
+                            start = Offset(center.x - halfRibbonW + xShift0, y0),
+                            end = Offset(center.x + halfRibbonW + xShift0, y0),
+                            strokeWidth = 1.5f
+                        )
+                    }
+
+                    // Flanking fluttering folded paper diamonds in the wake
+                    val diamondSize = size.width * (0.09f + tierBoost * 0.015f)
+                    for (side in intArrayOf(-1, 1)) {
+                        val dx = center.x + side * size.width * 0.30f
+                        val dy = (topY + botY) * 0.5f + (side * segH * 0.3f)
+                        val diamond = Path().apply {
+                            moveTo(dx, dy - diamondSize)
+                            lineTo(dx + diamondSize * 0.75f, dy)
+                            lineTo(dx, dy + diamondSize)
+                            lineTo(dx - diamondSize * 0.75f, dy)
+                            close()
+                        }
+                        drawPath(diamond, ribbonColor)
+                        drawLine(
+                            color = foldLight,
+                            start = Offset(dx, dy - diamondSize),
+                            end = Offset(dx, dy + diamondSize),
+                            strokeWidth = 1.3f
+                        )
+                    }
+                }
+
+                // B) Origami 8-Point Star-Crease & Scissor-Cut Perforation Burst on Match Crush
+                val crushP = crushRingAnim.value
+                if (crushP > 0.01f) {
+                    val fade = (1f - crushP).coerceIn(0f, 1f)
+                    val outerR = size.minDimension * (0.28f + crushP * (0.58f + tierBoost * 0.06f))
+                    val innerR = outerR * 0.54f
+                    val starColor = if (comboTier >= 2) tierColor.copy(alpha = fade * 0.88f)
+                    else tile.type.primaryColor.copy(alpha = fade * 0.84f)
+
+                    val starPath = Path()
+                    val points = 16
+                    for (i in 0 until points) {
+                        val r = if (i % 2 == 0) outerR else innerR
+                        val angle = (i * PI / 8.0 + crushP * 0.45).toFloat()
+                        val px = center.x + cos(angle) * r
+                        val py = center.y + sin(angle) * r
+                        if (i == 0) starPath.moveTo(px, py) else starPath.lineTo(px, py)
+                    }
+                    starPath.close()
+
+                    drawPath(
+                        path = starPath,
+                        color = StickyNoteYellow.copy(alpha = fade * 0.38f)
+                    )
+                    drawPath(
+                        path = starPath,
+                        color = starColor,
+                        style = Stroke(width = size.minDimension * 0.065f * fade)
+                    )
+
+                    // Dashed scissor-cut diagonal crease guidelines across the crushed cell
+                    val diagR = outerR * 0.92f
+                    for (d in 0 until 4) {
+                        val a = (d * PI / 4.0).toFloat()
+                        val cA = cos(a)
+                        val sA = sin(a)
+                        drawLine(
+                            color = InkBrown.copy(alpha = fade * 0.70f),
+                            start = Offset(center.x - cA * diagR, center.y - sA * diagR),
+                            end = Offset(center.x + cA * diagR, center.y + sA * diagR),
+                            strokeWidth = 2f,
+                            pathEffect = dashEffect
+                        )
+                    }
+                }
+
+                // C) Unfolding Origami Diamond-Crease & Flying Paper-Dart Landing Burst
+                val impactP = impactRingAnim.value
+                if (impactP > 0.01f) {
+                    val fade = (1f - impactP).coerceIn(0f, 1f)
+                    val reach = size.minDimension * (0.26f + impactP * (0.40f + tierBoost * 0.07f))
+                    val notch = reach * 0.62f
+                    val creaseColor = tierColor.copy(alpha = fade * (0.62f + tierBoost * 0.08f).coerceAtMost(0.95f))
+
+                    // 8-point folded origami diamond-star outline
+                    val diamondStar = Path().apply {
+                        moveTo(center.x, center.y - reach)
+                        lineTo(center.x + notch * 0.55f, center.y - notch * 0.55f)
+                        lineTo(center.x + reach, center.y)
+                        lineTo(center.x + notch * 0.55f, center.y + notch * 0.55f)
+                        lineTo(center.x, center.y + reach)
+                        lineTo(center.x - notch * 0.55f, center.y + notch * 0.55f)
+                        lineTo(center.x - reach, center.y)
+                        lineTo(center.x - notch * 0.55f, center.y - notch * 0.55f)
                         close()
                     }
                     drawPath(
-                        path = quad,
-                        color = if (f % 2 == 0) ribbonColor else tile.type.secondaryColor.copy(alpha = streakAlpha * 0.85f)
+                        path = diamondStar,
+                        color = creaseColor,
+                        style = Stroke(width = size.minDimension * (0.052f + tierBoost * 0.01f) * fade)
                     )
-                    // Crisp horizontal origami fold-crease line
-                    drawLine(
-                        color = foldLight,
-                        start = Offset(center.x - halfRibbonW + xShift0, y0),
-                        end = Offset(center.x + halfRibbonW + xShift0, y0),
-                        strokeWidth = 1.5f
-                    )
-                }
 
-                // Flanking fluttering folded paper diamonds in the wake
-                val diamondSize = size.width * (0.09f + tierBoost * 0.015f)
-                for (side in intArrayOf(-1, 1)) {
-                    val dx = center.x + side * size.width * 0.30f
-                    val dy = (topY + botY) * 0.5f + (side * segH * 0.3f)
-                    val diamond = Path().apply {
-                        moveTo(dx, dy - diamondSize)
-                        lineTo(dx + diamondSize * 0.75f, dy)
-                        lineTo(dx, dy + diamondSize)
-                        lineTo(dx - diamondSize * 0.75f, dy)
+                    // Inner stitched/perforated square fold-crease frame
+                    val innerReach = reach * 0.72f
+                    val innerSquare = Path().apply {
+                        moveTo(center.x - innerReach, center.y - innerReach)
+                        lineTo(center.x + innerReach, center.y - innerReach)
+                        lineTo(center.x + innerReach, center.y + innerReach)
+                        lineTo(center.x - innerReach, center.y + innerReach)
                         close()
                     }
-                    drawPath(diamond, ribbonColor)
-                    drawLine(
-                        color = foldLight,
-                        start = Offset(dx, dy - diamondSize),
-                        end = Offset(dx, dy + diamondSize),
-                        strokeWidth = 1.3f
+                    drawPath(
+                        path = innerSquare,
+                        color = StickyNoteYellow.copy(alpha = fade * 0.82f),
+                        style = Stroke(width = 2f, pathEffect = dashEffect)
                     )
-                }
-            }
 
-            // B) Origami 8-Point Star-Crease & Scissor-Cut Perforation Burst on Match Crush
-            val crushP = crushRingAnim.value
-            if (crushP > 0.01f) {
-                val fade = (1f - crushP).coerceIn(0f, 1f)
-                val outerR = size.minDimension * (0.28f + crushP * (0.58f + tierBoost * 0.06f))
-                val innerR = outerR * 0.54f
-                val starColor = if (comboTier >= 2) tierColor.copy(alpha = fade * 0.88f)
-                else tile.type.primaryColor.copy(alpha = fade * 0.84f)
+                    // Outward-flying folded paper triangle darts on x2, x3, x4+ cascade drops!
+                    if (comboTier >= 2) {
+                        val dartCount = (4 + tierBoost * 2).coerceAtMost(8)
+                        val dartDist = size.minDimension * (0.24f + impactP * (0.44f + tierBoost * 0.06f))
+                        val dartLen = size.minDimension * (0.12f + tierBoost * 0.015f) * fade
+                        for (i in 0 until dartCount) {
+                            val angle = (i * (2.0 * PI / dartCount) + impactP * 0.35).toFloat()
+                            val cA = cos(angle)
+                            val sA = sin(angle)
+                            val pA = -sA
+                            val pB = cA
+                            val tipX = center.x + cA * (dartDist + dartLen)
+                            val tipY = center.y + sA * (dartDist + dartLen)
+                            val baseX = center.x + cA * dartDist
+                            val baseY = center.y + sA * dartDist
+                            val wingW = dartLen * 0.58f
 
-                val starPath = Path()
-                val points = 16
-                for (i in 0 until points) {
-                    val r = if (i % 2 == 0) outerR else innerR
-                    val angle = (i * PI / 8.0 + crushP * 0.45).toFloat()
-                    val px = center.x + cos(angle) * r
-                    val py = center.y + sin(angle) * r
-                    if (i == 0) starPath.moveTo(px, py) else starPath.lineTo(px, py)
-                }
-                starPath.close()
-
-                drawPath(
-                    path = starPath,
-                    color = StickyNoteYellow.copy(alpha = fade * 0.38f)
-                )
-                drawPath(
-                    path = starPath,
-                    color = starColor,
-                    style = Stroke(width = size.minDimension * 0.065f * fade)
-                )
-
-                // Dashed scissor-cut diagonal crease guidelines across the crushed cell
-                val diagR = outerR * 0.92f
-                for (d in 0 until 4) {
-                    val a = (d * PI / 4.0).toFloat()
-                    val cA = cos(a)
-                    val sA = sin(a)
-                    drawLine(
-                        color = InkBrown.copy(alpha = fade * 0.70f),
-                        start = Offset(center.x - cA * diagR, center.y - sA * diagR),
-                        end = Offset(center.x + cA * diagR, center.y + sA * diagR),
-                        strokeWidth = 2f,
-                        pathEffect = dashEffect
-                    )
-                }
-            }
-
-            // C) Unfolding Origami Diamond-Crease & Flying Paper-Dart Landing Burst
-            val impactP = impactRingAnim.value
-            if (impactP > 0.01f) {
-                val fade = (1f - impactP).coerceIn(0f, 1f)
-                val reach = size.minDimension * (0.26f + impactP * (0.40f + tierBoost * 0.07f))
-                val notch = reach * 0.62f
-                val creaseColor = tierColor.copy(alpha = fade * (0.62f + tierBoost * 0.08f).coerceAtMost(0.95f))
-
-                // 8-point folded origami diamond-star outline
-                val diamondStar = Path().apply {
-                    moveTo(center.x, center.y - reach)
-                    lineTo(center.x + notch * 0.55f, center.y - notch * 0.55f)
-                    lineTo(center.x + reach, center.y)
-                    lineTo(center.x + notch * 0.55f, center.y + notch * 0.55f)
-                    lineTo(center.x, center.y + reach)
-                    lineTo(center.x - notch * 0.55f, center.y + notch * 0.55f)
-                    lineTo(center.x - reach, center.y)
-                    lineTo(center.x - notch * 0.55f, center.y - notch * 0.55f)
-                    close()
-                }
-                drawPath(
-                    path = diamondStar,
-                    color = creaseColor,
-                    style = Stroke(width = size.minDimension * (0.052f + tierBoost * 0.01f) * fade)
-                )
-
-                // Inner stitched/perforated square fold-crease frame
-                val innerReach = reach * 0.72f
-                val innerSquare = Path().apply {
-                    moveTo(center.x - innerReach, center.y - innerReach)
-                    lineTo(center.x + innerReach, center.y - innerReach)
-                    lineTo(center.x + innerReach, center.y + innerReach)
-                    lineTo(center.x - innerReach, center.y + innerReach)
-                    close()
-                }
-                drawPath(
-                    path = innerSquare,
-                    color = StickyNoteYellow.copy(alpha = fade * 0.82f),
-                    style = Stroke(width = 2f, pathEffect = dashEffect)
-                )
-
-                // Outward-flying folded paper triangle darts on x2, x3, x4+ cascade drops!
-                if (comboTier >= 2) {
-                    val dartCount = (4 + tierBoost * 2).coerceAtMost(8)
-                    val dartDist = size.minDimension * (0.24f + impactP * (0.44f + tierBoost * 0.06f))
-                    val dartLen = size.minDimension * (0.12f + tierBoost * 0.015f) * fade
-                    for (i in 0 until dartCount) {
-                        val angle = (i * (2.0 * PI / dartCount) + impactP * 0.35).toFloat()
-                        val cA = cos(angle)
-                        val sA = sin(angle)
-                        val pA = -sA
-                        val pB = cA
-                        val tipX = center.x + cA * (dartDist + dartLen)
-                        val tipY = center.y + sA * (dartDist + dartLen)
-                        val baseX = center.x + cA * dartDist
-                        val baseY = center.y + sA * dartDist
-                        val wingW = dartLen * 0.58f
-
-                        val leftWing = Path().apply {
-                            moveTo(tipX, tipY)
-                            lineTo(baseX + pA * wingW, baseY + pB * wingW)
-                            lineTo(baseX, baseY)
-                            close()
+                            val leftWing = Path().apply {
+                                moveTo(tipX, tipY)
+                                lineTo(baseX + pA * wingW, baseY + pB * wingW)
+                                lineTo(baseX, baseY)
+                                close()
+                            }
+                            val rightWing = Path().apply {
+                                moveTo(tipX, tipY)
+                                lineTo(baseX - pA * wingW, baseY - pB * wingW)
+                                lineTo(baseX, baseY)
+                                close()
+                            }
+                            drawPath(leftWing, tierColor.copy(alpha = fade * 0.90f))
+                            drawPath(rightWing, StickyNoteYellow.copy(alpha = fade * 0.90f))
                         }
-                        val rightWing = Path().apply {
-                            moveTo(tipX, tipY)
-                            lineTo(baseX - pA * wingW, baseY - pB * wingW)
-                            lineTo(baseX, baseY)
-                            close()
-                        }
-                        drawPath(leftWing, tierColor.copy(alpha = fade * 0.90f))
-                        drawPath(rightWing, StickyNoteYellow.copy(alpha = fade * 0.90f))
                     }
                 }
             }
@@ -911,7 +913,12 @@ private fun PaperBoardCell(
                     val rowOff = offsetRowAnim.value
                     val swapP = swapArcProgress.value
                     val squash = landingSquashAnim.value
-                    val wave = sharedWaveState.value
+                    // Only subscribe to sharedWaveState on the 1-2 selected or hinted cells!
+                    val wave = if (isSelected || isHinted || hintPartnerDelta != null) {
+                        sharedWaveState.value
+                    } else {
+                        0f
+                    }
 
                     val isFallingMidAir = tile.spawnDistance > 0.001f && abs(rowOff) > 0.08f
                     val fallRatio = if (tile.spawnDistance > 0.001f) {

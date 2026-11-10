@@ -1,0 +1,89 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pillar 4.1: Global Safety Net (Default-Deny Catch-All)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3: Reusable Hardened Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email == 'jcv.ai.use@gmail.com' && request.auth.token.email_verified == true) ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Pillar 2: Standalone Entity Validation Blueprint
+    function isValidPlayerProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.userId == request.auth.uid &&
+             data.username is string && data.username.size() >= 1 && data.username.size() <= 40 &&
+             data.role is string && data.role.size() <= 16 && (data.role == 'player' || data.role == 'gm') &&
+             data.level is int && data.level >= 1 && data.level <= 50 &&
+             data.highestUnlockedLevel is int && data.highestUnlockedLevel >= 1 && data.highestUnlockedLevel <= 50 &&
+             data.highScore is int && data.highScore >= 0 && data.highScore <= 100000000 &&
+             data.scissorsCount is int && data.scissorsCount >= 0 && data.scissorsCount <= 999 &&
+             data.glueCount is int && data.glueCount >= 0 && data.glueCount <= 999 &&
+             data.hammerCount is int && data.hammerCount >= 0 && data.hammerCount <= 999 &&
+             data.starsEncoded is string && data.starsEncoded.size() <= 600 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       incoming().keys().hasAll([
+                         'userId', 'username', 'role', 'level', 'highestUnlockedLevel',
+                         'highScore', 'scissorsCount', 'glueCount', 'hammerCount',
+                         'starsEncoded', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'username', 'role', 'level', 'highestUnlockedLevel',
+                         'highScore', 'scissorsCount', 'glueCount', 'hammerCount',
+                         'starsEncoded', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidPlayerProfile(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(userId) &&
+                       isValidPlayerProfile(incoming()) && (
+                         (
+                           request.auth.uid == userId &&
+                           incoming().userId == existing().userId &&
+                           incoming().createdAt == existing().createdAt &&
+                           incoming().diff(existing()).affectedKeys().hasOnly([
+                             'username', 'role', 'level', 'highestUnlockedLevel',
+                             'highScore', 'scissorsCount', 'glueCount', 'hammerCount',
+                             'starsEncoded', 'updatedAt'
+                           ])
+                         ) ||
+                         isAdmin()
+                       );
+
+      allow delete: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+    }
+  }
+}

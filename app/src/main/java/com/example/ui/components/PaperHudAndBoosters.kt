@@ -1,10 +1,17 @@
 package com.example.ui.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,6 +21,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -25,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
@@ -35,20 +44,32 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 import com.example.R
 import com.example.model.BoosterType
 import com.example.model.GameStatus
@@ -71,6 +92,7 @@ import com.example.ui.theme.StickyNoteShadow
 import com.example.ui.theme.StickyNoteYellow
 import com.example.ui.theme.ThumbtackHighlight
 import com.example.ui.theme.ThumbtackRed
+import com.example.ui.theme.WrappedCandyPurple
 
 @Composable
 fun PaperTopHud(
@@ -81,6 +103,8 @@ fun PaperTopHud(
     onOpenTutorial: () -> Unit = {},
     onNextTutorialStep: () -> Unit = {},
     onDismissTutorial: () -> Unit = {},
+    onOpenHomeScreen: () -> Unit = {},
+    onOpenGmPanel: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val animatedScore by animateIntAsState(
@@ -102,12 +126,32 @@ fun PaperTopHud(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                // Home / Account Portal Button
+                IconButton(
+                    onClick = onOpenHomeScreen,
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .size(38.dp)
+                        .shadow(3.dp, CircleShape)
+                        .background(MaskingTapeCream, CircleShape)
+                        .border(1.5.dp, CardboardMedium, CircleShape)
+                        .testTag("open_home_screen_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Home,
+                        contentDescription = "Home & Login",
+                        tint = InkBrown,
+                        modifier = Modifier.size(19.dp)
+                    )
+                }
+
                 IconButton(
                     onClick = onToggleSound,
                     modifier = Modifier
                         .minimumInteractiveComponentSize()
+                        .size(38.dp)
                         .shadow(3.dp, CircleShape)
                         .background(MaskingTapeCream, CircleShape)
                         .border(1.5.dp, CardboardMedium, CircleShape)
@@ -124,7 +168,8 @@ fun PaperTopHud(
                         } else {
                             stringResource(R.string.btn_sound_off)
                         },
-                        tint = InkBrown
+                        tint = InkBrown,
+                        modifier = Modifier.size(19.dp)
                     )
                 }
 
@@ -137,21 +182,21 @@ fun PaperTopHud(
                         .background(StickyNoteYellow, RoundedCornerShape(99.dp))
                         .border(1.5.dp, CardboardDark, RoundedCornerShape(99.dp))
                         .clickable(onClick = onOpenWorldMap)
-                        .padding(horizontal = 10.dp, vertical = 7.dp)
+                        .padding(horizontal = 9.dp, vertical = 6.dp)
                         .testTag("open_world_map_button"),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Map,
                         contentDescription = stringResource(R.string.btn_world_map),
                         tint = PeppermintRed,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                     Text(
                         text = "Map",
                         style = MaterialTheme.typography.titleMedium.copy(
-                            fontSize = 13.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.ExtraBold
                         ),
                         color = InkBrown
@@ -161,7 +206,7 @@ fun PaperTopHud(
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
                 modifier = Modifier.clickable(onClick = onOpenWorldMap)
             ) {
                 Box(
@@ -170,13 +215,13 @@ fun PaperTopHud(
                         .shadow(3.dp, TornPaperShape(teethCount = 6, toothDepthPx = 7f))
                         .background(MaskingTapeCream, TornPaperShape(teethCount = 6, toothDepthPx = 7f))
                         .border(1.dp, MaskingTapeBorder, TornPaperShape(teethCount = 6, toothDepthPx = 7f))
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
                         .testTag("header_paper_craft_tape")
                 ) {
                     Text(
-                        text = "Stage ${stageInfo.stageNumber}",
+                        text = "Stg ${stageInfo.stageNumber}",
                         style = MaterialTheme.typography.titleMedium.copy(
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         ),
                         color = InkBrown
@@ -188,12 +233,12 @@ fun PaperTopHud(
                         .shadow(3.dp, TornPaperShape(teethCount = 6, toothDepthPx = 7f))
                         .background(StickyNoteYellow, TornPaperShape(teethCount = 6, toothDepthPx = 7f))
                         .border(1.5.dp, StickyNoteShadow, TornPaperShape(teethCount = 6, toothDepthPx = 7f))
-                        .padding(horizontal = 11.dp, vertical = 4.dp)
+                        .padding(horizontal = 9.dp, vertical = 4.dp)
                         .testTag("header_level_tape")
                 ) {
                     Text(
                         text = stringResource(R.string.header_torn_level, state.level),
-                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp),
+                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 14.sp),
                         color = PeppermintRed
                     )
                 }
@@ -201,13 +246,37 @@ fun PaperTopHud(
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                if (state.isGmAccount) {
+                    Box(
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .shadow(3.dp, RoundedCornerShape(99.dp))
+                            .clip(RoundedCornerShape(99.dp))
+                            .background(WrappedCandyPurple, RoundedCornerShape(99.dp))
+                            .border(1.5.dp, StarCardboardGold, RoundedCornerShape(99.dp))
+                            .clickable(onClick = onOpenGmPanel)
+                            .padding(horizontal = 8.dp, vertical = 6.dp)
+                            .testTag("open_gm_panel_button"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "★ GM",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Black
+                            ),
+                            color = PeppermintWhite
+                        )
+                    }
+                }
+
                 // Interactive Tutorial Guide '?' Button
                 Box(
                     modifier = Modifier
                         .minimumInteractiveComponentSize()
-                        .size(40.dp)
+                        .size(38.dp)
                         .shadow(3.dp, CircleShape)
                         .clip(CircleShape)
                         .background(
@@ -226,7 +295,7 @@ fun PaperTopHud(
                     Text(
                         text = "?",
                         style = MaterialTheme.typography.titleMedium.copy(
-                            fontSize = 18.sp,
+                            fontSize = 17.sp,
                             fontWeight = FontWeight.Black
                         ),
                         color = if (state.tutorialPrompt != null && !state.tutorialDismissed) PeppermintRed else InkBrown
@@ -237,6 +306,7 @@ fun PaperTopHud(
                     onClick = onResetProgress,
                     modifier = Modifier
                         .minimumInteractiveComponentSize()
+                        .size(38.dp)
                         .shadow(3.dp, CircleShape)
                         .background(MaskingTapeCream, CircleShape)
                         .border(1.5.dp, CardboardMedium, CircleShape)
@@ -245,7 +315,8 @@ fun PaperTopHud(
                     Icon(
                         imageVector = Icons.Default.Refresh,
                         contentDescription = stringResource(R.string.btn_retry_level),
-                        tint = InkBrown
+                        tint = InkBrown,
+                        modifier = Modifier.size(19.dp)
                     )
                 }
             }
@@ -281,6 +352,7 @@ fun PaperTopHud(
         OrigamiFeverStrip(
             feverCharge = state.feverCharge,
             feverMovesLeft = state.feverMovesLeft,
+            feverBurstSeq = state.feverBurstSeq,
             streakCount = state.streakCount,
             mechanicLabel = state.mechanicLabel
         )
@@ -301,60 +373,344 @@ fun PaperTopHud(
 private fun OrigamiFeverStrip(
     feverCharge: Float,
     feverMovesLeft: Int,
+    feverBurstSeq: Long,
     streakCount: Int,
     mechanicLabel: String = ""
 ) {
     val isFever = feverMovesLeft > 0
+    val isNearFull = !isFever && feverCharge >= 0.72f
+
+    // 1. Full-Charge Ignition Celebration Burst (0f -> 1f over 920ms when feverBurstSeq increments)
+    val burstProgress = remember { Animatable(1f) }
+    LaunchedEffect(feverBurstSeq) {
+        if (feverBurstSeq > 0L) {
+            burstProgress.snapTo(0f)
+            burstProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 920, easing = LinearEasing)
+            )
+        }
+    }
+    val burstT = burstProgress.value
+    val isBursting = feverBurstSeq > 0L && burstT < 0.99f
+
+    // 2. Smooth Spring Fill Animation
     val animatedFill by animateFloatAsState(
-        targetValue = if (isFever) 1f else feverCharge.coerceIn(0.05f, 1f),
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+        targetValue = if (isFever || isBursting) 1f else feverCharge.coerceIn(0.06f, 1f),
+        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
         label = "fever_fill"
     )
-    val barShape = RoundedCornerShape(10.dp)
+
+    // 3. Continuous 60fps Infinite Animation during Fever Mode or Near-Full Charge
+    val infiniteTransition = rememberInfiniteTransition(label = "fever_infinite")
+    val flowPhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 950, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "fever_flow_phase"
+    )
+    val pulsePhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 520, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "fever_pulse_phase"
+    )
+
+    // Elastic pop & celebratory shake on full-charge ignition + rhythmic heartbeat during Fever
+    val ignitionPop = if (isBursting) {
+        sin(burstT * PI.toFloat()) * 0.13f * (1f - burstT * 0.45f)
+    } else 0f
+    val feverHeartbeat = if (isFever) pulsePhase * 0.032f else if (isNearFull) pulsePhase * 0.015f else 0f
+    val scaleX = 1f + ignitionPop + feverHeartbeat
+    val scaleY = 1f + (ignitionPop * 1.35f) + (feverHeartbeat * 1.25f)
+    val tiltZ = if (isBursting) {
+        sin(burstT * 26f) * (1f - burstT) * 2.2f
+    } else 0f
+
+    val barShape = RoundedCornerShape(12.dp)
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(22.dp)
-            .shadow(3.dp, barShape)
-            .clip(barShape)
-            .background(MaskingTapeCream, barShape)
-            .border(
-                width = if (isFever) 2.dp else 1.dp,
-                color = if (isFever) PeppermintRed else CardboardDark,
-                shape = barShape
-            ),
+            .height(26.dp)
+            .testTag("fever_meter_strip")
+            .graphicsLayer {
+                this.scaleX = scaleX
+                this.scaleY = scaleY
+                this.rotationZ = tiltZ
+                this.clip = false
+            },
         contentAlignment = Alignment.Center
     ) {
+        // Outer Eruption Canvas (Shockwave Rings, Sunburst Rays & Origami Star Sparks on Full Charge)
+        if (isBursting || isFever) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { clip = false }
+            ) {
+                val cx = size.width * 0.5f
+                val cy = size.height * 0.5f
+
+                // Continuous Golden Aura Glow while in Fever Mode
+                if (isFever) {
+                    val glowAlpha = 0.22f + pulsePhase * 0.18f
+                    drawRoundRect(
+                        color = StarCardboardGold.copy(alpha = glowAlpha),
+                        topLeft = Offset(-6f, -5f),
+                        size = Size(size.width + 12f, size.height + 10f),
+                        cornerRadius = CornerRadius(32f, 32f),
+                        style = Stroke(width = 6f)
+                    )
+                }
+
+                // Full-Charge Ignition Shockwave Rings, Radial Rays & 12 Origami Sparks
+                if (isBursting) {
+                    val fade = (1f - burstT).coerceIn(0f, 1f)
+                    val ringExpandX = size.width * (0.5f + burstT * 0.62f)
+                    val ringExpandY = size.height * (0.65f + burstT * 2.2f)
+
+                    // Primary Gold Shockwave Ring
+                    drawRoundRect(
+                        color = StarCardboardGold.copy(alpha = fade * 0.85f),
+                        topLeft = Offset(cx - ringExpandX, cy - ringExpandY),
+                        size = Size(ringExpandX * 2f, ringExpandY * 2f),
+                        cornerRadius = CornerRadius(42f, 42f),
+                        style = Stroke(width = (8f * fade).coerceAtLeast(1.5f))
+                    )
+
+                    // Secondary Crimson Shockwave Ring
+                    val innerProgress = (burstT * 1.25f).coerceIn(0f, 1f)
+                    val innerFade = (1f - innerProgress).coerceIn(0f, 1f)
+                    val innerX = size.width * (0.48f + innerProgress * 0.45f)
+                    val innerY = size.height * (0.55f + innerProgress * 1.6f)
+                    drawRoundRect(
+                        color = PeppermintRed.copy(alpha = innerFade * 0.75f),
+                        topLeft = Offset(cx - innerX, cy - innerY),
+                        size = Size(innerX * 2f, innerY * 2f),
+                        cornerRadius = CornerRadius(36f, 36f),
+                        style = Stroke(width = (5f * innerFade).coerceAtLeast(1f))
+                    )
+
+                    // 12 Erupting Origami Diamond & Star Sparks around the meter
+                    val sparkColors = listOf(
+                        StarCardboardGold,
+                        PeppermintRed,
+                        StickyNoteYellow,
+                        OrigamiFoxOrange,
+                        PeppermintWhite
+                    )
+                    for (i in 0 until 12) {
+                        val angle = (i * (360f / 12f) + 15f) * (PI.toFloat() / 180f)
+                        val distX = (size.width * 0.22f) + (size.width * 0.36f * burstT)
+                        val distY = (size.height * 0.45f) + (size.height * 1.75f * burstT)
+                        val sx = cx + cos(angle) * distX
+                        val sy = cy + sin(angle) * distY
+                        val sparkRadius = (11f * fade).coerceAtLeast(2f)
+                        val sparkColor = sparkColors[i % sparkColors.size].copy(alpha = fade)
+
+                        rotate(degrees = burstT * 320f + i * 30f, pivot = Offset(sx, sy)) {
+                            val diamond = Path().apply {
+                                moveTo(sx, sy - sparkRadius)
+                                lineTo(sx + sparkRadius * 0.7f, sy)
+                                lineTo(sx, sy + sparkRadius)
+                                lineTo(sx - sparkRadius * 0.7f, sy)
+                                close()
+                            }
+                            drawPath(path = diamond, color = sparkColor)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Main Meter Pill Container
         Box(
             modifier = Modifier
-                .fillMaxHeight()
-                .fillMaxWidth(animatedFill)
-                .align(Alignment.CenterStart)
-                .background(
-                    Brush.horizontalGradient(
-                        if (isFever) {
-                            listOf(PeppermintRed, OrigamiFoxOrange, StarCardboardGold)
-                        } else {
-                            listOf(StickyNoteYellow, StarCardboardGold, OrigamiFoxOrange)
-                        }
+                .fillMaxSize()
+                .shadow(if (isFever || isBursting) 6.dp else 3.dp, barShape)
+                .clip(barShape)
+                .background(if (isFever) Color(0xFF2B160C) else MaskingTapeCream, barShape)
+                .border(
+                    width = if (isFever || isBursting) 2.2.dp else 1.2.dp,
+                    color = when {
+                        isBursting -> PeppermintWhite
+                        isFever -> StarCardboardGold
+                        isNearFull -> OrigamiFoxOrange
+                        else -> CardboardDark
+                    },
+                    shape = barShape
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            // Animated Fill Bar + Washi Chevrons + Foil Shimmer + Leading Edge Spark Crest
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val fillW = (size.width * animatedFill).coerceIn(0f, size.width)
+                val h = size.height
+
+                // Base Gradient Fill
+                val fillColors = if (isFever || isBursting) {
+                    listOf(
+                        PeppermintRed,
+                        OrigamiFoxOrange,
+                        StarCardboardGold,
+                        PeppermintRed
                     )
+                } else if (isNearFull) {
+                    listOf(StarCardboardGold, OrigamiFoxOrange, PeppermintRed)
+                } else {
+                    listOf(StickyNoteYellow, StarCardboardGold, OrigamiFoxOrange)
+                }
+
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        colors = fillColors,
+                        startX = 0f,
+                        endX = fillW.coerceAtLeast(1f)
+                    ),
+                    size = Size(fillW, h)
                 )
+
+                // Scrolling Diagonal Origami Washi Stripes during Fever Mode or Near-Full Charge
+                if ((isFever || isBursting || isNearFull) && fillW > 12f) {
+                    val stripeSpacing = 28f
+                    val offsetShift = flowPhase * stripeSpacing
+                    val stripeAlpha = if (isFever || isBursting) 0.28f else 0.16f
+                    var x = -h + offsetShift
+                    while (x < fillW + h) {
+                        val stripePath = Path().apply {
+                            moveTo(x, h)
+                            lineTo(x + 12f, h)
+                            lineTo(x + 12f + h * 0.65f, 0f)
+                            lineTo(x + h * 0.65f, 0f)
+                            close()
+                        }
+                        drawPath(
+                            path = stripePath,
+                            color = PeppermintWhite.copy(alpha = stripeAlpha)
+                        )
+                        x += stripeSpacing
+                    }
+
+                    // High-Energy Foil Shimmer Sweep across the bar
+                    val shimmerCenter = ((flowPhase * 1.4f) - 0.2f) * fillW
+                    val shimmerHalfW = 46f
+                    drawRect(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                PeppermintWhite.copy(alpha = if (isFever) 0.48f else 0.28f),
+                                Color.Transparent
+                            ),
+                            startX = shimmerCenter - shimmerHalfW,
+                            endX = shimmerCenter + shimmerHalfW
+                        ),
+                        size = Size(fillW, h)
+                    )
+                }
+
+                // Glowing Leading-Edge Charge Crest when building charge
+                if (!isFever && fillW > 8f && fillW < size.width - 2f) {
+                    val crestAlpha = if (isNearFull) 0.65f + pulsePhase * 0.35f else 0.55f
+                    drawCircle(
+                        color = PeppermintWhite.copy(alpha = crestAlpha),
+                        radius = if (isNearFull) h * 0.48f else h * 0.32f,
+                        center = Offset(fillW, h * 0.5f)
+                    )
+                }
+
+                // Full-Charge Ignition White-Gold Flash Overlay (first 320ms of burst)
+                if (isBursting && burstT < 0.38f) {
+                    val flashAlpha = ((0.38f - burstT) / 0.38f).coerceIn(0f, 1f) * 0.72f
+                    drawRect(
+                        color = PeppermintWhite.copy(alpha = flashAlpha),
+                        size = size
+                    )
+                }
+            }
+
+            // Left & Right Spinning Origami Pinwheel Emblems during Fever Mode
+            if (isFever || isBursting) {
+                OrigamiSpinningPinwheelIcon(
+                    rotationDeg = flowPhase * 360f,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 6.dp)
+                        .size(16.dp)
+                )
+                OrigamiSpinningPinwheelIcon(
+                    rotationDeg = -flowPhase * 360f,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 6.dp)
+                        .size(16.dp)
+                )
+            }
+
+            // Center Label + Fever Move Star Pips
+            Text(
+                text = when {
+                    isBursting && burstT < 0.45f -> "★ FULL CHARGE! ORIGAMI FEVER IGNITED! 2x SCORE! ★"
+                    isFever -> {
+                        val pips = "★".repeat(feverMovesLeft.coerceIn(1, 5))
+                        "$pips ORIGAMI FEVER 2x SCORE! ($feverMovesLeft MOVES) $pips"
+                    }
+                    isNearFull -> "⚡ ALMOST FEVER! (${(feverCharge * 100).toInt()}%) • ${mechanicLabel.uppercase()}"
+                    streakCount >= 2 -> "HOT STREAK x$streakCount • ${mechanicLabel.uppercase()}"
+                    mechanicLabel.isNotBlank() -> mechanicLabel.uppercase()
+                    else -> "FEVER METER • MATCH 4+ FOR LINE CUTTER!"
+                },
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontSize = if (isFever || isBursting) 11.sp else 10.5.sp,
+                    fontWeight = FontWeight.Black
+                ),
+                color = if (isFever || isBursting) PeppermintWhite else InkBrown,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+private fun OrigamiSpinningPinwheelIcon(
+    rotationDeg: Float,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier) {
+        val cx = size.width * 0.5f
+        val cy = size.height * 0.5f
+        val r = size.minDimension * 0.46f
+        val bladeColors = listOf(
+            StarCardboardGold,
+            PeppermintWhite,
+            StickyNoteYellow,
+            OrigamiFoxOrange
         )
-        Text(
-            text = when {
-                isFever -> "★ ORIGAMI FEVER 2x SCORE! ($feverMovesLeft MOVES) ★"
-                streakCount >= 2 -> "HOT STREAK x$streakCount • ${mechanicLabel.uppercase()}"
-                mechanicLabel.isNotBlank() -> mechanicLabel.uppercase()
-                else -> "FEVER METER • MATCH 4+ FOR LINE CUTTER!"
-            },
-            style = MaterialTheme.typography.labelLarge.copy(
-                fontSize = 10.5.sp,
-                fontWeight = FontWeight.Bold
-            ),
-            color = if (isFever) PeppermintWhite else InkBrown,
-            maxLines = 1
-        )
+        rotate(degrees = rotationDeg, pivot = Offset(cx, cy)) {
+            for (i in 0 until 4) {
+                rotate(degrees = i * 90f, pivot = Offset(cx, cy)) {
+                    val blade = Path().apply {
+                        moveTo(cx, cy)
+                        lineTo(cx + r * 0.45f, cy - r * 0.25f)
+                        lineTo(cx + r, cy)
+                        lineTo(cx + r * 0.35f, cy + r * 0.35f)
+                        close()
+                    }
+                    drawPath(path = blade, color = bladeColors[i])
+                }
+            }
+            drawCircle(
+                color = PeppermintRed,
+                radius = r * 0.24f,
+                center = Offset(cx, cy)
+            )
+        }
     }
 }
 

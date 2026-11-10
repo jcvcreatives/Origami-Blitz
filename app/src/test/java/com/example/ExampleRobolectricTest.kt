@@ -53,4 +53,17 @@ class ExampleRobolectricTest {
         assertTrue(matches.contains(GridPos(0, 2)))
         assertTrue(matches.contains(GridPos(0, 3)))
     }
+
+    @Test
+    fun paperCraftCrush_all50LevelsHaveClearStageRulesAndFriendlyMoves() {
+        for (lvl in 1..com.example.model.TOTAL_LEVELS) {
+            val stage = com.example.model.getStageInfoForLevel(lvl)
+            val blueprint = com.example.model.getLevelBlueprint(lvl)
+            assertTrue(stage.easyRuleBadge.isNotBlank())
+            assertTrue(blueprint.mechanicLabel.isNotBlank())
+            assertTrue(blueprint.moves in 27..34)
+            assertTrue(blueprint.primaryGoal.targetCount in 10..22)
+        }
+    }
 }
+
