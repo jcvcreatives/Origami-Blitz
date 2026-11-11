@@ -80,6 +80,15 @@ data class FloatingScorePopup(
     val comboMultiplier: Int = 1
 )
 
+data class FeverParticleBurst(
+    val id: Long,
+    val row: Float,
+    val col: Float,
+    val primaryColor: Color,
+    val secondaryColor: Color,
+    val comboTier: Int = 1
+)
+
 enum class BoosterType(
     val title: String,
     val actionLabel: String
@@ -536,6 +545,9 @@ data class PaperGameState(
     val feverCharge: Float = 0f,
     val feverMovesLeft: Int = 0,
     val feverBurstSeq: Long = 0L,
+    val feverShakeSeq: Long = 0L,
+    val feverShakeIntensity: Float = 0f,
+    val feverParticleBursts: List<FeverParticleBurst> = emptyList(),
     val boardPunchSeq: Long = 0L,
     val boardPunchStrength: Float = 0f,
     val floatingPopups: List<FloatingScorePopup> = emptyList(),

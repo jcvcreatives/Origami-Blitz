@@ -72,6 +72,7 @@ import androidx.compose.ui.zIndex
 import com.example.R
 import com.example.model.BOARD_SIZE
 import com.example.model.BoardTile
+import com.example.model.FeverParticleBurst
 import com.example.model.FloatingScorePopup
 import com.example.model.GameStatus
 import com.example.model.GridPos
@@ -138,7 +139,7 @@ fun PaperCardboardBoard(
         label = "shared_wave"
     )
 
-    // Subtle, non-dizzying board pulse on big matches (no vertical shaking or tilt drift)
+    // Subtle, non-dizzying board pulse on normal matches
     val boardPunchAnim = remember { Animatable(0f) }
     LaunchedEffect(state.boardPunchSeq) {
         if (state.boardPunchSeq > 0L && state.boardPunchStrength > 0f) {
@@ -154,13 +155,31 @@ fun PaperCardboardBoard(
         }
     }
 
+    // High-energy Fever Mode Screen-Shake specifically when matches are made during Fever Mode
+    val feverShakeAnim = remember { Animatable(0f) }
+    LaunchedEffect(state.feverShakeSeq) {
+        if (state.feverShakeSeq > 0L) {
+            feverShakeAnim.snapTo(1f)
+            feverShakeAnim.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing)
+            )
+        }
+    }
+
     Box(
         modifier = modifier
             .graphicsLayer {
                 val punchVal = boardPunchAnim.value
-                val punchScale = 1f + (punchVal * 0.012f)
+                val shakeDecay = feverShakeAnim.value
+                val shakePhase = (1f - shakeDecay) * (PI.toFloat() * 10f)
+                val shakeAmpPx = shakeDecay * state.feverShakeIntensity.coerceIn(0.8f, 1.75f) * 9.5f.dp.toPx()
+                val punchScale = 1f + (punchVal * 0.012f) + (shakeDecay * 0.018f)
                 scaleX = punchScale
                 scaleY = punchScale
+                translationX = sin(shakePhase * 1.3f) * shakeAmpPx
+                translationY = cos(shakePhase * 1.7f) * shakeAmpPx * 0.82f
+                rotationZ = sin(shakePhase) * shakeDecay * state.feverShakeIntensity * 1.45f
             }
             .aspectRatio(1f)
             .shadow(if (isFever || activeCombo >= 2) 14.dp else 10.dp, outerShape)
@@ -311,6 +330,16 @@ fun PaperCardboardBoard(
                     sharedWaveState = sharedWaveState,
                     modifier = Modifier.zIndex(21f)
                 )
+            }
+
+            // Colored Particle Burst Overlays specifically during Fever Mode matches
+            state.feverParticleBursts.forEach { burst ->
+                key(burst.id) {
+                    FeverParticleBurstOverlay(
+                        burst = burst,
+                        cellSize = cellSize
+                    )
+                }
             }
 
             // Floating Score Popups right over matched cells
@@ -482,6 +511,152 @@ private fun FloatingScoreBadge(
             ),
             color = if (mult >= 3) PeppermintWhite else InkBrown
         )
+    }
+}
+
+/**
+ * High-intensity colored particle burst & shockwave overlay rendered specifically during Fever Mode
+ * when matches are made. Emits dual colored shockwave rings, radial sunburst rays, and 16 spinning
+ * colored origami stars/diamonds from the matched cluster center.
+ */
+@Composable
+private fun FeverParticleBurstOverlay(
+    burst: FeverParticleBurst,
+    cellSize: Dp
+) {
+    val density = LocalDensity.current
+    val cellPx = with(density) { cellSize.toPx() }
+    val progress = remember(burst.id) { Animatable(0f) }
+
+    LaunchedEffect(burst.id) {
+        progress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 640, easing = FastOutSlowInEasing)
+        )
+    }
+
+    Canvas(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(24f)
+    ) {
+        val p = progress.value
+        if (p <= 0.005f || p >= 0.995f) return@Canvas
+
+        val fade = (1f - p).coerceIn(0f, 1f)
+        val cx = (burst.col + 0.5f) * cellPx
+        val cy = (burst.row + 0.5f) * cellPx
+        val tierBoost = (burst.comboTier - 1).coerceIn(0, 4)
+        val maxRadius = cellPx * (2.35f + tierBoost * 0.32f)
+
+        // 1. Chromatic Fever Edge Glow Flash on initial impact
+        if (p < 0.42f) {
+            val rimAlpha = ((0.42f - p) / 0.42f) * 0.48f
+            drawRect(
+                color = burst.primaryColor.copy(alpha = rimAlpha),
+                style = Stroke(width = cellPx * 0.24f)
+            )
+        }
+
+        // 2. Dual Expanding Colored Shockwave Rings
+        val ring1R = cellPx * 0.28f + maxRadius * p
+        val ring2R = cellPx * 0.15f + maxRadius * (p * 0.76f)
+        drawCircle(
+            color = burst.primaryColor.copy(alpha = fade * 0.85f),
+            radius = ring1R,
+            center = Offset(cx, cy),
+            style = Stroke(width = (cellPx * 0.14f * fade).coerceAtLeast(2f))
+        )
+        drawCircle(
+            color = burst.secondaryColor.copy(alpha = fade * 0.90f),
+            radius = ring2R,
+            center = Offset(cx, cy),
+            style = Stroke(width = (cellPx * 0.09f * fade).coerceAtLeast(1.5f))
+        )
+        if (p < 0.35f) {
+            val coreAlpha = ((0.35f - p) / 0.35f) * 0.55f
+            drawCircle(
+                color = StickyNoteYellow.copy(alpha = coreAlpha),
+                radius = cellPx * (0.45f + p * 1.1f),
+                center = Offset(cx, cy)
+            )
+        }
+
+        // 3. 12 Radial Colored Speed-Line Sunburst Rays
+        val rayCount = 12
+        for (i in 0 until rayCount) {
+            val angle = (i * (2.0 * PI / rayCount) + (burst.id % 7) * 0.18).toFloat()
+            val cA = cos(angle)
+            val sA = sin(angle)
+            val innerD = maxRadius * (0.18f + p * 0.48f)
+            val outerD = maxRadius * (0.42f + p * 0.96f)
+            val rayColor = when (i % 3) {
+                0 -> burst.primaryColor
+                1 -> StickyNoteYellow
+                else -> burst.secondaryColor
+            }
+            drawLine(
+                color = rayColor.copy(alpha = fade * 0.88f),
+                start = Offset(cx + cA * innerD, cy + sA * innerD),
+                end = Offset(cx + cA * outerD, cy + sA * outerD),
+                strokeWidth = (cellPx * 0.075f * fade).coerceAtLeast(1.5f)
+            )
+        }
+
+        // 4. 16 High-Velocity Colored Origami Star & Diamond Burst Particles
+        val particleCount = 16
+        val easeOut = 1f - (1f - p) * (1f - p)
+        for (i in 0 until particleCount) {
+            val seed = (burst.id.toInt() * 31 + i * 17) and 0x7FFFFFFF
+            val angle = ((i.toFloat() / particleCount) * (2f * PI.toFloat())) + ((seed % 19) - 9) * 0.035f
+            val speedFactor = 0.58f + ((seed % 11) / 10f) * 0.68f
+            val dist = maxRadius * easeOut * speedFactor
+            val px = cx + cos(angle) * dist
+            val py = cy + sin(angle) * dist + (p * p * cellPx * 0.32f) // subtle gravity arc
+            val sizePx = cellPx * (0.19f + (i % 3) * 0.045f) * (0.35f + fade * 0.75f)
+            val spin = angle + p * (if (i % 2 == 0) 4.2f else -4.2f)
+
+            val pColor = when (i % 4) {
+                0 -> burst.primaryColor
+                1 -> burst.secondaryColor
+                2 -> StickyNoteYellow
+                else -> PeppermintRed
+            }
+
+            val path = Path()
+            if (i % 2 == 0) {
+                // 4-point Origami Star Shard
+                for (pt in 0 until 8) {
+                    val r = if (pt % 2 == 0) sizePx else sizePx * 0.42f
+                    val a = spin + (pt * PI / 4.0).toFloat()
+                    val vx = px + cos(a) * r
+                    val vy = py + sin(a) * r
+                    if (pt == 0) path.moveTo(vx, vy) else path.lineTo(vx, vy)
+                }
+                path.close()
+            } else {
+                // Folded Origami Diamond Shard
+                val c0 = cos(spin)
+                val s0 = sin(spin)
+                val pX = -s0
+                val pY = c0
+                path.moveTo(px + c0 * sizePx * 1.15f, py + s0 * sizePx * 1.15f)
+                path.lineTo(px + pX * sizePx * 0.68f, py + pY * sizePx * 0.68f)
+                path.lineTo(px - c0 * sizePx * 1.15f, py - s0 * sizePx * 1.15f)
+                path.lineTo(px - pX * sizePx * 0.68f, py - pY * sizePx * 0.68f)
+                path.close()
+            }
+
+            drawPath(
+                path = path,
+                color = pColor.copy(alpha = fade * 0.96f)
+            )
+            drawPath(
+                path = path,
+                color = InkBrown.copy(alpha = fade * 0.72f),
+                style = Stroke(width = 1.5f)
+            )
+        }
     }
 }
 

@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -226,14 +227,38 @@ fun PaperCraftCrushApp(
 
         // 2. Auth Gate: Only mount active gameplay board when authenticated (Google Sign-In or Account/GM Login)
         if (!isHomeAuthVisible) {
+            val feverScreenShake = remember { androidx.compose.animation.core.Animatable(0f) }
+            LaunchedEffect(state.feverShakeSeq) {
+                if (state.feverShakeSeq > 0L) {
+                    feverScreenShake.snapTo(1f)
+                    feverScreenShake.animateTo(
+                        targetValue = 0f,
+                        animationSpec = androidx.compose.animation.core.tween(
+                            durationMillis = 360,
+                            easing = androidx.compose.animation.core.FastOutSlowInEasing
+                        )
+                    )
+                }
+            }
+
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.safeDrawing)
                     .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .graphicsLayer {
+                        val shakeDecay = feverScreenShake.value
+                        if (shakeDecay > 0.001f) {
+                            val phase = (1f - shakeDecay) * (kotlin.math.PI.toFloat() * 10f)
+                            val ampPx = shakeDecay * state.feverShakeIntensity.coerceIn(0.8f, 1.75f) * 6.5f.dp.toPx()
+                            translationX = kotlin.math.sin(phase * 1.35f) * ampPx
+                            translationY = kotlin.math.cos(phase * 1.75f) * ampPx * 0.85f
+                            rotationZ = kotlin.math.sin(phase) * shakeDecay * state.feverShakeIntensity * 0.75f
+                        }
+                    }
             ) {
-                val isLandscape = maxWidth > maxHeight * 1.12f
                 val hudParallaxModifier = Modifier
+                val isLandscape = maxWidth > maxHeight * 1.12f && maxHeight < 560.dp
 
                 if (isLandscape) {
                     Row(

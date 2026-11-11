@@ -9,6 +9,7 @@ import com.example.model.BoardTile
 import com.example.model.BoosterType
 import com.example.model.ConfettiDepthLayer
 import com.example.model.ConfettiScrap
+import com.example.model.FeverParticleBurst
 import com.example.model.FloatingScorePopup
 import com.example.model.GameStatus
 import com.example.model.GridPos
@@ -1426,6 +1427,7 @@ class PaperCrushViewModel(
     ) {
         if (clearedTiles.isEmpty() && goldCollected == 0 && tapeCleared == 0) return
         val popupId = nextPopupId++
+        val createdBurstIds = mutableListOf<Long>()
 
         _uiState.update { state ->
             val primaryHits = clearedTiles.count { it.type == state.goal.targetPiece }
@@ -1462,6 +1464,35 @@ class PaperCrushViewModel(
                 state.feverBurstSeq
             }
 
+            // Screen-shake effect & colored particle burst overlays specifically during Fever Mode
+            val isFeverMatchIntensity = isFeverActive || triggeredNewFever
+            val nextFeverShakeSeq = if (isFeverMatchIntensity) nextPunchSeq++ else state.feverShakeSeq
+            val nextFeverShakeIntensity = if (isFeverMatchIntensity) {
+                (0.95f + (comboStep * 0.25f) + (if (triggeredNewFever) 0.35f else 0f)).coerceIn(0.95f, 1.75f)
+            } else {
+                state.feverShakeIntensity
+            }
+            val newFeverBursts = if (isFeverMatchIntensity && clearedTiles.isNotEmpty()) {
+                clearedTiles
+                    .groupBy { it.type }
+                    .entries
+                    .take(4)
+                    .map { (pieceType, groupTiles) ->
+                        val bId = nextPopupId++
+                        createdBurstIds.add(bId)
+                        FeverParticleBurst(
+                            id = bId,
+                            row = groupTiles.map { it.row }.average().toFloat(),
+                            col = groupTiles.map { it.col }.average().toFloat(),
+                            primaryColor = pieceType.primaryColor,
+                            secondaryColor = pieceType.secondaryColor,
+                            comboTier = comboStep.coerceAtLeast(if (triggeredNewFever) 3 else 2)
+                        )
+                    }
+            } else {
+                emptyList()
+            }
+
             val avgRow = if (clearedTiles.isNotEmpty()) clearedTiles.map { it.row }.average().toFloat() else 3f
             val avgCol = if (clearedTiles.isNotEmpty()) clearedTiles.map { it.col }.average().toFloat() else 3f
             val bang = "!".repeat(comboStep.coerceIn(1, 4))
@@ -1492,8 +1523,11 @@ class PaperCrushViewModel(
                 feverCharge = nextCharge,
                 feverMovesLeft = nextFeverMoves,
                 feverBurstSeq = nextFeverBurstSeq,
-                boardPunchSeq = if (triggeredNewFever) nextPunchSeq++ else state.boardPunchSeq,
-                boardPunchStrength = if (triggeredNewFever) 1.0f else state.boardPunchStrength,
+                feverShakeSeq = nextFeverShakeSeq,
+                feverShakeIntensity = nextFeverShakeIntensity,
+                feverParticleBursts = (state.feverParticleBursts + newFeverBursts).takeLast(8),
+                boardPunchSeq = if (triggeredNewFever || isFeverActive) nextPunchSeq++ else state.boardPunchSeq,
+                boardPunchStrength = if (triggeredNewFever || isFeverActive) 1.25f else state.boardPunchStrength,
                 comboBannerText = if (triggeredNewFever) "★ ORIGAMI FEVER IGNITED! 2x SCORE! ★" else state.comboBannerText,
                 floatingPopups = (state.floatingPopups + popup).takeLast(6),
                 goal = state.goal.copy(collectedCount = state.goal.collectedCount + primaryHits),
@@ -1506,7 +1540,14 @@ class PaperCrushViewModel(
         viewModelScope.launch {
             delay(760)
             _uiState.update { st ->
-                st.copy(floatingPopups = st.floatingPopups.filterNot { it.id == popupId })
+                st.copy(
+                    floatingPopups = st.floatingPopups.filterNot { it.id == popupId },
+                    feverParticleBursts = if (createdBurstIds.isEmpty()) {
+                        st.feverParticleBursts
+                    } else {
+                        st.feverParticleBursts.filterNot { it.id in createdBurstIds }
+                    }
+                )
             }
         }
     }
@@ -2388,16 +2429,18 @@ class PaperCrushViewModel(
         isRegister: Boolean
     ): String? {
         val cleanUser = username.trim()
-        if (cleanUser.length < 2) {
-            return "Please enter a username (at least 2 characters)."
+        val cleanPass = password.trim()
+        if (cleanUser.length < 3) {
+            return "Please enter a valid username (at least 3 characters)."
         }
-        if (password.length < 3) {
-            return "Please enter a password (at least 3 characters)."
+        if (cleanPass.length < 4) {
+            return "Please enter a valid password (at least 4 characters)."
         }
 
         // Built-in GM Account check: username "jcv" and password "jan27"
         if (cleanUser.equals(GM_USERNAME, ignoreCase = true)) {
-            if (password != GM_PASSWORD) {
+            if (!cleanPass.equals(GM_PASSWORD, ignoreCase = true)) {
+                soundSynth.playInvalidShake()
                 return "Invalid GM password for 'jcv'."
             }
             soundSynth.playFeverFanfare()
@@ -2428,17 +2471,22 @@ class PaperCrushViewModel(
         // Standard Username & Password Account
         val accountsMap = loadSavedAccountsMap().toMutableMap()
         val keyLower = cleanUser.lowercase()
+        val existingPass = accountsMap[keyLower]
         if (isRegister) {
-            accountsMap[keyLower] = password
+            if (existingPass != null) {
+                soundSynth.playInvalidShake()
+                return "Account '$cleanUser' already exists. Switch to 'Log In'!"
+            }
+            accountsMap[keyLower] = cleanPass
             saveAccountsMap(accountsMap)
         } else {
-            val existingPass = accountsMap[keyLower]
-            if (existingPass != null && existingPass != password) {
-                return "Incorrect password for '$cleanUser'."
-            }
             if (existingPass == null) {
-                accountsMap[keyLower] = password
-                saveAccountsMap(accountsMap)
+                soundSynth.playInvalidShake()
+                return "Account '$cleanUser' is not registered. Tap 'Create Account' first!"
+            }
+            if (existingPass != cleanPass) {
+                soundSynth.playInvalidShake()
+                return "Incorrect password for '$cleanUser'."
             }
         }
 
@@ -2790,6 +2838,6 @@ class PaperCrushViewModel(
         private const val KEY_ACTIVE_USERNAME = "active_username"
         private const val KEY_IS_AUTHENTICATED = "is_authenticated_session"
         private const val KEY_IS_GM = "is_gm_account"
-        private const val KEY_ACCOUNTS_MAP = "registered_accounts_map"
+        private const val KEY_ACCOUNTS_MAP = "registered_accounts_map_v2"
     }
 }
